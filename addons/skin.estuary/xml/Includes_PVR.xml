@@ -410,4 +410,135 @@
 			</control>
 		</definition>
 	</include>
+	<include name="PVRProgressBar">
+	  <param name="id">410</param>
+	  <param name="bwidth">100%</param>
+	  <param name="bheight">15</param>
+	  <!-- for tries -->
+	  <param name="tpos">50%</param> 
+      <definition>
+        <control type="group" id="$PARAM[id]">
+		    <visible>!Player.ChannelPreviewActive</visible>
+            <animation effect="fade" time="300">VisibleChange</animation>
+		    <!-- <left>0</left>
+            <top>0</top> -->
+            <width>$PARAM[bwidth]</width>
+            <height>$PARAM[bheight]</height>
+			<control type="group">
+                <visible>VideoPlayer.HasEpg</visible>
+				<control type="group">
+				    <visible>PVR.IsTimeShift</visible>
+					<control type="progress">
+                        <!-- <width>$PARAM[bwidth]</width>
+                        <height>$PARAM[bheight]</height> -->
+                        <info>PVR.TimeshiftEndProgress</info>
+                        <texturebg border="3" colordiffuse="60FFFFFF">colors/white50.png</texturebg>
+                        <midtexture>colors/white50.png</midtexture>
+                    </control>
+					<!-- <control type="progress">
+                        <info>PVR.EpgEventProgress</info>
+                        <texturebg border="3" colordiffuse="60FFFFFF">colors/white50.png</texturebg>
+                        <midtexture>colors/white50.png</midtexture>
+                    </control> -->				
+                    <control type="progress">
+					    <!-- <width>$PARAM[bwidth]</width>
+                        <height>$PARAM[bheight]</height> -->
+                		<!-- <info>PVR.TimeshiftEventProgress</info> -->
+						<info>PVR.EpgEventProgress</info>
+                		<texturebg border="3" colordiffuse="00FFFFFF">colors/white50.png</texturebg>
+                        <midtexture colordiffuse="button_focus">colors/white.png</midtexture>
+                    </control>
+					<control type="slider" id="401">
+					    <!-- <width>$PARAM[bwidth]</width>
+                        <height>$PARAM[bheight]</height> -->
+                		<left>3</left>
+                		<texturesliderbar colordiffuse="00FFFFFF">osd/progress/nub_bar.png</texturesliderbar>
+                		<textureslidernib colordiffuse="white">osd/progress/nub_bar.png</textureslidernib>
+                		<textureslidernibfocus colordiffuse="white">colors/white.png</textureslidernibfocus>
+                    </control>
+					<control type="progress">
+					    <!-- <width>$PARAM[bwidth]</width>
+                        <height>$PARAM[bheight]</height> -->
+                        <info>PVR.TimeshiftStartProgress</info>
+                        <texturebg border="0" colordiffuse="00FFFFFF">colors/white50.png</texturebg>
+                        <midtexture>colors/white50.png</midtexture>
+                    </control>
+			        <control type="group">
+			            <visible>PVR.HasTimeshiftBeforeEvent</visible>
+                        <control type="image">
+                    	    <width>$PARAM[bheight]</width>
+                    	    <height>$PARAM[bheight]</height>
+							<align>left</align>
+                    	    <texture border="0" colordiffuse="black" flipy="false" flipx="true">overlays/arrowright.png</texture>
+                        </control>
+			    	    <control type="label">
+                            <top>19</top>
+                            <left>10</left>
+                            <height>20</height>
+                            <align>left</align>
+                            <aligny>center</aligny>
+                            <font>font12</font>
+                            <label>[COLOR grey]$INFO[PVR.TimeshiftBeforeEventTime,-][/COLOR]</label>
+                        </control>
+			        </control>
+			        <control type="group">
+			            <visible>PVR.HasTimeshiftAfterEvent</visible>
+			        	<control type="image">
+                            <right>0</right>
+                            <width>$PARAM[bheight]</width>
+                            <height>$PARAM[bheight]</height>
+							<align>left</align>
+                            <texture border="0" colordiffuse="black" flipy="false" flipx="false">overlays/arrowright.png</texture>
+			            </control>
+                        <control type="label">
+                            <bottom>-5</bottom>
+                            <right>10</right>
+                            <height>-20</height>
+                            <align>right</align>
+                            <aligny>center</aligny>
+                            <font>font12</font>
+                            <label>[COLOR grey]$INFO[PVR.TimeshiftAfterEventTime,+][/COLOR]</label>
+						</control>
+                    </control>
+			    </control>
+				<control type="progress">
+				    <visible>!PVR.IsTimeshift</visible>
+					<!-- <width>$PARAM[bwidth]</width>
+                    <height>$PARAM[bheight]</height> -->
+                    <info>PVR.EpgEventProgress</info>
+                    <texturebg border="3" colordiffuse="60FFFFFF">colors/white50.png</texturebg>
+                    <midtexture colordiffuse="button_focus">colors/white.png</midtexture>
+                </control>
+            </control>
+			<control type="progress">
+			    <visible>!VideoPlayer.HasEpg</visible>
+			    <!-- <width>$PARAM[bwidth]</width>
+                <height>$PARAM[bheight]</height> -->
+			    <info>Player.Progress</info>
+			    <texturebg border="3" colordiffuse="60FFFFFF">colors/white50.png</texturebg>
+			    <midtexture colordiffuse="button_focus">colors/white.png</midtexture>
+			</control> 
+			<control type="label">
+                <!-- <visible>PVR.IsPlayingTv || PVR.IsPlayingRadio</visible> -->
+                <top>-35</top>
+                <left>10</left>
+                <height>30</height>
+                <align>left</align>
+                <aligny>center</aligny>
+                <font>font30</font>
+                <!-- <label>$INFO[PVR.EpgEventStartTime]</label> -->
+                <label>$INFO[VideoPlayer.Start-Time]</label>
+            </control>
+            <control type="label">
+                <top>-35</top>
+                <right>10</right>
+                <height>30</height>
+                <align>right</align>
+                <aligny>center</aligny>
+                <font>font30</font>
+                <label>$INFO[VideoPlayer.EndTime]</label>
+            </control>
+        </control>
+      </definition>
+	</include>
 </includes>

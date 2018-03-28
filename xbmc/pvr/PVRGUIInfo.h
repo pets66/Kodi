@@ -93,6 +93,21 @@ namespace PVR
     int GetElapsedTime(void) const;
 
     /*!
+     * @brief PS_try: Get the position the TimeshiftBuffer starts relative to the start of the 
+     * running live TV event in milliseconds 
+     * @return The relative position in milliseconds or NULL if no EPG data.
+     */ 
+    int TimeshiftStartOffset(void) const;
+    int TimeshiftBeforeEventTime(void) const;
+    int TimeshiftAfterEventTime(void) const;
+    bool HasTimeshiftBeforeEvent(void) const;
+    bool HasTimeshiftAfterEvent(void) const;
+    float TimeshiftStartPercent(void) const;
+    float TimeshiftEndPercent(void) const;
+    float TimeshiftPlayPercent(void) const;
+    float PlayPercent(const CFileItem *item) const;
+
+    /*!
      * @brief Clear the playing EPG tag.
      */
     void ResetPlayingTag(void);
@@ -242,6 +257,9 @@ namespace PVR
 
     int GetRemainingTime(const CFileItem *item) const;
 
+    void CharInfoTimeshiftBeforeEventTime(std::string &strValue) const;
+    void CharInfoTimeshiftAfterEventTime(std::string &strValue) const;
+    void UpdateInfos(void);
     /** @name GUIInfoManager data */
     //@{
     AnyTimerInfo   m_anyTimersInfo; // tv + radio
@@ -289,6 +307,14 @@ namespace PVR
     time_t                          m_iTimeshiftEndTime;
     time_t                          m_iTimeshiftPlayTime;
     unsigned int                    m_iTimeshiftOffset;
+
+    unsigned int                    m_iTimeshiftStartOffset;
+    unsigned int                    m_iTimeshiftBeforeEventTime;
+    unsigned int                    m_iTimeshiftAfterEventTime;
+    bool                            m_bHasTimeshiftBeforeEvent;
+    bool                            m_bHasTimeshiftAfterEvent;
+    std::string                     m_strTimeshiftBeforeEventTime;
+    std::string                     m_strTimeshiftAfterEventTime;
 
     CCriticalSection                m_critSection;
 

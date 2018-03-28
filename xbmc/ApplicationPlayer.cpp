@@ -23,7 +23,7 @@
 #include "cores/IPlayer.h"
 #include "cores/playercorefactory/PlayerCoreFactory.h"
 #include "guilib/GUIWindowManager.h"
-#include "cores/DataCacheCore.h"
+//#include "cores/DataCacheCore.h"
 #include "Application.h"
 #include "PlayListPlayer.h"
 #include "ServiceBroker.h"

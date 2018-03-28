@@ -318,7 +318,7 @@ CUPnPRenderer::UpdateState()
         avt->SetStateVariable("NumberOfTracks", "1");
         avt->SetStateVariable("CurrentTrack", "1");
 
-        std::string buffer = g_infoManager.GetCurrentPlayTime(TIME_FORMAT_HH_MM_SS);
+        std::string buffer = g_infoManager.GetPlayTimeLabel(TIME_FORMAT_HH_MM_SS);
         avt->SetStateVariable("RelativeTimePosition", buffer.c_str());
         avt->SetStateVariable("AbsoluteTimePosition", buffer.c_str());
 

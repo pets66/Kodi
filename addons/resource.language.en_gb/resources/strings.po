@@ -21595,3 +21595,14 @@ msgstr ""
 msgctxt "#39109"
 msgid "Select Program"
 msgstr ""
+
+#: system/settings/setings.xml
+msgctxt "#39110"
+msgid "Unmute on volume change"
+msgstr ""
+
+#. Description of setting "System -> Audio output -> Unmute on volume change" with label #39110
+#: system/settings/settings.xml
+msgctxt "#39111"
+msgid "Whether to unmute if the volume is changed when muted."
+msgstr ""

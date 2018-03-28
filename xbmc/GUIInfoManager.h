@@ -141,13 +141,15 @@ public:
   const std::string GetMusicPlaylistInfo(const GUIInfo& info);
   std::string GetPictureLabel(int item);
 
-  int64_t GetPlayTime() const;  // in ms
-  std::string GetCurrentPlayTime(TIME_FORMAT format = TIME_FORMAT_GUESS) const;
-  std::string GetCurrentSeekTime(TIME_FORMAT format = TIME_FORMAT_GUESS) const;
+  int GetPlayTime() const;  // in s
+  std::string GetPlayTimeLabel(TIME_FORMAT format = TIME_FORMAT_GUESS) const;
+  std::string GetSeekTimeLabel(TIME_FORMAT format = TIME_FORMAT_GUESS) const;
   int GetPlayTimeRemaining() const;
   int GetTotalPlayTime() const;
+  float GetPlayPercent() const;
   float GetSeekPercent() const;
-  std::string GetCurrentPlayTimeRemaining(TIME_FORMAT format) const;
+  float GetCachePercent() const;
+  std::string GetPlayTimeRemainingLabel(TIME_FORMAT format) const;
   int GetEpgEventProgress() const;
   int GetEpgEventSeekPercent() const;
 

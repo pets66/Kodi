@@ -2387,6 +2387,11 @@
           </constraints>
           <control type="list" format="integer" />
         </setting>
+        <setting id="audiooutput.autounmute" type="boolean" label="39110" help="39111">
+          <level>2</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
         <setting id="audiooutput.maintainoriginalvolume" type="boolean" label="346" help="36533">
           <level>2</level>
           <default>true</default>

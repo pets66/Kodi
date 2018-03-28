@@ -831,6 +831,12 @@ void CDateTime::GetAsTime(time_t& time) const
   time=(time_t)((ll - UNIX_BASE_TIME) / 10000000);
 }
 
+time_t CDateTime::GetAsTime(void) const
+{
+  long long ll = (static_cast<long long>(m_time.dwHighDateTime) << 32) + m_time.dwLowDateTime;
+  return (time_t)((ll - UNIX_BASE_TIME) / 10000000);
+}
+
 void CDateTime::GetAsTm(tm& time) const
 {
   SYSTEMTIME st;

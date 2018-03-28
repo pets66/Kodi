@@ -2255,8 +2255,12 @@ bool CApplication::OnAction(const CAction &action)
   {
     if (!m_appPlayer.IsPassthrough())
     {
-      if (m_muted)
+      if (m_muted && m_ServiceManager->GetSettings().GetBool(CSettings::SETTING_AUDIOOUTPUT_AUTOUNMUTE))
+        { // allow to start from Volume 0 as could have been (to) loud when muted (/muted because to loud)
+          // if (action.GetID() == ACTION_VOLUME_UP)  //Should a related Setting be added to enable this behaviour?
+          //   SetVolume(0, false);
         UnMute();
+        }
       float volume = m_volumeLevel;
       int volumesteps = m_ServiceManager->GetSettings().GetInt(CSettings::SETTING_AUDIOOUTPUT_VOLUMESTEPS);
       // sanity check

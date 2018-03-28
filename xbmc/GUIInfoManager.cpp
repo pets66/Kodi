@@ -2137,6 +2137,7 @@ const infomap videoplayer[] =    {{ "title",            VIDEOPLAYER_TITLE },
                                   { "subtitlesenabled", VIDEOPLAYER_SUBTITLESENABLED },
                                   { "subtitleslanguage",VIDEOPLAYER_SUBTITLES_LANG },
                                   { "starttime",        VIDEOPLAYER_STARTTIME },
+                                  { "start-time",       VIDEOPLAYER_STARTTIME },
                                   { "endtime",          VIDEOPLAYER_ENDTIME },
                                   { "nexttitle",        VIDEOPLAYER_NEXT_TITLE },
                                   { "nextgenre",        VIDEOPLAYER_NEXT_GENRE },
@@ -4674,7 +4675,13 @@ const infomap pvr[] =            {{ "isrecording",              PVR_IS_RECORDING
                                   { "hasnonrecordingradiotimer",  PVR_HAS_NONRECORDING_RADIO_TIMER },
                                   { "channelnumberinput",         PVR_CHANNEL_NUMBER_INPUT },
                                   { "canrecordplayingchannel",    PVR_CAN_RECORD_PLAYING_CHANNEL },
-                                  { "isrecordingplayingchannel",  PVR_IS_RECORDING_PLAYING_CHANNEL }};
+                                  { "isrecordingplayingchannel",  PVR_IS_RECORDING_PLAYING_CHANNEL },
+  		 	                          { "timeshiftstartprogress",     PVR_TIMESHIFT_START_PROGRESS },
+                                  { "timeshiftendprogress",       PVR_TIMESHIFT_END_PROGRESS },                                 
+                                  { "hastimeshiftbeforeevent",    PVR_HAS_TIMESHIFT_BEFORE_EVENT },
+                                  { "hastimeshiftafterevent",     PVR_HAS_TIMESHIFT_AFTER_EVENT },
+                                  { "timeshiftbeforeeventtime",   PVR_TIMESHIFT_BEFORE_EVENT_TIME },
+                                  { "timeshiftaftereventtime",    PVR_TIMESHIFT_AFTER_EVENT_TIME }};
 
 /// \page modules__General__List_of_gui_access
 /// \section modules__General__List_of_gui_access_PvrTimes PvrTimes
@@ -6131,7 +6138,7 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
   case PVR_BACKEND_NUMBER:
   case PVR_TOTAL_DISKSPACE:
   case PVR_NEXT_TIMER:
-  case PVR_EPG_EVENT_PROGRESS:
+  //case PVR_EPG_EVENT_PROGRESS:
   case PVR_ACTUAL_STREAM_CLIENT:
   case PVR_ACTUAL_STREAM_DEVICE:
   case PVR_ACTUAL_STREAM_STATUS:
@@ -6169,6 +6176,8 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
   case PVR_RADIO_NEXT_RECORDING_CHANNEL:
   case PVR_RADIO_NEXT_RECORDING_CHAN_ICO:
   case PVR_RADIO_NEXT_RECORDING_DATETIME:
+  case PVR_TIMESHIFT_BEFORE_EVENT_TIME:
+  case PVR_TIMESHIFT_AFTER_EVENT_TIME:
     CServiceBroker::GetPVRManager().TranslateCharInfo(m_currentFile, info, strLabel);
     break;
   case PVR_CHANNEL_NUMBER_INPUT:
@@ -6225,7 +6234,7 @@ std::string CGUIInfoManager::GetLabel(int info, int contextWindow, std::string *
     }
     break;
   case PLAYER_TIME:
-    strLabel = GetCurrentPlayTime(TIME_FORMAT_HH_MM);
+    strLabel = GetPlayTimeLabel(TIME_FORMAT_HH_MM);
     break;
   case PLAYER_DURATION:
     strLabel = GetDuration(TIME_FORMAT_HH_MM);
@@ -6929,13 +6938,14 @@ bool CGUIInfoManager::GetInt(int &value, int info, int contextWindow, const CGUI
       value = g_application.GetAudioDelay();
       return true;
     case PLAYER_PROGRESS:
-      value = lrintf(g_application.GetPercentage());
+      //value = lrintf(g_application.GetPercentage());
+      value = std::lrintf(GetPlayPercent());
       return true;
     case PLAYER_PROGRESS_CACHE:
-      value = lrintf(g_application.GetCachePercentage());
+      value = std::lrintf(GetCachePercent());
       return true;
     case PLAYER_SEEKBAR:
-      value = lrintf(GetSeekPercent());
+      value = std::lrintf(GetSeekPercent());
       return true;
     case PLAYER_CACHELEVEL:
       value = g_application.GetAppPlayer().GetCacheLevel();
@@ -6980,6 +6990,8 @@ bool CGUIInfoManager::GetInt(int &value, int info, int contextWindow, const CGUI
     case PVR_ACTUAL_STREAM_SNR_PROGR:
     case PVR_BACKEND_DISKSPACE_PROGR:
     case PVR_TIMESHIFT_PROGRESS:
+    case PVR_TIMESHIFT_START_PROGRESS:
+    case PVR_TIMESHIFT_END_PROGRESS:
       value = CServiceBroker::GetPVRManager().TranslateIntInfo(m_currentFile, info);
       return true;
     case SYSTEM_BATTERY_LEVEL:
@@ -8160,11 +8172,11 @@ std::string CGUIInfoManager::GetMultiInfoLabel(const GUIInfo &info, int contextW
   }
   else if (info.m_info == PLAYER_TIME)
   {
-    return GetCurrentPlayTime((TIME_FORMAT)info.GetData1());
+    return GetPlayTimeLabel((TIME_FORMAT)info.GetData1());
   }
   else if (info.m_info == PLAYER_TIME_REMAINING)
   {
-    return GetCurrentPlayTimeRemaining((TIME_FORMAT)info.GetData1());
+    return GetPlayTimeRemainingLabel((TIME_FORMAT)info.GetData1());
   }
   else if (info.m_info == PLAYER_FINISH_TIME)
   {
@@ -8187,9 +8199,9 @@ std::string CGUIInfoManager::GetMultiInfoLabel(const GUIInfo &info, int contextW
     std::string strTime;
     float speed = g_application.GetAppPlayer().GetPlaySpeed();
     if (speed != 1.0)
-      strTime = StringUtils::Format("%s (%ix)", GetCurrentPlayTime((TIME_FORMAT)info.GetData1()).c_str(), (int)speed);
+      strTime = StringUtils::Format("%s (%ix)", GetPlayTimeLabel((TIME_FORMAT)info.GetData1()).c_str(), (int)speed);
     else
-      strTime = GetCurrentPlayTime();
+      strTime = GetPlayTimeLabel();
     return strTime;
   }
   else if (info.m_info == PLAYER_DURATION)
@@ -8198,7 +8210,7 @@ std::string CGUIInfoManager::GetMultiInfoLabel(const GUIInfo &info, int contextW
   }
   else if (info.m_info == PLAYER_SEEKTIME)
   {
-    return GetCurrentSeekTime((TIME_FORMAT)info.GetData1());
+    return GetSeekTimeLabel((TIME_FORMAT)info.GetData1());
   }
   else if (info.m_info == PVR_EPG_EVENT_SEEK_TIME)
   {
@@ -8481,7 +8493,8 @@ std::string CGUIInfoManager::GetDuration(TIME_FORMAT format) const
   }
   if (g_application.GetAppPlayer().IsPlayingVideo() && !m_currentMovieDuration.empty())
     return m_currentMovieDuration;
-  int iTotal = lrint(g_application.GetTotalTime());
+  //int iTotal = lrint(g_application.GetTotalTime());
+  int iTotal = lrint(GetTotalPlayTime());
   if (iTotal > 0)
     return StringUtils::SecondsToTimeString(iTotal, format);
   return "";
@@ -9119,36 +9132,51 @@ std::string CGUIInfoManager::GetGameLabel(int item)
   return "";
 }
 
-int64_t CGUIInfoManager::GetPlayTime() const
+int CGUIInfoManager::GetPlayTime() const 
 {
-  int64_t ret = lrint(g_application.GetTime() * 1000);
-  return ret;
+  //  int64_t ret = lrint(g_application.GetTime());
+  //  return ret;
+    
+   int playtime = m_currentFile->HasPVRChannelInfoTag() ? CServiceBroker::GetPVRManager().GetElapsedTime()
+                                                        : lrint(g_application.GetTime());
+   return playtime;
 }
 
-std::string CGUIInfoManager::GetCurrentPlayTime(TIME_FORMAT format) const
+std::string CGUIInfoManager::GetPlayTimeLabel(TIME_FORMAT format) const
 {
   if (format == TIME_FORMAT_GUESS && GetTotalPlayTime() >= 3600)
     format = TIME_FORMAT_HH_MM_SS;
-  return StringUtils::SecondsToTimeString(lrint(GetPlayTime()/1000.0), format);
+  return StringUtils::SecondsToTimeString(GetPlayTime(), format);
 }
 
-std::string CGUIInfoManager::GetCurrentSeekTime(TIME_FORMAT format) const
+std::string CGUIInfoManager::GetSeekTimeLabel(TIME_FORMAT format) const
 {
   if (format == TIME_FORMAT_GUESS && GetTotalPlayTime() >= 3600)
     format = TIME_FORMAT_HH_MM_SS;
-  return StringUtils::SecondsToTimeString(g_application.GetTime() + g_application.GetAppPlayer().GetSeekHandler().GetSeekSize(), format);
+  // return StringUtils::SecondsToTimeString(g_application.GetTime() + g_application.GetAppPlayer().GetSeekHandler().GetSeekSize(), format);
+  return StringUtils::SecondsToTimeString(GetPlayTime() + g_application.GetAppPlayer().GetSeekHandler().GetSeekSize(), format);
 }
 
 int CGUIInfoManager::GetTotalPlayTime() const
 {
-  int iTotalTime = lrint(g_application.GetTotalTime());
+  //int iTotalTime = lrint(g_application.GetTotalTime());
+  int iTotalTime = m_currentFile->HasPVRChannelInfoTag() ? CServiceBroker::GetPVRManager().GetTotalTime()
+                                                         : lrint(g_application.GetTotalTime());
+
   return iTotalTime;
 }
 
 int CGUIInfoManager::GetPlayTimeRemaining() const
 {
-  int iReverse = GetTotalPlayTime() - lrint(g_application.GetTime());
+  //int iReverse = GetTotalPlayTime() - lrint(g_application.GetTime());
+  int iReverse = GetTotalPlayTime() - GetPlayTime();
   return iReverse > 0 ? iReverse : 0;
+}
+
+float CGUIInfoManager::GetPlayPercent() const
+{
+  float percentage = static_cast<float>(GetPlayTime()) / GetTotalPlayTime() * 100;
+  return percentage;
 }
 
 float CGUIInfoManager::GetSeekPercent() const
@@ -9156,7 +9184,7 @@ float CGUIInfoManager::GetSeekPercent() const
   if (GetTotalPlayTime() == 0)
     return 0.0f;
 
-  float percentPlayTime = static_cast<float>(GetPlayTime()) / GetTotalPlayTime() * 0.1f;
+  float percentPlayTime = GetPlayPercent();
   float percentPerSecond = 100.0f / static_cast<float>(GetTotalPlayTime());
   float percent = percentPlayTime + percentPerSecond * g_application.GetAppPlayer().GetSeekHandler().GetSeekSize();
 
@@ -9168,7 +9196,15 @@ float CGUIInfoManager::GetSeekPercent() const
   return percent;
 }
 
-std::string CGUIInfoManager::GetCurrentPlayTimeRemaining(TIME_FORMAT format) const
+float CGUIInfoManager::GetCachePercent(void) const
+{
+  float fCachePercent = m_currentFile->HasPVRChannelInfoTag() ? CServiceBroker::GetPVRManager().TranslateIntInfo(m_currentFile, PVR_TIMESHIFT_END_PROGRESS)
+                                                              : g_application.GetCachePercentage();
+
+  return fCachePercent;
+}
+
+std::string CGUIInfoManager::GetPlayTimeRemainingLabel(TIME_FORMAT format) const
 {
   if (format == TIME_FORMAT_GUESS && GetTotalPlayTime() >= 3600)
     format = TIME_FORMAT_HH_MM_SS;
@@ -9178,27 +9214,27 @@ std::string CGUIInfoManager::GetCurrentPlayTimeRemaining(TIME_FORMAT format) con
   return "";
 }
 
-int CGUIInfoManager::GetEpgEventProgress() const
-{
-  return std::lrintf(static_cast<float>(CServiceBroker::GetPVRManager().GetElapsedTime()) / CServiceBroker::GetPVRManager().GetTotalTime() * 100.0f);
-}
+// int CGUIInfoManager::GetEpgEventProgress() const
+// {
+//   return std::lrintf(static_cast<float>(CServiceBroker::GetPVRManager().GetElapsedTime()) / CServiceBroker::GetPVRManager().GetTotalTime() * 100.0f);
+// }
 
-int CGUIInfoManager::GetEpgEventSeekPercent() const
-{
-  int seekSize = g_application.GetAppPlayer().GetSeekHandler().GetSeekSize();
-  if (seekSize != 0)
-  {
-    float elapsedTime = static_cast<float>(CServiceBroker::GetPVRManager().GetElapsedTime());
-    float totalTime = static_cast<float>(CServiceBroker::GetPVRManager().GetTotalTime());
-    float percentPerSecond = 100.0f / totalTime;
-    float percent = elapsedTime / totalTime * 100.0f + percentPerSecond * seekSize;
-    return std::lrintf(percent);
-  }
-  else
-  {
-    return GetEpgEventProgress();
-  }
-}
+// int CGUIInfoManager::GetEpgEventSeekPercent() const
+// {
+//   int seekSize = g_application.GetAppPlayer().GetSeekHandler().GetSeekSize();
+//   if (seekSize != 0)
+//   {
+//     float elapsedTime = static_cast<float>(CServiceBroker::GetPVRManager().GetElapsedTime());
+//     float totalTime = static_cast<float>(CServiceBroker::GetPVRManager().GetTotalTime());
+//     float percentPerSecond = 100.0f / totalTime;
+//     float percent = elapsedTime / totalTime * 100.0f + percentPerSecond * seekSize;
+//     return std::lrintf(percent);
+//   }
+//   else
+//   {
+//     return GetEpgEventProgress();
+//   }
+// }
 
 void CGUIInfoManager::ResetCurrentItem()
 {

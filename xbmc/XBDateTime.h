@@ -201,6 +201,7 @@ public:
   void GetAsTime(time_t& time) const;
   void GetAsTm(tm& time) const;
   void GetAsTimeStamp(FILETIME& time) const;
+  time_t GetAsTime(void) const;
 
   CDateTime GetAsUTCDateTime() const;
   std::string GetAsSaveString() const;

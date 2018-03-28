@@ -237,7 +237,7 @@
 		<value>$INFO[Container(9000).ListItem.Label2]</value>
 	</variable>
 	<variable name="VolumeIconVar">
-		<value condition="Player.Muted">dialogs/volume/mute.png</value>
+		<!-- <value condition="Player.Muted">dialogs/volume/mute.png</value> -->
 		<value condition="Integer.IsGreater(Player.Volume,66)">dialogs/volume/volume.png</value>
 		<value condition="Integer.IsGreater(Player.Volume,33)">dialogs/volume/volume2.png</value>
 		<value condition="player.passthrough">dialogs/volume/volume.png</value>
@@ -434,5 +434,29 @@
 	<variable name="MasterModeLabel">
 		<value condition="!System.IsMaster">$LOCALIZE[20045]</value>
 		<value>$LOCALIZE[20046]</value>
+	</variable>
+	<variable name="TimeRemaining">
+		<value condition="Videoplayer.HasEpg">$INFO[PVR.EpgEventRemainingTime]</value>
+		<value condition="!Videoplayer.FasEpg">$INFO[Player.TimeRemaining]</value>
+	</variable>
+	<variable name="BufferPercentage">
+		<value condition="Videoplayer.HasEpg">$INFO[PVR.TimeshiftEndProgress]</value>
+		<value>$INFO[Player.ProgressCache]</value>
+	</variable>
+	<variable name="PlayPercentage">
+		<value condition="Videoplayer.HasEpg">$INFO[PVR.EpgEventProgress]</value>
+		<value>$INFO[Player.Progress]</value>
+	</variable>
+	<!-- <variable name="ViewPercentage">
+		<value condition="PVR.IsPlaying">$INFO[PVR.EventViewPercentage]</value>
+		<value>$INFO[Player.MaxProgress]</value>
+	</variable> -->
+	<variable name="PVRSeekStart">
+		<value condition="PVR.IsTimeshift">$INFO[PVR.TimeshiftStartProgress]%</value>
+		<value condition="!PVR.IsTimeshift">10%</value>
+	</variable>
+	<variable name="PVRSeekEnd">
+		<value condition="PVR.IsTimeshift">$INFO[PVR.TimeshiftEndProgress]%</value>
+		<value condition="!PVR.IsTimeshift">10%</value>
 	</variable>
 </includes>

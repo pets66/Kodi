@@ -172,6 +172,10 @@ void CPVRGUIInfo::Process(void)
       UpdateNextTimer();
     Sleep(0);
 
+    if (!m_bStop)
+      UpdateInfos();
+    Sleep(0);
+
     // Update the backend cache every toggleInterval seconds
     if (!m_bStop && mLoop % toggleInterval == 0)
       UpdateBackendCache();
@@ -290,7 +294,7 @@ void CPVRGUIInfo::UpdateTimeshift(void)
   m_iStartTime = iStartTime;
   m_iTimeshiftStartTime = iStartTime + iMinTime;
   m_iTimeshiftEndTime = iStartTime + iMaxTime;
-
+  
   if (m_iTimeshiftEndTime > m_iTimeshiftStartTime)
   {
     // timeshifting supported
@@ -452,6 +456,12 @@ bool CPVRGUIInfo::TranslateCharInfo(const CFileItem *item, DWORD dwInfo, std::st
   case PVR_TOTAL_DISKSPACE:
     CharInfoTotalDiskSpace(strValue);
     break;
+  case PVR_TIMESHIFT_BEFORE_EVENT_TIME:
+    CharInfoTimeshiftBeforeEventTime(strValue);
+    break;
+  case PVR_TIMESHIFT_AFTER_EVENT_TIME:
+    CharInfoTimeshiftAfterEventTime(strValue) ;
+    break;
   default:
     strValue.clear();
     bReturn = false;
@@ -519,6 +529,12 @@ bool CPVRGUIInfo::TranslateBoolInfo(DWORD dwInfo) const
   case PVR_IS_TIMESHIFTING:
     bReturn = m_bIsTimeshifting;
     break;
+  case PVR_HAS_TIMESHIFT_BEFORE_EVENT:
+    bReturn = m_bHasTimeshiftBeforeEvent;
+    break;
+  case PVR_HAS_TIMESHIFT_AFTER_EVENT:
+    bReturn = m_bHasTimeshiftAfterEvent;
+    break;  
   case PVR_CAN_RECORD_PLAYING_CHANNEL:
     bReturn = m_bCanRecordPlayingChannel;
     break;
@@ -538,18 +554,9 @@ int CPVRGUIInfo::TranslateIntInfo(const CFileItem *item, DWORD dwInfo) const
   CSingleLock lock(m_critSection);
 
   if (dwInfo == PVR_EPG_EVENT_PROGRESS)
-  {
-    CPVREpgInfoTagPtr epgTag = CPVRItem(item).GetEpgInfoTag();
-    if (epgTag && epgTag != m_playingEpgTag)
-      iReturn = std::lrintf(epgTag->ProgressPercentage());
-    else
-      iReturn = std::lrintf(static_cast<float>(GetElapsedTime()) / m_iDuration * 100);
-  }
+    iReturn = std::lrintf(PlayPercent(item));
   else if (dwInfo == PVR_TIMESHIFT_PROGRESS)
-  {
-    iReturn = std::lrintf(static_cast<float>(m_iTimeshiftPlayTime - m_iTimeshiftStartTime) /
-                          (m_iTimeshiftEndTime - m_iTimeshiftStartTime) * 100);
-  }
+    iReturn = std::lrintf(TimeshiftPlayPercent());
   else if (dwInfo == PVR_ACTUAL_STREAM_SIG_PROGR)
     iReturn = (int) ((float) m_qualityInfo.iSignal / 0xFFFF * 100);
   else if (dwInfo == PVR_ACTUAL_STREAM_SNR_PROGR)
@@ -561,7 +568,11 @@ int CPVRGUIInfo::TranslateIntInfo(const CFileItem *item, DWORD dwInfo) const
     else
       iReturn = 0xFF;
   }
-
+  else if (dwInfo == PVR_TIMESHIFT_START_PROGRESS)
+    iReturn = std::lrintf(TimeshiftStartPercent());
+  else if (dwInfo == PVR_TIMESHIFT_END_PROGRESS)
+    iReturn = std::lrintf(TimeshiftEndPercent());
+    
   return iReturn;
 }
 
@@ -570,7 +581,7 @@ bool CPVRGUIInfo::GetVideoLabel(const CFileItem *item, int iLabel, std::string &
   const CPVRRecordingPtr recording(item->GetPVRRecordingInfoTag());
   if (recording)
   {
-    // Note: CPVRRecoding is derived from CVideoInfoTag. All base class properties will be handled
+    // Note: CPVRRecording is derived from CVideoInfoTag. All base class properties will be handled
     //       by CGUIInfoManager. Only properties introduced by CPVRRecording need to be handled here.
     switch (iLabel)
     {
@@ -849,8 +860,33 @@ bool CPVRGUIInfo::GetMultiInfoLabel(const CFileItem *item, const GUIInfo &info, 
 bool CPVRGUIInfo::GetSeekTimeLabel(int iSeekSize, TIME_FORMAT format, std::string &strValue) const
 {
   CSingleLock lock(m_critSection);
-  strValue = StringUtils::SecondsToTimeString(GetElapsedTime() + iSeekSize, format).c_str();
+  int iSeekTime = GetElapsedTime() + iSeekSize;
+
+  if (m_playingEpgTag)
+  {
+    CPVREpgInfoTagPtr epgTag = m_playingEpgTag;
+    int n;
+    if (iSeekTime > 0)
+    {
+      for (n=0; iSeekTime > epgTag->GetDuration(); ++n)
+      {
+        iSeekTime -= epgTag->GetDuration();
+        if (epgTag->GetNextEvent())
+          epgTag = epgTag->GetNextEvent();
+        else
+          break;
+      }
+      if (n > 0)
+        strValue = "+$n: ";
+    }
+  //  else if (iSeekTime < 0)
+  //  {
+  //    epgTag = epgTag.GetTable()->GetTagNow(false);
+  //  }
+
+  strValue += StringUtils::SecondsToTimeString(iSeekTime, format).c_str();
   return true;
+  }
 }
 
 namespace
@@ -938,6 +974,18 @@ void CPVRGUIInfo::CharInfoEpgEventFinishTime(const CFileItem *item, TIME_FORMAT 
   CDateTime finish = CDateTime::GetCurrentDateTime();
   finish += CDateTimeSpan(0, 0, 0, GetRemainingTime(item));
   strValue = StringUtils::SecondsToTimeString(finish.GetHour() * 60 * 60 + finish.GetMinute() * 60 + finish.GetSecond(), format).c_str();
+}
+
+void CPVRGUIInfo::CharInfoTimeshiftBeforeEventTime(std::string &strValue) const
+{
+  //strValue = StringUtils::SecondsToTimeString(TimeshiftBeforeEventTime(), TIME_FORMAT_HH_MM).c_str();
+  strValue = m_strTimeshiftBeforeEventTime;
+}
+
+void CPVRGUIInfo::CharInfoTimeshiftAfterEventTime(std::string &strValue) const
+{
+  //strValue = StringUtils::SecondsToTimeString(TimeshiftAfterEventTime(), TIME_FORMAT_HH_MM).c_str();
+  strValue = m_strTimeshiftAfterEventTime;
 }
 
 void CPVRGUIInfo::CharInfoBackendNumber(std::string &strValue) const
@@ -1193,11 +1241,13 @@ int CPVRGUIInfo::GetElapsedTime(void) const
 {
   CSingleLock lock(m_critSection);
 
-  if (m_playingEpgTag || m_iTimeshiftStartTime)
+  //if (m_playingEpgTag || m_iTimeshiftStartTime)
+  if (m_playingEpgTag || m_iStartTime)
   {
     CDateTime current(m_iTimeshiftPlayTime);
     CDateTime start = m_playingEpgTag ? CDateTime(m_playingEpgTag->StartAsUTC())
-                                      : CDateTime(m_iTimeshiftStartTime);
+                                      : CDateTime(m_iStartTime);
+                                      //: CDateTime(m_iTimeshiftStartTime);
     CDateTimeSpan time = current > start ? current - start : CDateTimeSpan(0, 0, 0, 0);
     return time.GetSecondsTotal();
   }
@@ -1207,11 +1257,163 @@ int CPVRGUIInfo::GetElapsedTime(void) const
   }
 }
 
+
+float CPVRGUIInfo::PlayPercent(const CFileItem *item) const
+{
+    CPVREpgInfoTagPtr epgTag = CPVRItem(item).GetEpgInfoTag();
+    if (epgTag && epgTag != m_playingEpgTag)
+      return epgTag->ProgressPercentage();
+    else
+      return static_cast<float>(GetElapsedTime()) / m_iDuration * 100;
+  }
+
+int CPVRGUIInfo::TimeshiftStartOffset(void) const
+{
+  CSingleLock lock(m_critSection);
+
+// int startOffset(TimeshiftStartOffset());
+    // if (startOffset > 0)
+    //  iReturn = int(startOffset * 100.0f / m_iDuration);    // just secs left;  check m_iDuration: here Duration is to be the EventDuration, not the TimeshiftDuration
+    // else 
+    //  iReturn = 0;
+
+  if (!m_bHasTimeshiftData)
+  {
+    // fetch data
+    const_cast<CPVRGUIInfo*>(this)->UpdateTimeshift();
+    const_cast<CPVRGUIInfo*>(this)->UpdatePlayingTag();
+  }
+  if (m_bIsTimeshifting)
+  {
+    time_t iStartTime = m_playingEpgTag ? m_playingEpgTag->StartAsUTC().GetAsTime()
+                                        : m_iStartTime;
+    return m_iTimeshiftStartTime - iStartTime > 0 ? int(m_iTimeshiftStartTime - iStartTime) : 0;
+  }
+  return 0;
+}
+
+float CPVRGUIInfo::TimeshiftStartPercent(void) const
+{
+  return m_iTimeshiftStartOffset * 100.0f / m_iDuration;
+}
+
+float CPVRGUIInfo::TimeshiftEndPercent(void) const
+{
+  if (m_bIsTimeshifting)
+  {
+    return m_playingEpgTag ? m_playingEpgTag->ProgressPercentage() 
+                           : -1;
+
+  //if (m_bIsTimeshifting)
+  //  {
+  //      return m_playingEpgTag ? static_cast<int>(m_playingEpgTag->ProgressPercentage()) : 100;     //based on current time
+        // iReturn = std::lrintf(m_playingEpgTag->ProgressPercentage());
+
+      //const CPVREpgInfoTagPtr epgTag = m_playingEpgTag; //works
+      //if (epgTag)
+      //{
+        // time_t iEpgTagStartTime, iEpgTagEndTime, iTagDuration, currentTime;
+        // epgTag->StartAsUTC().GetAsTime(iEpgTagStartTime);
+        // epgTag->EndAsUTC().GetAsTime(iEpgTagEndTime);
+        // iTagDuration = iEpgTagEndTime - iEpgTagStartTime;
+        // CDateTime::GetCurrentDateTime().GetAsUTCDateTime().GetAsTime(currentTime);
+        
+        // if (m_iTimeshiftEndTime >= iEpgTagStartTime && m_iTimeshiftEndTime <= iEpgTagEndTime)
+        // {
+        //   int progress = static_cast<int>((m_iTimeshiftEndTime - iEpgTagStartTime) * 100.0f / iTagDuration); // *1000?
+        //   //int progress = static_cast<int>((currentTime - iEpgTagStartTime) * 100.0f / iTagDuration); // base on current time
+        //   iReturn = progress;
+        // }
+        // else if (m_iTimeshiftEndTime > iEpgTagEndTime)
+        //   iReturn = 100; 
+      // }
+      // else
+      //   iReturn = 100;
+  //  }
+  //  return 0; 
+
+  }
+}
+
+float CPVRGUIInfo::TimeshiftPlayPercent(void) const
+{
+  return static_cast<float>(m_iTimeshiftPlayTime - m_iTimeshiftStartTime) /
+                           (m_iTimeshiftEndTime - m_iTimeshiftStartTime) * 100;
+}
+
+int CPVRGUIInfo::TimeshiftBeforeEventTime(void) const
+{
+  CSingleLock lock(m_critSection);
+
+  if (!m_bHasTimeshiftData) //temp
+  {
+    // fetch data
+    const_cast<CPVRGUIInfo*>(this)->UpdateTimeshift();
+    const_cast<CPVRGUIInfo*>(this)->UpdatePlayingTag();
+  }
+  if (m_bIsTimeshifting && m_playingEpgTag)
+  {
+    time_t EpgEventStartTime;
+    m_playingEpgTag->StartAsUTC().GetAsTime(EpgEventStartTime);
+    if (EpgEventStartTime > m_iTimeshiftStartTime)
+      return int(EpgEventStartTime - m_iTimeshiftStartTime);
+  }
+  return 0;
+}
+
+int CPVRGUIInfo::TimeshiftAfterEventTime(void) const
+{
+  CSingleLock lock(m_critSection);
+
+  if (!m_bHasTimeshiftData) //temp
+  {
+    // fetch data
+    const_cast<CPVRGUIInfo*>(this)->UpdateTimeshift();
+    const_cast<CPVRGUIInfo*>(this)->UpdatePlayingTag();  // check: updated PlayingTag required?
+  }
+  if (m_bIsTimeshifting && m_playingEpgTag)
+  {
+    time_t EpgEventEndTime, currentTime;
+    m_playingEpgTag->EndAsUTC().GetAsTime(EpgEventEndTime);
+    CDateTime::GetCurrentDateTime().GetAsUTCDateTime().GetAsTime(currentTime);
+    //if (m_iTimeshiftEndTime > EpgEventEndTime) //not updated in PAUSE - go with CurrentTime for now
+    if (currentTime > EpgEventEndTime)
+      return int(currentTime - EpgEventEndTime);
+  }
+  return 0;
+} 
+
+void CPVRGUIInfo::UpdateInfos()
+{
+  if (m_bIsTimeshifting)
+  {
+    int iTimeshiftStartOffset = TimeshiftStartOffset();
+    int iTimeshiftBeforeEpgTime = TimeshiftBeforeEventTime();
+    int iTimeshiftAfterEpgTime = TimeshiftAfterEventTime();
+    bool bHasTimeshiftBeforeEpgEvent = static_cast<bool>(iTimeshiftBeforeEpgTime);
+    bool bHasTimeshiftAfterEpgEvent = static_cast<bool>(iTimeshiftAfterEpgTime);
+    std::string strTimeshiftBeforeEpgTime = StringUtils::SecondsToTimeString(iTimeshiftBeforeEpgTime, TIME_FORMAT_HH_MM);
+    std::string strTimeshiftAfterEpgTime = StringUtils::SecondsToTimeString(iTimeshiftAfterEpgTime, TIME_FORMAT_HH_MM);
+    
+    CSingleLock lock(m_critSection);  //Is this required here? This is a private method and private data anyway.
+
+    m_iTimeshiftStartOffset       = iTimeshiftStartOffset;
+    m_iTimeshiftBeforeEventTime   = iTimeshiftBeforeEpgTime;
+    m_iTimeshiftAfterEventTime    = iTimeshiftAfterEpgTime;
+    m_bHasTimeshiftBeforeEvent    = bHasTimeshiftBeforeEpgEvent;
+    m_bHasTimeshiftAfterEvent     = bHasTimeshiftAfterEpgEvent;
+    m_strTimeshiftBeforeEventTime = strTimeshiftBeforeEpgTime;
+    m_strTimeshiftAfterEventTime  = strTimeshiftAfterEpgTime;
+  }
+}
+
 void CPVRGUIInfo::ResetPlayingTag(void)
 {
   CSingleLock lock(m_critSection);
   m_playingEpgTag.reset();
   m_iDuration = 0;
+  m_iTimeshiftBeforeEventTime = 0;
+  m_iTimeshiftAfterEventTime = 0;
 }
 
 CPVREpgInfoTagPtr CPVRGUIInfo::GetPlayingTag() const
