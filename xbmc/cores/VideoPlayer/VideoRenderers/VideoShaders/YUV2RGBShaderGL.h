@@ -1,25 +1,14 @@
 /*
- *      Copyright (C) 2007-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
-#include "guilib/TransformMatrix.h"
+#include "utils/TransformMatrix.h"
 #include "ShaderFormats.h"
 #include "GLSLOutput.h"
 #include "guilib/Shader.h"
@@ -55,6 +44,7 @@ public:
   void SetNonLinStretch(float stretch) { m_stretch = stretch; }
   void SetDisplayMetadata(bool hasDisplayMetadata, AVMasteringDisplayMetadata displayMetadata,
                           bool hasLightMetadata, AVContentLightMetadata lightMetadata);
+  void SetToneMapParam(float param) { m_toneMappingParam = param; }
 
   void SetConvertFullColorRange(bool convertFullRange) { m_convertFullRange = convertFullRange; }
 
@@ -63,7 +53,7 @@ public:
   GLint GetUcoordLoc() { return m_hUcoord; }
   GLint GetVcoordLoc() { return m_hVcoord; }
 
-  void SetMatrices(GLfloat *p, GLfloat *m) { m_proj = p; m_model = m; }
+  void SetMatrices(const GLfloat *p, const GLfloat *m) { m_proj = p; m_model = m; }
   void SetAlpha(GLfloat alpha)  { m_alpha = alpha; }
 
 protected:
@@ -83,13 +73,14 @@ protected:
   bool m_hasLightMetadata = false;
   AVContentLightMetadata m_lightMetadata;
   bool m_toneMapping = false;
+  float m_toneMappingParam = 1.0;
 
   float m_black;
   float m_contrast;
   float m_stretch;
 
-  GLfloat *m_proj = nullptr;
-  GLfloat *m_model = nullptr;
+  const GLfloat *m_proj = nullptr;
+  const GLfloat *m_model = nullptr;
   GLfloat m_alpha = 1.0f;
 
   std::string m_defines;

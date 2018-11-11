@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ServiceBroker.h"
@@ -37,7 +25,7 @@ CGLTexture::CGLTexture(unsigned int width, unsigned int height, unsigned int for
 : CBaseTexture(width, height, format)
 {
   unsigned int major, minor;
-  CServiceBroker::GetRenderSystem().GetRenderVersion(major, minor);
+  CServiceBroker::GetRenderSystem()->GetRenderVersion(major, minor);
   if (major >= 3)
     m_isOglVersion3orNewer = true;
 }
@@ -55,7 +43,7 @@ void CGLTexture::CreateTextureObject()
 void CGLTexture::DestroyTextureObject()
 {
   if (m_texture)
-    g_TextureManager.ReleaseHwTexture(m_texture);
+    CServiceBroker::GetGUI()->GetTextureManager().ReleaseHwTexture(m_texture);
 }
 
 void CGLTexture::LoadToGPU()
@@ -99,7 +87,7 @@ void CGLTexture::LoadToGPU()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  unsigned int maxSize = CServiceBroker::GetRenderSystem().GetMaxTextureSize();
+  unsigned int maxSize = CServiceBroker::GetRenderSystem()->GetMaxTextureSize();
   if (m_textureHeight > maxSize)
   {
     CLog::Log(LOGERROR, "GL: Image height %d too big to fit into single texture unit, truncating to %u", m_textureHeight, maxSize);
@@ -183,12 +171,12 @@ void CGLTexture::LoadToGPU()
       internalformat = pixelformat = GL_RGB;
       break;
     case XB_FMT_A8R8G8B8:
-      if (CServiceBroker::GetRenderSystem().IsExtSupported("GL_EXT_texture_format_BGRA8888") ||
-          CServiceBroker::GetRenderSystem().IsExtSupported("GL_IMG_texture_format_BGRA8888"))
+      if (CServiceBroker::GetRenderSystem()->IsExtSupported("GL_EXT_texture_format_BGRA8888") ||
+          CServiceBroker::GetRenderSystem()->IsExtSupported("GL_IMG_texture_format_BGRA8888"))
       {
         internalformat = pixelformat = GL_BGRA_EXT;
       }
-      else if (CServiceBroker::GetRenderSystem().IsExtSupported("GL_APPLE_texture_format_BGRA8888"))
+      else if (CServiceBroker::GetRenderSystem()->IsExtSupported("GL_APPLE_texture_format_BGRA8888"))
       {
         // Apple's implementation does not conform to spec. Instead, they require
         // differing format/internalformat, more like GL.

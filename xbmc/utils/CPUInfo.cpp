@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <cstdlib>
 
 #include "CPUInfo.h"
 #include "utils/log.h"
+#include "utils/SysfsUtils.h"
 #include "utils/Temperature.h"
 #include <string>
 #include <string.h>
@@ -67,6 +56,11 @@
 #pragma comment(lib, "Pdh.lib")
 #endif
 
+#ifdef TARGET_WINDOWS_STORE
+#include <winrt/Windows.Foundation.Metadata.h>
+#include <winrt/Windows.System.Diagnostics.h>
+#endif
+
 // Defines to help with calls to CPUID
 #define CPUID_INFOTYPE_STANDARD 0x00000001
 #define CPUID_INFOTYPE_EXTENDED 0x80000001
@@ -99,7 +93,9 @@
 #endif
 
 #ifdef TARGET_POSIX
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #endif
 
 #include "utils/StringUtils.h"
@@ -124,7 +120,7 @@ CCPUInfo::CCPUInfo(void)
 
   size_t len = 4;
   std::string cpuVendor;
-  
+
   // The number of cores.
   if (sysctlbyname("hw.activecpu", &m_cpuCount, &len, NULL, 0) == -1)
       m_cpuCount = 1;
@@ -145,7 +141,7 @@ CCPUInfo::CCPUInfo(void)
   len = 512;
   if (sysctlbyname("machdep.cpu.vendor", &buffer, &len, NULL, 0) == 0)
     cpuVendor = buffer;
-  
+
 #endif
   // Go through each core.
   for (int i=0; i<m_cpuCount; i++)
@@ -235,7 +231,7 @@ CCPUInfo::CCPUInfo(void)
   }
   else
     m_cpuQueryFreq = nullptr;
-  
+
   if (PdhOpenQueryW(nullptr, 0, &m_cpuQueryLoad) == ERROR_SUCCESS)
   {
     for (size_t i = 0; i < m_cores.size(); i++)
@@ -277,9 +273,9 @@ CCPUInfo::CCPUInfo(void)
   if (m_fProcTemperature == NULL)
     m_fProcTemperature = fopen("/proc/acpi/thermal_zone/TZ0/temperature", "r");
   // read from the new location of the temperature data on new kernels, 2.6.39, 3.0 etc
-  if (m_fProcTemperature == NULL)   
+  if (m_fProcTemperature == NULL)
     m_fProcTemperature = fopen("/sys/class/hwmon/hwmon0/temp1_input", "r");
-  if (m_fProcTemperature == NULL)   
+  if (m_fProcTemperature == NULL)
     m_fProcTemperature = fopen("/sys/class/thermal/thermal_zone0/temp", "r");  // On Raspberry PIs
 
   m_fCPUFreq = fopen ("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r");
@@ -426,6 +422,21 @@ CCPUInfo::CCPUInfo(void)
       }
     }
     fclose(fCPUInfo);
+    // new socs use the sysfs soc interface to describe the hardware
+    if (SysfsUtils::Has("/sys/bus/soc/devices/soc0"))
+    {
+      std::string machine, family, soc_id;
+      if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/machine"))
+        SysfsUtils::GetString("/sys/bus/soc/devices/soc0/machine", machine);
+      if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/family"))
+        SysfsUtils::GetString("/sys/bus/soc/devices/soc0/family", family);
+      if (SysfsUtils::Has("/sys/bus/soc/devices/soc0/soc_id"))
+        SysfsUtils::GetString("/sys/bus/soc/devices/soc0/soc_id", soc_id);
+      if (m_cpuHardware.empty() && !machine.empty())
+        m_cpuHardware = machine;
+      if (!family.empty() && !soc_id.empty())
+        m_cpuSoC = family + " " + soc_id;
+    }
     //  /proc/cpuinfo is not reliable on some Android platforms
     //  At least we should get the correct cpu count for multithreaded decoding
 #if defined(TARGET_ANDROID)
@@ -551,10 +562,10 @@ float CCPUInfo::getCPUFrequency()
   if (sysctlbyname("hw.cpufrequency", &hz, &len, NULL, 0) == -1)
     return 0.f;
   return hz / 1000000.0;
-#elif defined(TARGET_WINDOWS_STORE) 
+#elif defined(TARGET_WINDOWS_STORE)
   CLog::Log(LOGDEBUG, "%s is not implemented", __FUNCTION__);
   return 0.f;
-#elif defined(TARGET_WINDOWS_DESKTOP) 
+#elif defined(TARGET_WINDOWS_DESKTOP)
   if (m_cpuFreqCounter && PdhCollectQueryData(m_cpuQueryFreq) == ERROR_SUCCESS)
   {
     PDH_RAW_COUNTER cnt;
@@ -565,7 +576,7 @@ float CCPUInfo::getCPUFrequency()
       return float(cnt.FirstValue);
     }
   }
-  
+
   if (!m_cores.empty())
     return float(m_cores.begin()->second.m_fSpeed);
   else
@@ -612,7 +623,7 @@ bool CCPUInfo::getTemperature(CTemperature& temperature)
 {
   int         value = 0;
   char        scale = 0;
-  
+
 #ifdef TARGET_POSIX
 #if defined(TARGET_DARWIN_OSX)
   value = SMCGetTemperature(SMC_KEY_CPU_TEMP);
@@ -620,7 +631,7 @@ bool CCPUInfo::getTemperature(CTemperature& temperature)
 #else
   int         ret   = 0;
   FILE        *p    = NULL;
-  std::string  cmd   = g_advancedSettings.m_cpuTempCmd;
+  std::string  cmd   = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cpuTempCmd;
 
   temperature.SetValid(false);
 
@@ -641,11 +652,11 @@ bool CCPUInfo::getTemperature(CTemperature& temperature)
     // procfs is deprecated in the linux kernel, we should move away from
     // using it for temperature data.  It doesn't seem that sysfs has a
     // general enough interface to bother implementing ATM.
-    
+
     rewind(m_fProcTemperature);
     fflush(m_fProcTemperature);
     ret = fscanf(m_fProcTemperature, "temperature: %d %c", &value, &scale);
-    
+
     // read from the temperature file of the new kernels
     if (!ret)
     {
@@ -657,7 +668,7 @@ bool CCPUInfo::getTemperature(CTemperature& temperature)
   }
 
   if (ret != 2)
-    return false; 
+    return false;
 #endif
 #endif // TARGET_POSIX
 
@@ -667,7 +678,7 @@ bool CCPUInfo::getTemperature(CTemperature& temperature)
     temperature = CTemperature::CreateFromFahrenheit(value);
   else
     return false;
-  
+
   return true;
 }
 
@@ -695,7 +706,7 @@ bool CCPUInfo::readProcStat(unsigned long long& user, unsigned long long& nice,
 #if defined(TARGET_WINDOWS)
   nice = 0;
   io = 0;
-#if defined (TARGET_WINDOWS_DESKTOP) 
+#if defined (TARGET_WINDOWS_DESKTOP)
   FILETIME idleTime;
   FILETIME kernelTime;
   FILETIME userTime;
@@ -722,7 +733,7 @@ bool CCPUInfo::readProcStat(unsigned long long& user, unsigned long long& nice,
         const LONGLONG deltaTotal = coreTotal - curCore.m_total,
                        deltaIdle  = coreIdle - curCore.m_idle;
         const double load = (double(deltaTotal - deltaIdle) * 100.0) / double(deltaTotal);
-        
+
         // win32 has some problems with calculation of load if load close to zero
         curCore.m_fPct = (load < 0) ? 0 : load;
         if (load >= 0 || deltaTotal > 5 * 10 * 1000 * 1000) // do not update (smooth) values for 5 seconds on negative loads
@@ -739,30 +750,21 @@ bool CCPUInfo::readProcStat(unsigned long long& user, unsigned long long& nice,
     for (std::map<int, CoreInfo>::iterator it = m_cores.begin(); it != m_cores.end(); ++it)
       it->second.m_fPct = double(m_lastUsedPercentage); // use CPU average as fallback
 #endif // TARGET_WINDOWS_DESKTOP
-#if defined(TARGET_WINDOWS_STORE) && defined(NTDDI_WIN10_RS2) && (NTDDI_VERSION >= NTDDI_WIN10_RS2)
-  // introduced in 10.0.15063.0
-  if (Windows::Foundation::Metadata::ApiInformation::IsTypePresent("Windows.System.Diagnostics.SystemDiagnosticInfo"))
+#if defined(TARGET_WINDOWS_STORE)
+  if (winrt::Windows::Foundation::Metadata::ApiInformation::IsTypePresent(L"Windows.System.Diagnostics.SystemDiagnosticInfo"))
   {
-    try
-    {
-      auto diagnostic = Windows::System::Diagnostics::SystemDiagnosticInfo::GetForCurrentSystem();
-      auto usage = diagnostic->CpuUsage;
-      auto report = usage->GetReport();
+    auto diagnostic = winrt::Windows::System::Diagnostics::SystemDiagnosticInfo::GetForCurrentSystem();
+    auto usage = diagnostic.CpuUsage();
+    auto report = usage.GetReport();
 
-      user = report->UserTime.Duration;
-      idle = report->IdleTime.Duration;
-      system = report->KernelTime.Duration - idle;
-      return true;
-    }
-    catch (...)
-    {
-      // requires Win10 CU (10.0.15063) or later
-      return false;
-    }
+    user = report.UserTime().count();
+    idle = report.IdleTime().count();
+    system = report.KernelTime().count() - idle;
+    return true;
   }
   else
-#endif // TARGET_WINDOWS_STORE
     return false;
+#endif // TARGET_WINDOWS_STORE
 #elif defined(TARGET_FREEBSD)
   long *cptimes;
   size_t len;
@@ -890,12 +892,12 @@ std::string CCPUInfo::GetCoresUsageString() const
       if (!strCores.empty())
         strCores += ' ';
       if (it->second.m_fPct < 10.0)
-        strCores += StringUtils::Format("CPU%d: %1.1f%%", it->first, it->second.m_fPct);
+        strCores += StringUtils::Format("#%d: %1.1f%%", it->first, it->second.m_fPct);
       else
-        strCores += StringUtils::Format("CPU%d: %3.0f%%", it->first, it->second.m_fPct);
+        strCores += StringUtils::Format("#%d: %3.0f%%", it->first, it->second.m_fPct);
     }
   }
-  else 
+  else
   {
     strCores += StringUtils::Format("%3.0f%%", double(m_lastUsedPercentage));
   }

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <stdio.h>
@@ -35,11 +23,12 @@
 #include "DVDDemuxers/DVDDemuxUtils.h"
 #include "DVDCodecs/DVDCodecUtils.h"
 #include "settings/DisplaySettings.h"
-#include "settings/Settings.h"
 #include "settings/MediaSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 
 #include "platform/linux/RBP.h"
@@ -80,7 +69,6 @@ OMXPlayerVideo::OMXPlayerVideo(OMXClock *av_clock,
   m_stalled               = false;
   m_iSubtitleDelay        = 0;
   m_bRenderSubs           = false;
-  m_bAllowFullscreen      = false;
   m_iCurrentPts           = DVD_NOPTS_VALUE;
   m_fForcedAspectRatio    = 0.0f;
   bool small_mem = g_RBP.GetArmMem() < 256;
@@ -106,7 +94,7 @@ OMXPlayerVideo::~OMXPlayerVideo()
 bool OMXPlayerVideo::OpenStream(CDVDStreamInfo hints)
 {
   m_hints       = hints;
-  m_hdmi_clock_sync = (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_ADJUSTREFRESHRATE) != ADJUST_REFRESHRATE_OFF);
+  m_hdmi_clock_sync = (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_ADJUSTREFRESHRATE) != ADJUST_REFRESHRATE_OFF);
   m_syncState = IDVDStreamPlayer::SYNC_STARTING;
   m_flush       = false;
   m_stalled     = m_messageQueue.GetPacketCount(CDVDMsg::DEMUXER_PACKET) == 0;
@@ -668,7 +656,7 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
 {
   CRect SrcRect = InSrcRect, DestRect = InDestRect;
   bool stereo_invert = false;
-  RENDER_STEREO_MODE display_stereo_mode = g_graphicsContext.GetStereoMode();
+  RENDER_STEREO_MODE display_stereo_mode = CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode();
   RENDER_STEREO_MODE video_stereo_mode = RENDER_STEREO_MODE_OFF;
   std::string stereoMode = GetStereoMode();
 
@@ -731,7 +719,7 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
   CLog::Log(LOGDEBUG, "OMXPlayerVideo::%s %d,%d,%d,%d -> %d,%d,%d,%d (%d,%d,%d,%d,%s)", __func__,
       (int)SrcRect.x1, (int)SrcRect.y1, (int)SrcRect.x2, (int)SrcRect.y2,
       (int)DestRect.x1, (int)DestRect.y1, (int)DestRect.x2, (int)DestRect.y2,
-      video_stereo_mode, display_stereo_mode, m_processInfo.GetVideoSettings().m_StereoInvert, g_graphicsContext.GetStereoView(), OMXPlayerVideo::GetStereoMode().c_str());
+      video_stereo_mode, display_stereo_mode, m_processInfo.GetVideoSettings().m_StereoInvert, CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoView(), OMXPlayerVideo::GetStereoMode().c_str());
 
   m_src_rect = SrcRect;
   m_dst_rect = DestRect;
@@ -741,7 +729,7 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
 
   // might need to scale up m_dst_rect to display size as video decodes
   // to separate video plane that is at display size.
-  RESOLUTION res = g_graphicsContext.GetVideoResolution();
+  RESOLUTION res = CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution();
   CRect gui(0, 0, CDisplaySettings::GetInstance().GetResolutionInfo(res).iWidth, CDisplaySettings::GetInstance().GetResolutionInfo(res).iHeight);
   CRect display(0, 0, CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenWidth, CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenHeight);
 
@@ -772,7 +760,7 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
 
 void OMXPlayerVideo::ResolutionUpdateCallBack(uint32_t width, uint32_t height, float framerate, float display_aspect)
 {
-  RESOLUTION res  = g_graphicsContext.GetVideoResolution();
+  RESOLUTION res  = CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution();
   uint32_t video_width   = CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenWidth;
   uint32_t video_height  = CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenHeight;
 
@@ -801,13 +789,11 @@ void OMXPlayerVideo::ResolutionUpdateCallBack(uint32_t width, uint32_t height, f
   picture.iDisplayWidth = iDisplayWidth;
   picture.iDisplayHeight = iDisplayHeight;
 
-  if(!m_renderManager.Configure(picture, m_fFrameRate, m_bAllowFullscreen, m_hints.orientation, 3))
+  if(!m_renderManager.Configure(picture, m_fFrameRate, m_hints.orientation, 3))
   {
     CLog::Log(LOGERROR, "%s - failed to configure renderer", __FUNCTION__);
     return;
   }
-
-  m_bAllowFullscreen = false; // only allow on first configure
 
   m_src_rect.SetRect(0, 0, 0, 0);
   m_dst_rect.SetRect(0, 0, 0, 0);

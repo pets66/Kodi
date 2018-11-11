@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -28,7 +16,6 @@
 #define WINDOW_FILES                      10003
 #define WINDOW_SETTINGS_MENU              10004
 #define WINDOW_SYSTEM_INFORMATION         10007
-#define WINDOW_TEST_PATTERN               10008
 #define WINDOW_SCREEN_CALIBRATION         10011
 
 #define WINDOW_SETTINGS_START             10016
@@ -101,12 +88,11 @@
 #define WINDOW_DIALOG_EXT_PROGRESS        10151
 #define WINDOW_DIALOG_MEDIA_FILTER        10152
 #define WINDOW_DIALOG_SUBTITLES           10153
-#define WINDOW_DIALOG_AUDIO_DSP_MANAGER   10154
-#define WINDOW_DIALOG_AUDIO_DSP_OSD_SETTINGS 10155
 #define WINDOW_DIALOG_KEYBOARD_TOUCH      10156
 #define WINDOW_DIALOG_CMS_OSD_SETTINGS    10157
 #define WINDOW_DIALOG_INFOPROVIDER_SETTINGS 10158
 #define WINDOW_DIALOG_SUBTITLE_OSD_SETTINGS  10159
+#define WINDOW_DIALOG_BUSY_NOCANCEL       10160
 
 #define WINDOW_MUSIC_PLAYLIST             10500
 #define WINDOW_MUSIC_NAV                  10502
@@ -159,8 +145,10 @@
 #define WINDOW_GAMES                      10821
 #define WINDOW_DIALOG_GAME_OSD            10822
 #define WINDOW_DIALOG_GAME_VIDEO_FILTER   10823
-#define WINDOW_DIALOG_GAME_VIEW_MODE      10824
+#define WINDOW_DIALOG_GAME_STRETCH_MODE   10824
 #define WINDOW_DIALOG_GAME_VOLUME         10825
+#define WINDOW_DIALOG_GAME_ADVANCED_SETTINGS 10826
+#define WINDOW_DIALOG_GAME_VIDEO_ROTATION 10827
 
 //#define WINDOW_VIRTUAL_KEYBOARD           11000
 // WINDOW_ID's from 11100 to 11199 reserved for Skins

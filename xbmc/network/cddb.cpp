@@ -1,28 +1,18 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <taglib/id3v1genres.h>
 #include "cddb.h"
 #include "CompileInfo.h"
 #include "network/DNSNameCache.h"
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "filesystem/File.h"
@@ -45,7 +35,7 @@ Xcddb::Xcddb()
 #else
     : m_cddb_socket(close, -1)
 #endif
-    , m_cddb_ip_address(g_advancedSettings.m_cddbAddress)
+    , m_cddb_ip_address(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cddbAddress)
 {
   m_lastError = 0;
 }
@@ -479,12 +469,12 @@ void Xcddb::parseData(const char *buffer)
   std::map<std::string, std::string> keywords;
   std::list<std::string> keywordsOrder; // remember order of keywords as it appears in data received from CDDB
 
-  // Collect all the keywords and put them in map. 
-  // Multiple occurrences of the same keyword indicate that 
+  // Collect all the keywords and put them in map.
+  // Multiple occurrences of the same keyword indicate that
   // the data contained on those lines should be concatenated
   char *line;
   const char trenner[3] = {'\n', '\r', '\0'};
-  strtok((char*)buffer, trenner); // skip first line
+  strtok(const_cast<char*>(buffer), trenner); // skip first line
   while ((line = strtok(0, trenner)))
   {
     // Lines that begin with # are comments, should be ignored
@@ -512,7 +502,7 @@ void Xcddb::parseData(const char *buffer)
     }
   }
 
-  // parse keywords 
+  // parse keywords
   for (std::list<std::string>::const_iterator it = keywordsOrder.begin(); it != keywordsOrder.end(); ++it)
   {
     std::string strKeyword = *it;
@@ -774,7 +764,7 @@ bool Xcddb::writeCacheFile( const char* pBuffer, uint32_t discid )
   XFILE::CFile file;
   if (file.OpenForWrite(GetCacheFile(discid), true))
   {
-    const bool ret = ( (size_t) file.Write((void*)pBuffer, strlen(pBuffer) + 1) == strlen(pBuffer) + 1);
+    const bool ret = ( (size_t) file.Write((const void*)pBuffer, strlen(pBuffer) + 1) == strlen(pBuffer) + 1);
     file.Close();
     return ret;
   }
@@ -963,7 +953,7 @@ bool Xcddb::queryCDinfo(CCdInfo* pInfo)
   switch(m_lastError)
   {
   case 200: //Found exact match
-    strtok((char *)recv_buffer.c_str(), " ");
+    strtok(const_cast<char *>(recv_buffer.c_str()), " ");
     read_buffer = StringUtils::Format("cddb read %s %08x", strtok(NULL, " "), discid);
     break;
 

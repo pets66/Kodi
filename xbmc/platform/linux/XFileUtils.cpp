@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PlatformDefs.h"
@@ -48,120 +36,6 @@
 #include "storage/cdioSupport.h"
 
 #include "utils/log.h"
-
-HANDLE CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess,
-  DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
-  DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
-{
-  // Fail on unsupported items
-  if (lpSecurityAttributes != NULL )
-  {
-    CLog::Log(LOGERROR, "CreateFile does not support security attributes");
-    return INVALID_HANDLE_VALUE;
-  }
-
-  if (hTemplateFile != (HANDLE) 0)
-  {
-    CLog::Log(LOGERROR, "CreateFile does not support template file");
-    return INVALID_HANDLE_VALUE;
-  }
-
-  int flags = 0, mode=S_IRUSR | S_IRGRP | S_IROTH;
-  if (dwDesiredAccess & FILE_WRITE_DATA)
-  {
-    flags = O_RDWR;
-    mode |= S_IWUSR;
-  }
-  else if ( (dwDesiredAccess & FILE_READ_DATA) == FILE_READ_DATA)
-    flags = O_RDONLY;
-  else
-  {
-    CLog::Log(LOGERROR, "CreateFile does not permit access other than read and/or write");
-    return INVALID_HANDLE_VALUE;
-  }
-
-  switch (dwCreationDisposition)
-  {
-    case OPEN_ALWAYS:
-      flags |= O_CREAT;
-      break;
-    case TRUNCATE_EXISTING:
-      flags |= O_TRUNC;
-      mode  |= S_IWUSR;
-      break;
-    case CREATE_ALWAYS:
-      flags |= O_CREAT|O_TRUNC;
-      mode  |= S_IWUSR;
-      break;
-    case CREATE_NEW:
-      flags |= O_CREAT|O_TRUNC|O_EXCL;
-      mode  |= S_IWUSR;
-      break;
-    case OPEN_EXISTING:
-      break;
-  }
-
-  int fd = 0;
-
-  if (dwFlagsAndAttributes & FILE_FLAG_NO_BUFFERING)
-    flags |= O_SYNC;
-
-  // we always open files with fileflag O_NONBLOCK to support
-  // cdrom devices, but we then turn it of for actual reads
-  // apparently it's used for multiple things, read mode
-  // and how opens are handled. devices must be opened
-  // with this flag set to work correctly
-  flags |= O_NONBLOCK;
-
-  std::string strResultFile(lpFileName);
-
-  fd = open(lpFileName, flags, mode);
-
-  // Important to check reason for fail. Only if its
-  // "file does not exist" shall we try to find the file
-  if (fd == -1 && errno == ENOENT)
-  {
-    // Failed to open file. maybe due to case sensitivity.
-    // Try opening the same name in lower case.
-    std::string igFileName = CSpecialProtocol::TranslatePathConvertCase(lpFileName);
-    fd = open(igFileName.c_str(), flags, mode);
-    if (fd != -1)
-    {
-      CLog::Log(LOGWARNING,"%s, successfully opened <%s> instead of <%s>", __FUNCTION__, igFileName.c_str(), lpFileName);
-      strResultFile = igFileName;
-    }
-  }
-
-  if (fd == -1)
-  {
-    if (errno == 20)
-      CLog::Log(LOGWARNING,"%s, error %d opening file <%s>, flags:%x, mode:%x. ", __FUNCTION__, errno, lpFileName, flags, mode);
-    return INVALID_HANDLE_VALUE;
-  }
-
-  // turn of nonblocking reads/writes as we don't
-  // support this anyway currently
-  fcntl(fd, F_GETFL, &flags);
-  fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-
-  HANDLE result = new CXHandle(CXHandle::HND_FILE);
-  result->fd = fd;
-
-#if (defined(TARGET_LINUX) || defined(TARGET_FREEBSD)) && defined(HAS_DVD_DRIVE)
-  // special case for opening the cdrom device
-  if (strcmp(lpFileName, MEDIA_DETECT::CLibcdio::GetInstance()->GetDeviceFileName())==0)
-    result->m_bCDROM = true;
-  else
-#endif
-    result->m_bCDROM = false;
-
-  // if FILE_FLAG_DELETE_ON_CLOSE then "unlink" the file (delete)
-  // the file will be deleted when the last open descriptor is closed.
-  if (dwFlagsAndAttributes & FILE_FLAG_DELETE_ON_CLOSE)
-    unlink(strResultFile.c_str());
-
-  return result;
-}
 
 int ReadFile(HANDLE hFile, void* lpBuffer, DWORD nNumberOfBytesToRead,
   unsigned int* lpNumberOfBytesRead, void* lpOverlapped)
@@ -235,38 +109,6 @@ uint32_t SetFilePointer(HANDLE hFile, int32_t lDistanceToMove,
   }
 
   return (DWORD)currOff;
-}
-
-// uses statfs
-int GetDiskFreeSpaceEx(
-  LPCTSTR lpDirectoryName,
-  PULARGE_INTEGER lpFreeBytesAvailable,
-  PULARGE_INTEGER lpTotalNumberOfBytes,
-  PULARGE_INTEGER lpTotalNumberOfFreeBytes
-  )
-
-{
-#if defined(TARGET_ANDROID) || defined(TARGET_DARWIN)
-  struct statfs fsInfo;
-  // is 64-bit on android and darwin (10.6SDK + any iOS)
-  if (statfs(CSpecialProtocol::TranslatePath(lpDirectoryName).c_str(), &fsInfo) != 0)
-    return false;
-#else
-  struct statfs64 fsInfo;
-  if (statfs64(CSpecialProtocol::TranslatePath(lpDirectoryName).c_str(), &fsInfo) != 0)
-    return false;
-#endif
-
-  if (lpFreeBytesAvailable)
-    lpFreeBytesAvailable->QuadPart =  static_cast<unsigned long long>(fsInfo.f_bavail) * static_cast<unsigned long long>(fsInfo.f_bsize);
-
-  if (lpTotalNumberOfBytes)
-    lpTotalNumberOfBytes->QuadPart = static_cast<unsigned long long>(fsInfo.f_blocks) * static_cast<unsigned long long>(fsInfo.f_bsize);
-
-  if (lpTotalNumberOfFreeBytes)
-    lpTotalNumberOfFreeBytes->QuadPart = static_cast<unsigned long long>(fsInfo.f_bfree) * static_cast<unsigned long long>(fsInfo.f_bsize);
-
-  return 1;
 }
 
 uint32_t GetTimeZoneInformation( LPTIME_ZONE_INFORMATION lpTimeZoneInformation )

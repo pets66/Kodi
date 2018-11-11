@@ -1,26 +1,12 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
-
-#include "threads/Helpers.h"
 
 namespace XbmcThreads
 {
@@ -29,7 +15,7 @@ namespace XbmcThreads
    * This template will take any implementation of the "Lockable" concept
    * and allow it to be used as an "Exitable Lockable."
    *
-   * Something that implements the "Lockable concept" simply means that 
+   * Something that implements the "Lockable concept" simply means that
    * it has the three methods:
    *
    *   lock();
@@ -54,10 +40,10 @@ namespace XbmcThreads
     CountingLockable& operator=(const CountingLockable&) = delete;
   protected:
     L mutex;
-    unsigned int count;
+    unsigned int count = 0;
 
   public:
-    inline CountingLockable() : count(0) {}
+    inline CountingLockable() = default;
 
     // boost::thread Lockable concept
     inline void lock() { mutex.lock(); count++; }
@@ -73,8 +59,8 @@ namespace XbmcThreads
      *  only once, and so it backs out ALMOST all the way, but
      *  leaves one still there.
      */
-    inline unsigned int exit(unsigned int leave = 0) 
-    { 
+    inline unsigned int exit(unsigned int leave = 0)
+    {
       // it's possible we don't actually own the lock
       // so we will try it.
       unsigned int ret = 0;
@@ -82,9 +68,9 @@ namespace XbmcThreads
       {
         if (leave < (count - 1))
         {
-          ret = count - 1 - leave;  // The -1 is because we don't want 
+          ret = count - 1 - leave;  // The -1 is because we don't want
                                     //  to count the try_lock increment.
-          // We must NOT compare "count" in this loop since 
+          // We must NOT compare "count" in this loop since
           // as soon as the last unlock is called another thread
           // can modify it.
           for (unsigned int i = 0; i < ret; i++)
@@ -93,7 +79,7 @@ namespace XbmcThreads
         unlock(); // undo the try_lock before returning
       }
 
-      return ret; 
+      return ret;
     }
 
     /**
@@ -101,13 +87,13 @@ namespace XbmcThreads
      */
     inline void restore(unsigned int restoreCount)
     {
-      for (unsigned int i = 0; i < restoreCount; i++) 
+      for (unsigned int i = 0; i < restoreCount; i++)
         lock();
     }
 
     /**
-     * Some implementations (see pthreads) require access to the underlying 
-     *  CCriticalSection, which is also implementation specific. This 
+     * Some implementations (see pthreads) require access to the underlying
+     *  CCriticalSection, which is also implementation specific. This
      *  provides access to it through the same method on the guard classes
      *  UniqueLock, and SharedLock.
      *

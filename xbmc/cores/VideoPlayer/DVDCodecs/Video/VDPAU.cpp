@@ -1,37 +1,26 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "VDPAU.h"
 #include "ServiceBroker.h"
 #include <dlfcn.h>
 #include "windowing/X11/WinSystemX11.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/TextureManager.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 #include "rendering/RenderSystem.h"
-#include "settings/Settings.h"
 #include "settings/lib/Setting.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "Application.h"
 #include "utils/MathUtils.h"
 #include "utils/TimeUtils.h"
@@ -61,7 +50,6 @@ CDecoder::Desc decoder_profiles[] = {
 {"HEVC_MAIN", VDP_DECODER_PROFILE_HEVC_MAIN},
 #endif
 };
-const size_t decoder_profile_count = sizeof(decoder_profiles)/sizeof(CDecoder::Desc);
 
 static struct SInterlaceMapping
 {
@@ -126,7 +114,7 @@ bool CVDPAUContext::EnsureContext(CVDPAUContext **ctx)
   m_context = new CVDPAUContext();
   *ctx = m_context;
   {
-    CSingleLock gLock(g_graphicsContext);
+    CSingleLock gLock(CServiceBroker::GetWinSystem()->GetGfxContext());
     if (!m_context->LoadSymbols() || !m_context->CreateContext())
     {
       delete m_context;
@@ -190,8 +178,8 @@ bool CVDPAUContext::CreateContext()
 {
   CLog::Log(LOGNOTICE,"VDPAU::CreateContext - creating decoder context");
 
-  int mScreen;
-  { CSingleLock lock(g_graphicsContext);
+  int screen;
+  { CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
 
     if (!m_display)
       m_display = XOpenDisplay(NULL);
@@ -199,13 +187,13 @@ bool CVDPAUContext::CreateContext()
     if (!m_display)
       return false;
 
-    mScreen = CServiceBroker::GetWinSystem().GetCurrentScreen();
+    screen = static_cast<CWinSystemX11*>(CServiceBroker::GetWinSystem())->GetScreen();
   }
 
   VdpStatus vdp_st;
   // Create Device
   vdp_st = dl_vdp_device_create_x11(m_display,
-                                    mScreen,
+                                    screen,
                                    &m_vdpDevice,
                                    &m_vdpProcs.vdp_get_proc_address);
 
@@ -283,15 +271,15 @@ void CVDPAUContext::SpewHardwareAvailable()  //Copyright (c) 2008 Wladimir J. va
   CLog::Log(LOGNOTICE,"VDPAU Decoder capabilities:");
   CLog::Log(LOGNOTICE,"name          level macbs width height");
   CLog::Log(LOGNOTICE,"------------------------------------");
-  for(unsigned int x=0; x<decoder_profile_count; ++x)
+  for(const CDecoder::Desc& decoder_profile : decoder_profiles)
   {
     VdpBool is_supported = false;
     uint32_t max_level, max_macroblocks, max_width, max_height;
-    rv = m_vdpProcs.vdp_decoder_query_caps(m_vdpDevice, decoder_profiles[x].id,
+    rv = m_vdpProcs.vdp_decoder_query_caps(m_vdpDevice, decoder_profile.id,
                                 &is_supported, &max_level, &max_macroblocks, &max_width, &max_height);
     if(rv == VDP_STATUS_OK && is_supported)
     {
-      CLog::Log(LOGNOTICE,"%-16s %2i %5i %5i %5i\n", decoder_profiles[x].name,
+      CLog::Log(LOGNOTICE,"%-16s %2i %5i %5i %5i\n", decoder_profile.name,
                 max_level, max_macroblocks, max_width, max_height);
     }
   }
@@ -500,8 +488,14 @@ CDecoder::CDecoder(CProcessInfo& processInfo) :
 
 bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum AVPixelFormat fmt)
 {
+  // this could be done better by querying actual hw capabilities
+  // but since vdpau will be dropped anyway in v19, this should do
+  if (avctx->sw_pix_fmt != AV_PIX_FMT_YUV420P &&
+      avctx->sw_pix_fmt != AV_PIX_FMT_YUVJ420P)
+    return false;
+
   // check if user wants to decode this format with VDPAU
-  std::string gpuvendor = CServiceBroker::GetRenderSystem().GetRenderVendor();
+  std::string gpuvendor = CServiceBroker::GetRenderSystem()->GetRenderVendor();
   std::transform(gpuvendor.begin(), gpuvendor.end(), gpuvendor.begin(), ::tolower);
   // nvidia is whitelisted despite for mpeg-4 we need to query user settings
   if ((gpuvendor.compare(0, 6, "nvidia") != 0)  || (avctx->codec_id == AV_CODEC_ID_MPEG4) || (avctx->codec_id == AV_CODEC_ID_H263))
@@ -516,14 +510,14 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
     auto entry = settings_map.find(avctx->codec_id);
     if (entry != settings_map.end())
     {
-      bool enabled = CServiceBroker::GetSettings().GetBool(entry->second) &&
-                     CServiceBroker::GetSettings().GetSetting(entry->second)->IsVisible();
+      const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+      bool enabled = settings->GetBool(entry->second) && settings->GetSetting(entry->second)->IsVisible();
       if (!enabled)
         return false;
     }
   }
 
-  if (!CServiceBroker::GetRenderSystem().IsExtSupported("GL_NV_vdpau_interop"))
+  if (!CServiceBroker::GetRenderSystem()->IsExtSupported("GL_NV_vdpau_interop"))
   {
     CLog::Log(LOGNOTICE, "VDPAU::Open: required extension GL_NV_vdpau_interop not found");
     return false;
@@ -536,6 +530,7 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
     return false;
   }
   m_vdpauConfig.numRenderBuffers = 5;
+  m_vdpauConfig.timeOpened = CurrentHostCounter();
   m_decoderThread = CThread::GetCurrentThreadId();
 
   if (!CVDPAUContext::EnsureContext(&m_vdpauConfig.context))
@@ -597,7 +592,7 @@ bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum A
       avctx->slice_flags = SLICE_FLAG_CODED_ORDER|SLICE_FLAG_ALLOW_FIELD;
       avctx->hwaccel_context = &m_hwContext;
 
-      CServiceBroker::GetWinSystem().Register(this);
+      CServiceBroker::GetWinSystem()->Register(this);
       m_avctx = mainctx;
       return true;
     }
@@ -614,7 +609,7 @@ void CDecoder::Close()
 {
   CLog::Log(LOGNOTICE, " (VDPAU) %s", __FUNCTION__);
 
-  CServiceBroker::GetWinSystem().Unregister(this);
+  CServiceBroker::GetWinSystem()->Unregister(this);
 
   CSingleLock lock(m_DecoderSection);
 
@@ -676,22 +671,22 @@ long CDecoder::ReleasePicReference()
 
 void CDecoder::SetWidthHeight(int width, int height)
 {
-  m_vdpauConfig.upscale = g_advancedSettings.m_videoVDPAUScaling;
+  m_vdpauConfig.upscale = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoVDPAUScaling;
 
   //pick the smallest dimensions, so we downscale with vdpau and upscale with opengl when appropriate
   //this requires the least amount of gpu memory bandwidth
-  if (g_graphicsContext.GetWidth() < width || g_graphicsContext.GetHeight() < height || m_vdpauConfig.upscale >= 0)
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth() < width || CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight() < height || m_vdpauConfig.upscale >= 0)
   {
     //scale width to desktop size if the aspect ratio is the same or bigger than the desktop
-    if ((double)height * g_graphicsContext.GetWidth() / width <= (double)g_graphicsContext.GetHeight())
+    if ((double)height * CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth() / width <= (double)CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight())
     {
-      m_vdpauConfig.outWidth = g_graphicsContext.GetWidth();
-      m_vdpauConfig.outHeight = MathUtils::round_int((double)height * g_graphicsContext.GetWidth() / width);
+      m_vdpauConfig.outWidth = CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth();
+      m_vdpauConfig.outHeight = MathUtils::round_int((double)height * CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth() / width);
     }
     else //scale height to the desktop size if the aspect ratio is smaller than the desktop
     {
-      m_vdpauConfig.outHeight = g_graphicsContext.GetHeight();
-      m_vdpauConfig.outWidth = MathUtils::round_int((double)width * g_graphicsContext.GetHeight() / height);
+      m_vdpauConfig.outHeight = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
+      m_vdpauConfig.outWidth = MathUtils::round_int((double)width * CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight() / height);
     }
   }
   else
@@ -706,7 +701,7 @@ void CDecoder::OnLostDisplay()
 {
   CLog::Log(LOGNOTICE,"CVDPAU::OnLostDevice event");
 
-  int count = g_graphicsContext.exit();
+  int count = CServiceBroker::GetWinSystem()->GetGfxContext().exit();
 
   CSingleLock lock(m_DecoderSection);
   FiniVDPAUOutput();
@@ -718,14 +713,14 @@ void CDecoder::OnLostDisplay()
   lock.Leave();
   m_DisplayEvent.Reset();
 
-  g_graphicsContext.restore(count);
+  CServiceBroker::GetWinSystem()->GetGfxContext().restore(count);
 }
 
 void CDecoder::OnResetDisplay()
 {
   CLog::Log(LOGNOTICE,"CVDPAU::OnResetDevice event");
 
-  int count = g_graphicsContext.exit();
+  int count = CServiceBroker::GetWinSystem()->GetGfxContext().exit();
 
   CSingleLock lock(m_DecoderSection);
   if (m_DisplayState == VDPAU_LOST)
@@ -735,7 +730,7 @@ void CDecoder::OnResetDisplay()
     m_DisplayEvent.Set();
   }
 
-  g_graphicsContext.restore(count);
+  CServiceBroker::GetWinSystem()->GetGfxContext().restore(count);
 }
 
 CDVDVideoCodec::VCReturn CDecoder::Check(AVCodecContext* avctx)
@@ -914,7 +909,7 @@ bool CDecoder::ConfigVDPAU(AVCodecContext* avctx, int ref_frames)
     return false;
 
   // initialize output
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
   m_vdpauConfig.stats = &m_bufferStats;
   m_vdpauConfig.vdpau = this;
   m_bufferStats.Reset();
@@ -1105,14 +1100,14 @@ CDVDVideoCodec::VCReturn CDecoder::Decode(AVCodecContext *avctx, AVFrame *pFrame
     m_videoSurfaces.MarkRender(surf);
 
     // send frame to output for processing
-    CVdpauDecodedPicture pic;
-    static_cast<ICallbackHWAccel*>(avctx->opaque)->GetPictureCommon(&pic.DVDPic);
-    pic.videoSurface = surf;
-    pic.DVDPic.color_space = avctx->colorspace;
+    CVdpauDecodedPicture *pic = new CVdpauDecodedPicture();
+    static_cast<ICallbackHWAccel*>(avctx->opaque)->GetPictureCommon(&(pic->DVDPic));
+    m_codecControl = pic->DVDPic.iFlags & (DVD_CODEC_CTRL_HURRY | DVD_CODEC_CTRL_NO_POSTPROC);
+    pic->videoSurface = surf;
+    pic->DVDPic.color_space = avctx->colorspace;
     m_bufferStats.IncDecoded();
-    m_vdpauOutput.m_dataPort.SendOutMessage(COutputDataProtocol::NEWFRAME, &pic, sizeof(pic));
-
-    m_codecControl = pic.DVDPic.iFlags & (DVD_CODEC_CTRL_DRAIN | DVD_CODEC_CTRL_NO_POSTPROC);
+    CPayloadWrap<CVdpauDecodedPicture> *payload = new CPayloadWrap<CVdpauDecodedPicture>(pic);
+    m_vdpauOutput.m_dataPort.SendOutMessage(COutputDataProtocol::NEWFRAME, payload);
   }
 
   uint16_t decoded, processed, render;
@@ -1285,7 +1280,7 @@ bool CDecoder::CheckStatus(VdpStatus vdp_st, int line)
 
 IHardwareDecoder* CDecoder::Create(CDVDStreamInfo &hint, CProcessInfo &processInfo, AVPixelFormat fmt)
  {
-   if (CDecoder::IsVDPAUFormat(fmt) && CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAU))
+   if (CDecoder::IsVDPAUFormat(fmt) && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAU))
      return new VDPAU::CDecoder(processInfo);
 
    return nullptr;
@@ -1303,17 +1298,19 @@ void CDecoder::Register()
 
   CDVDFactoryCodec::RegisterHWAccel("vdpau", CDecoder::Create);
 
-  std::string gpuvendor = CServiceBroker::GetRenderSystem().GetRenderVendor();
+  std::string gpuvendor = CServiceBroker::GetRenderSystem()->GetRenderVendor();
   std::transform(gpuvendor.begin(), gpuvendor.end(), gpuvendor.begin(), ::tolower);
   bool isNvidia = (gpuvendor.compare(0, 6, "nvidia") == 0);
 
-  CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAU)->SetVisible(true);
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAU)->SetVisible(true);
 
   if (!isNvidia)
   {
-    CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG4)->SetVisible(true);
-    CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUVC1)->SetVisible(true);
-    CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG2)->SetVisible(true);
+    settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG4)->SetVisible(true);
+    settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUVC1)->SetVisible(true);
+    settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG2)->SetVisible(true);
+    settings->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER)->SetVisible(true);
   }
 
 }
@@ -1620,11 +1617,11 @@ void CMixer::StateMachine(int signal, Protocol *port, Message *msg)
         switch (signal)
         {
         case CMixerDataProtocol::FRAME:
-          CVdpauDecodedPicture *frame;
-          frame = (CVdpauDecodedPicture*)msg->data;
-          if (frame)
+          CPayloadWrap<CVdpauDecodedPicture> *payload;
+          payload = dynamic_cast<CPayloadWrap<CVdpauDecodedPicture>*>(msg->payloadObj.get());
+          if (payload)
           {
-            m_decodedPics.push(*frame);
+            m_decodedPics.push(*(payload->GetPlayload()));
           }
           m_extTimeout = 0;
           return;
@@ -2074,7 +2071,7 @@ void CMixer::SetColor()
   }
 
   VdpVideoMixerAttribute attributes[] = { VDP_VIDEO_MIXER_ATTRIBUTE_CSC_MATRIX };
-  if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOSCREEN_LIMITEDRANGE))
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOSCREEN_LIMITEDRANGE))
   {
     float studioCSC[3][4];
     GenerateStudioCSCMatrix(colorStandard, studioCSC);
@@ -2177,7 +2174,7 @@ void CMixer::SetDeinterlacing()
     ||  method == VS_INTERLACEMETHOD_VDPAU_TEMPORAL_HALF)
     {
       VdpBool enabled[] = {1,0,0};
-      if (g_advancedSettings.m_videoVDPAUtelecine)
+      if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoVDPAUtelecine)
         enabled[2] = 1;
       vdp_st = m_config.context->GetProcs().vdp_video_mixer_set_feature_enables(m_videoMixer, ARSIZE(feature), feature, enabled);
     }
@@ -2185,7 +2182,7 @@ void CMixer::SetDeinterlacing()
          ||  method == VS_INTERLACEMETHOD_VDPAU_TEMPORAL_SPATIAL_HALF)
     {
       VdpBool enabled[] = {1,1,0};
-      if (g_advancedSettings.m_videoVDPAUtelecine)
+      if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoVDPAUtelecine)
         enabled[2] = 1;
       vdp_st = m_config.context->GetProcs().vdp_video_mixer_set_feature_enables(m_videoMixer, ARSIZE(feature), feature, enabled);
     }
@@ -2199,7 +2196,7 @@ void CMixer::SetDeinterlacing()
 
   SetDeintSkipChroma();
 
-  m_config.useInteropYuv = !CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER);
+  m_config.useInteropYuv = !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER);
 
   std::string deintStr = GetDeintStrFromInterlaceMethod(method);
   // update deinterlacing method used in processInfo (none if progressive)
@@ -2212,7 +2209,7 @@ void CMixer::SetDeintSkipChroma()
   VdpStatus vdp_st;
 
   uint8_t val;
-  if (g_advancedSettings.m_videoVDPAUdeintSkipChromaHD && m_config.outHeight >= 720)
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoVDPAUdeintSkipChromaHD && m_config.outHeight >= 720)
     val = 1;
   else
     val = 0;
@@ -2395,8 +2392,8 @@ void CMixer::Init()
   m_PostProc = false;
   m_vdpError = false;
 
-  m_config.upscale = g_advancedSettings.m_videoVDPAUScaling;
-  m_config.useInteropYuv = !CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER);
+  m_config.upscale = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoVDPAUScaling;
+  m_config.useInteropYuv = !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER);
 
   CreateVdpauMixer();
 
@@ -2446,8 +2443,13 @@ void CMixer::Flush()
   {
     if (msg->signal == CMixerDataProtocol::FRAME)
     {
-      CVdpauDecodedPicture pic = *reinterpret_cast<CVdpauDecodedPicture*>(msg->data);
-      m_config.videoSurfaces->ClearRender(pic.videoSurface);
+      CPayloadWrap<CVdpauDecodedPicture> *payload;
+      payload = dynamic_cast<CPayloadWrap<CVdpauDecodedPicture>*>(msg->payloadObj.get());
+      if (payload)
+      {
+        CVdpauDecodedPicture pic = *(payload->GetPlayload());
+        m_config.videoSurfaces->ClearRender(pic.videoSurface);
+      }
     }
     else if (msg->signal == CMixerDataProtocol::BUFFER)
     {
@@ -2514,7 +2516,7 @@ void CMixer::InitCycle()
     {
       if(method == VS_INTERLACEMETHOD_VDPAU_TEMPORAL_HALF ||
          method == VS_INTERLACEMETHOD_VDPAU_TEMPORAL_SPATIAL_HALF ||
-         !g_graphicsContext.IsFullScreenVideo())
+         !CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo())
         m_mixersteps = 1;
       else
       {
@@ -2761,7 +2763,7 @@ COutput::~COutput()
 
 void COutput::Dispose()
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
   m_bStop = true;
   m_outMsgEvent.Set();
   StopThread();
@@ -2906,12 +2908,11 @@ void COutput::StateMachine(int signal, Protocol *port, Message *msg)
         switch (signal)
         {
         case COutputDataProtocol::NEWFRAME:
-          CVdpauDecodedPicture *frame;
-          frame = (CVdpauDecodedPicture*)msg->data;
-          if (frame)
+          CPayloadWrap<CVdpauDecodedPicture> *payload;
+          payload = dynamic_cast<CPayloadWrap<CVdpauDecodedPicture>*>(msg->payloadObj.release());
+          if (payload)
           {
-            m_mixer.m_dataPort.SendOutMessage(CMixerDataProtocol::FRAME,
-                                               frame,sizeof(CVdpauDecodedPicture));
+            m_mixer.m_dataPort.SendOutMessage(CMixerDataProtocol::FRAME, payload);
           }
           return;
         case COutputDataProtocol::RETURNPIC:
@@ -3126,8 +3127,13 @@ void COutput::Flush()
   {
     if (msg->signal == COutputDataProtocol::NEWFRAME)
     {
-      CVdpauDecodedPicture pic = *reinterpret_cast<CVdpauDecodedPicture*>(msg->data);
-      m_config.videoSurfaces->ClearRender(pic.videoSurface);
+      CPayloadWrap<CVdpauDecodedPicture> *payload;
+      payload = dynamic_cast<CPayloadWrap<CVdpauDecodedPicture>*>(msg->payloadObj.get());
+      if (payload)
+      {
+        CVdpauDecodedPicture pic = *(payload->GetPlayload());
+        m_config.videoSurfaces->ClearRender(pic.videoSurface);
+      }
     }
     else if (msg->signal == COutputDataProtocol::RETURNPIC)
     {
@@ -3194,7 +3200,7 @@ CVdpauRenderPicture* COutput::ProcessMixerPicture()
     retPic->procPic = procPic;
     retPic->device = reinterpret_cast<void*>(m_config.context->GetDevice());
     retPic->procFunc = reinterpret_cast<void*>(m_config.context->GetProcs().vdp_get_proc_address);
-    retPic->ident = m_config.vdpau + m_config.resetCounter;
+    retPic->ident = m_config.timeOpened + m_config.resetCounter;
 
     retPic->DVDPic.SetParams(procPic.DVDPic);
     if (!procPic.isYuv)

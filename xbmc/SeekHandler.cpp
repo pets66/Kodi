@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "SeekHandler.h"
@@ -26,26 +14,19 @@
 #include "Application.h"
 #include "cores/DataCacheCore.h"
 #include "FileItem.h"
-#include "guilib/GraphicContext.h"
+#include "guilib/GUIComponent.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
 #include "settings/Settings.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
-
-CSeekHandler::CSeekHandler()
-: m_seekDelay(500),
-  m_requireSeek(false),
-  m_analogSeek(false),
-  m_seekSize(0),
-  m_seekStep(0)
-{
-}
 
 CSeekHandler::~CSeekHandler()
 {
@@ -58,9 +39,11 @@ void CSeekHandler::Configure()
 {
   Reset();
 
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+
   m_seekDelays.clear();
-  m_seekDelays.insert(std::make_pair(SEEK_TYPE_VIDEO, CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_SEEKDELAY)));
-  m_seekDelays.insert(std::make_pair(SEEK_TYPE_MUSIC, CServiceBroker::GetSettings().GetInt(CSettings::SETTING_MUSICPLAYER_SEEKDELAY)));
+  m_seekDelays.insert(std::make_pair(SEEK_TYPE_VIDEO, settings->GetInt(CSettings::SETTING_VIDEOPLAYER_SEEKDELAY)));
+  m_seekDelays.insert(std::make_pair(SEEK_TYPE_MUSIC, settings->GetInt(CSettings::SETTING_MUSICPLAYER_SEEKDELAY)));
 
   m_forwardSeekSteps.clear();
   m_backwardSeekSteps.clear();
@@ -74,7 +57,7 @@ void CSeekHandler::Configure()
     std::vector<int> forwardSeekSteps;
     std::vector<int> backwardSeekSteps;
 
-    std::vector<CVariant> seekSteps = CServiceBroker::GetSettings().GetList(it->second);
+    std::vector<CVariant> seekSteps = settings->GetList(it->second);
     for (std::vector<CVariant>::iterator it = seekSteps.begin(); it != seekSteps.end(); ++it)
     {
       int stepSeconds = static_cast<int>((*it).asInteger());
@@ -150,7 +133,7 @@ void CSeekHandler::Seek(bool forward, float amount, float duration /* = 0 */, bo
     if( duration )
       speed *= duration;
     else
-      speed /= g_graphicsContext.GetFPS();
+      speed /= CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();
 
     double totalTime = g_application.GetTotalTime();
     if (totalTime < 0)
@@ -239,22 +222,22 @@ void CSeekHandler::FrameMove()
   if (m_seekChanged)
   {
     m_seekChanged = false;
-    g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_STATE_CHANGED);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_STATE_CHANGED);
   }
 }
 
-void CSeekHandler::SettingOptionsSeekStepsFiller(SettingConstPtr setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+void CSeekHandler::SettingOptionsSeekStepsFiller(SettingConstPtr setting, std::vector<std::pair<std::string, int>> &list, int &current, void *data)
 {
   std::string label;
-  for (std::vector<int>::iterator it = g_advancedSettings.m_seekSteps.begin(); it != g_advancedSettings.m_seekSteps.end(); ++it) {
-    int seconds = *it;
+  for (int seconds : CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_seekSteps)
+  {
     if (seconds > 60)
       label = StringUtils::Format(g_localizeStrings.Get(14044).c_str(), seconds / 60);
     else
       label = StringUtils::Format(g_localizeStrings.Get(14045).c_str(), seconds);
 
-    list.insert(list.begin(), make_pair("-" + label, seconds*-1));
-    list.push_back(make_pair(label, seconds));
+    list.insert(list.begin(), std::make_pair("-" + label, seconds * -1));
+    list.push_back(std::make_pair(label, seconds));
   }
 }
 

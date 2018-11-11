@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include "DBusReserve.h"
 
@@ -33,7 +21,7 @@
 CDBusReserve::CDBusReserve()
 {
   CDBusError error;
-  
+
   m_conn.Connect(DBUS_BUS_SESSION);
 }
 
@@ -53,7 +41,7 @@ bool CDBusReserve::AcquireDevice(const std::string& device)
   CDBusError error;
   int res;
 
-  // currently only max prio is supported since 
+  // currently only max prio is supported since
   // we don't implement the RequestRelease interface
   int prio = INT_MAX;
 
@@ -125,7 +113,7 @@ bool CDBusReserve::AcquireDevice(const std::string& device)
   }
 
   res = dbus_bus_request_name(m_conn, service.c_str()
-                                  , DBUS_NAME_FLAG_DO_NOT_QUEUE 
+                                  , DBUS_NAME_FLAG_DO_NOT_QUEUE
                                   | (prio == INT_MAX ? 0 : DBUS_NAME_FLAG_ALLOW_REPLACEMENT)
                                   | DBUS_NAME_FLAG_REPLACE_EXISTING
                                   , error);

@@ -1,28 +1,16 @@
 /*
- *      Copyright (C) 2005-2014 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "utils/log.h"
 #include "VideoSyncOsx.h"
 #include "ServiceBroker.h"
 #include "utils/MathUtils.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "utils/TimeUtils.h"
 #include "windowing/WinSystem.h"
 #include <QuartzCore/CVDisplayLink.h>
@@ -33,7 +21,7 @@
 bool CVideoSyncOsx::Setup(PUPDATECLOCK func)
 {
   CLog::Log(LOGDEBUG, "CVideoSyncOsx::%s setting up OSX", __FUNCTION__);
-  
+
   //init the vblank timestamp
   m_LastVBlankTime = 0;
   UpdateClock = func;
@@ -41,8 +29,8 @@ bool CVideoSyncOsx::Setup(PUPDATECLOCK func)
   m_displayReset = false;
   m_lostEvent.Reset();
 
-  CServiceBroker::GetWinSystem().Register(this);
-  
+  CServiceBroker::GetWinSystem()->Register(this);
+
   return true;
 }
 
@@ -71,12 +59,12 @@ void CVideoSyncOsx::Cleanup()
   CLog::Log(LOGDEBUG, "CVideoSyncOsx::%s cleaning up OSX", __FUNCTION__);
   m_lostEvent.Set();
   m_LastVBlankTime = 0;
-  CServiceBroker::GetWinSystem().Unregister(this);
+  CServiceBroker::GetWinSystem()->Unregister(this);
 }
 
 float CVideoSyncOsx::GetFps()
 {
-  m_fps = g_graphicsContext.GetFPS();
+  m_fps = CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();
   CLog::Log(LOGDEBUG, "CVideoSyncOsx::%s Detected refreshrate: %f hertz", __FUNCTION__, m_fps);
   return m_fps;
 }
@@ -105,7 +93,7 @@ void CVideoSyncOsx::VblankHandler(int64_t nowtime, uint32_t timebase)
   int           NrVBlanks;
   double        VBlankTime;
   int64_t       Now = CurrentHostCounter();
-  
+
   if (m_LastVBlankTime != 0)
   {
     VBlankTime = (double)(nowtime - m_LastVBlankTime) / (double)timebase;
@@ -124,17 +112,17 @@ static CVReturn DisplayLinkCallBack(CVDisplayLinkRef displayLink, const CVTimeSt
 {
   // Create an autorelease pool (necessary to call into non-Obj-C code from Obj-C code)
   void* pool = Cocoa_Create_AutoReleasePool();
-  
+
   CVideoSyncOsx *VideoSyncOsx = reinterpret_cast<CVideoSyncOsx*>(displayLinkContext);
 
   if (inOutputTime->flags & kCVTimeStampHostTimeValid)
     VideoSyncOsx->VblankHandler(inOutputTime->hostTime, CVGetHostClockFrequency());
   else
     VideoSyncOsx->VblankHandler(CVGetCurrentHostTime(), CVGetHostClockFrequency());
-  
+
   // Destroy the autorelease pool
   Cocoa_Destroy_AutoReleasePool(pool);
-  
+
   return kCVReturnSuccess;
 }
 

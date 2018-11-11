@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "URL.h"
@@ -499,15 +487,20 @@ std::string CURL::GetWithoutUserDetails(bool redact) const
   }
 
   unsigned int sizeneed = m_strProtocol.length()
-                        + m_strDomain.length()
                         + m_strHostName.length()
                         + m_strFileName.length()
                         + m_strOptions.length()
                         + m_strProtocolOptions.length()
                         + 10;
 
-  if (redact)
-    sizeneed += sizeof("USERNAME:PASSWORD@");
+  if (redact && !m_strUserName.empty())
+  {
+    sizeneed += sizeof("USERNAME");
+    if (!m_strPassword.empty())
+      sizeneed += sizeof(":PASSWORD@");
+    if (!m_strDomain.empty())
+      sizeneed += sizeof("DOMAIN;");
+  }
 
   strURL.reserve(sizeneed);
 
@@ -519,11 +512,11 @@ std::string CURL::GetWithoutUserDetails(bool redact) const
 
   if (redact && !m_strUserName.empty())
   {
+    if (!m_strDomain.empty())
+      strURL += "DOMAIN;";
     strURL += "USERNAME";
     if (!m_strPassword.empty())
-    {
       strURL += ":PASSWORD";
-    }
     strURL += "@";
   }
 
@@ -577,14 +570,13 @@ std::string CURL::GetWithoutFilename() const
   strURL = m_strProtocol;
   strURL += "://";
 
-  if (!m_strDomain.empty())
-  {
-    strURL += m_strDomain;
-    strURL += ";";
-  }
-
   if (!m_strUserName.empty())
   {
+    if (!m_strDomain.empty())
+    {
+      strURL += Encode(m_strDomain);
+      strURL += ";";
+    }
     strURL += Encode(m_strUserName);
     if (!m_strPassword.empty())
     {
@@ -593,8 +585,6 @@ std::string CURL::GetWithoutFilename() const
     }
     strURL += "@";
   }
-  else if (!m_strDomain.empty())
-    strURL += "@";
 
   if (!m_strHostName.empty())
   {
@@ -631,7 +621,7 @@ std::string CURL::GetRedacted(const std::string& path)
 
 bool CURL::IsLocal() const
 {
-  return (m_strProtocol.empty() || IsLocalHost());
+  return (m_strProtocol.empty() || IsLocalHost() || IsProtocol("win-lib"));
 }
 
 bool CURL::IsLocalHost() const
@@ -687,7 +677,7 @@ std::string CURL::Decode(const std::string& strURLData)
     }
     else strResult += kar;
   }
-  
+
   return strResult;
 }
 
@@ -701,7 +691,7 @@ std::string CURL::Encode(const std::string& strURLData)
   for (size_t i = 0; i < strURLData.size(); ++i)
   {
     const char kar = strURLData[i];
-    
+
     // Don't URL encode "-_.!()" according to RFC1738
     //! @todo Update it to "-_.~" after Gotham according to RFC3986
     if (StringUtils::isasciialphanum(kar) || kar == '-' || kar == '.' || kar == '_' || kar == '!' || kar == '(' || kar == ')')
@@ -786,7 +776,7 @@ bool CURL::GetProtocolOption(const std::string &key, std::string &value) const
   CVariant valueObj;
   if (!m_protocolOptions.GetOption(key, valueObj))
     return false;
-  
+
   value = valueObj.asString();
   return true;
 }
@@ -796,7 +786,7 @@ std::string CURL::GetProtocolOption(const std::string &key) const
   std::string value;
   if (!GetProtocolOption(key, value))
     return "";
-  
+
   return value;
 }
 

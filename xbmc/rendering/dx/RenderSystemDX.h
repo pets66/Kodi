@@ -1,35 +1,20 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
-
-#ifndef RENDER_SYSTEM_DX_H
-#define RENDER_SYSTEM_DX_H
 
 #pragma once
 
 #include "DeviceResources.h"
 #include "threads/Condition.h"
 #include "threads/CriticalSection.h"
+#include "utils/Color.h"
 #include "rendering/RenderSystem.h"
 
 #include <vector>
-#include <wrl.h>
 #include <wrl/client.h>
 
 enum PCI_Vendors
@@ -56,7 +41,7 @@ public:
   bool BeginRender() override;
   bool EndRender() override;
   void PresentRender(bool rendered, bool videoLayer) override;
-  bool ClearBuffers(color_t color) override;
+  bool ClearBuffers(UTILS::Color color) override;
   void SetViewPort(const CRect& viewPort) override;
   void GetViewPort(CRect& viewPort) override;
   void RestoreViewPort() override;
@@ -69,7 +54,6 @@ public:
   void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor = 0.f) override;
   void SetStereoMode(RENDER_STEREO_MODE mode, RENDER_STEREO_VIEW view) override;
   bool SupportsStereo(RENDER_STEREO_MODE mode) const override;
-  bool TestRender() override;
   void Project(float &x, float &y, float &z) override;
   bool SupportsNPOT(bool dxt) const override;
 
@@ -91,8 +75,6 @@ public:
 
   // empty overrides
   bool IsExtSupported(const char* extension) const override { return false; };
-  void ApplyHardwareTransform(const TransformMatrix &matrix) override {};
-  void RestoreHardwareTransform() override {};
   bool ResetRenderSystem(int width, int height) override { return true; };
 
   std::vector<AVPixelFormat> m_processorFormats;
@@ -133,4 +115,3 @@ protected:
   std::shared_ptr<DX::DeviceResources> m_deviceResources;
 };
 
-#endif // RENDER_SYSTEM_DX

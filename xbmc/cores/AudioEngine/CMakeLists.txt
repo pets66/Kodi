@@ -1,11 +1,5 @@
 set(SOURCES AEResampleFactory.cpp
             AESinkFactory.cpp
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSP.cpp
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPAddon.cpp
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPDatabase.cpp
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPMode.cpp
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPProcess.cpp
-            Engines/ActiveAE/AudioDSPAddons/AudioDSPSettings.cpp
             Encoders/AEEncoderFFmpeg.cpp
             Engines/ActiveAE/ActiveAE.cpp
             Engines/ActiveAE/ActiveAEBuffer.cpp
@@ -24,12 +18,6 @@ set(SOURCES AEResampleFactory.cpp
 
 set(HEADERS AEResampleFactory.h
             AESinkFactory.h
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSP.h
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPAddon.h
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPDatabase.h
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPMode.h
-            Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPProcess.h
-            Engines/ActiveAE/AudioDSPAddons/AudioDSPSettings.h
             Encoders/AEEncoderFFmpeg.h
             Engines/ActiveAE/ActiveAE.h
             Engines/ActiveAE/ActiveAEBuffer.h
@@ -60,11 +48,14 @@ set(HEADERS AEResampleFactory.h
 
 if(ALSA_FOUND)
   list(APPEND SOURCES Sinks/AESinkALSA.cpp
-                      Sinks/alsa/ALSAHControlMonitor.cpp
                       Utils/AEELDParser.cpp)
   list(APPEND HEADERS Sinks/AESinkALSA.h
-                      Sinks/alsa/ALSAHControlMonitor.h
                       Utils/AEELDParser.h)
+                      
+  if(NOT CORE_PLATFORM_NAME_LC STREQUAL x11)
+    list(APPEND SOURCES Sinks/alsa/ALSAHControlMonitor.cpp)
+    list(APPEND HEADERS Sinks/alsa/ALSAHControlMonitor.h)
+  endif()
 
   if(UDEV_FOUND)
     list(APPEND SOURCES Sinks/alsa/ALSADeviceMonitor.cpp)

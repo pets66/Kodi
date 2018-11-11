@@ -1,36 +1,54 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "guilib/GUIDialog.h"
+
+#include <memory>
 
 namespace KODI
 {
 namespace GAME
 {
+  class CDialogGameOSDHelp;
+
   class CDialogGameOSD : public CGUIDialog
   {
   public:
     CDialogGameOSD();
 
     ~CDialogGameOSD() override = default;
+
+    // Implementation of CGUIControl via CGUIDialog
+    bool OnAction(const CAction &action) override;
+
+    // Implementation of CGUIWindow via CGUIDialog
+    void OnDeinitWindow(int nextWindowID) override;
+
+    /*!
+     * \brief Decide if the game should play behind the given dialog
+     *
+     * If true, the game should be played at regular speed.
+     *
+     * \param dialog The current dialog
+     *
+     * \return True if the game should be played at regular speed behind the
+     *         dialog, false otherwise
+     */
+    static bool PlayInBackground(int dialogId);
+
+  protected:
+    // Implementation of CGUIWindow via CGUIDialog
+    void OnInitWindow() override;
+
+  private:
+    std::unique_ptr<CDialogGameOSDHelp> m_helpDialog;
  };
 }
 }

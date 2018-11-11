@@ -1,27 +1,17 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "InfoExpression.h"
 #include <stack>
 #include "utils/log.h"
 #include "GUIInfoManager.h"
+#include "guilib/GUIComponent.h"
+#include "ServiceBroker.h"
 #include <list>
 #include <memory>
 
@@ -29,12 +19,12 @@ using namespace INFO;
 
 void InfoSingle::Initialize()
 {
-  m_condition = g_infoManager.TranslateSingleString(m_expression, m_listItemDependent);
+  m_condition = CServiceBroker::GetGUI()->GetInfoManager().TranslateSingleString(m_expression, m_listItemDependent);
 }
 
 void InfoSingle::Update(const CGUIListItem *item)
 {
-  m_value = g_infoManager.GetBool(m_condition, m_context, item);
+  m_value = CServiceBroker::GetGUI()->GetInfoManager().GetBool(m_condition, m_context, item);
 }
 
 void InfoExpression::Initialize()
@@ -42,7 +32,7 @@ void InfoExpression::Initialize()
   if (!Parse(m_expression))
   {
     CLog::Log(LOGERROR, "Error parsing boolean expression %s", m_expression.c_str());
-    m_expression_tree = std::make_shared<InfoLeaf>(g_infoManager.Register("false", 0), false);
+    m_expression_tree = std::make_shared<InfoLeaf>(CServiceBroker::GetGUI()->GetInfoManager().Register("false", 0), false);
   }
 }
 
@@ -216,9 +206,13 @@ bool InfoExpression::Parse(const std::string &expression)
   bool after_binaryoperator = true;
   int bracket_count = 0;
 
+  CGUIInfoManager& infoMgr = CServiceBroker::GetGUI()->GetInfoManager();
+
   char c;
   // Skip leading whitespace - don't want it to count as an operand if that's all there is
-  while (isspace((unsigned char)(c=*s))) s++;
+  while (isspace((unsigned char)(c=*s)))
+    s++;
+
   while ((c = *s++) != '\0')
   {
     operator_t op;
@@ -240,7 +234,7 @@ bool InfoExpression::Parse(const std::string &expression)
       }
       if (!operand.empty())
       {
-        InfoPtr info = g_infoManager.Register(operand, m_context);
+        InfoPtr info = infoMgr.Register(operand, m_context);
         if (!info)
         {
           CLog::Log(LOGERROR, "Bad operand '%s'", operand.c_str());
@@ -291,7 +285,7 @@ bool InfoExpression::Parse(const std::string &expression)
   }
   if (!operand.empty())
   {
-    InfoPtr info = g_infoManager.Register(operand, m_context);
+    InfoPtr info = infoMgr.Register(operand, m_context);
     if (!info)
     {
       CLog::Log(LOGERROR, "Bad operand '%s'", operand.c_str());

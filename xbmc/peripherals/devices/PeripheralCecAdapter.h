@@ -1,24 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
+#pragma once
 
 #if !defined(HAVE_LIBCEC)
 #include "Peripheral.h"
@@ -57,7 +45,6 @@ namespace PERIPHERALS
 #endif
 #include <libcec/cectypes.h>
 
-class DllLibCEC;
 class CVariant;
 
 namespace CEC
@@ -153,7 +140,6 @@ namespace PERIPHERALS
     static void CecSourceActivated(void *param, const CEC::cec_logical_address address, const uint8_t activated);
     static void CecKeyPress(void *cbParam, const CEC::cec_keypress* key);
 
-    DllLibCEC* m_dll;
     CEC::ICECAdapter* m_cecAdapter;
     bool m_bStarted;
     bool m_bHasButton;
@@ -173,7 +159,7 @@ namespace PERIPHERALS
     bool m_bDeviceRemoved;
     CPeripheralCecAdapterUpdateThread*m_queryThread;
     CEC::ICECCallbacks m_callbacks;
-    CCriticalSection m_critSection;
+    mutable CCriticalSection m_critSection;
     CEC::libcec_configuration m_configuration;
     bool m_bActiveSourcePending;
     bool m_bStandbyPending;

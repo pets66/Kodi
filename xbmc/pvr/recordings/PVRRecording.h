@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 /*
  * DESCRIPTION:
@@ -52,7 +41,7 @@ namespace PVR
   /*!
    * @brief Representation of a CPVRRecording unique ID.
    */
-  class CPVRRecordingUid
+  class CPVRRecordingUid final
   {
   public:
     int           m_iClientId;        /*!< ID of the backend */
@@ -66,7 +55,7 @@ namespace PVR
     bool operator !=(const CPVRRecordingUid& right) const;
   };
 
-  class CPVRRecording : public CVideoInfoTag
+  class CPVRRecording final : public CVideoInfoTag
   {
   public:
     int           m_iClientId;        /*!< ID of the backend */
@@ -88,8 +77,6 @@ namespace PVR
     CPVRRecording &operator =(const CPVRRecording &other) = delete;
 
   public:
-    ~CPVRRecording() override = default;
-
     bool operator ==(const CPVRRecording& right) const;
     bool operator !=(const CPVRRecording& right) const;
 
@@ -300,6 +287,30 @@ namespace PVR
     */
    void SetGenre(int iGenreType, int iGenreSubType, const std::string &strGenre);
 
+    /*!
+     * @brief Get the genre type ID of this event.
+     * @return The genre type ID.
+     */
+    int GenreType(void) const { return m_iGenreType; }
+
+    /*!
+     * @brief Get the genre subtype ID of this event.
+     * @return The genre subtype ID.
+     */
+    int GenreSubType(void) const { return m_iGenreSubType; }
+
+    /*!
+     * @brief Get the genre as human readable string.
+     * @return The genre.
+     */
+    const std::vector<std::string> Genre(void) const { return m_genre; }
+
+    /*!
+     * @brief Get the genre(s) of this event as formatted string.
+     * @return The genres label.
+     */
+   const std::string GetGenresLabel() const;
+
   private:
     CDateTime    m_recordingTime; /*!< start time of the recording */
     bool         m_bGotMetaData;
@@ -307,6 +318,8 @@ namespace PVR
     unsigned int m_iEpgEventId;   /*!< epg broadcast id associated with this recording */
     int          m_iChannelUid;   /*!< channel uid associated with this recording */
     bool         m_bRadio;        /*!< radio or tv recording */
+    int          m_iGenreType = 0;    /*!< genre type */
+    int          m_iGenreSubType = 0; /*!< genre subtype */
 
     void UpdatePath(void);
   };

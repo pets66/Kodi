@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "cores/AudioEngine/Interfaces/AEStream.h"
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
@@ -102,10 +91,10 @@ class CActiveAEStreamBuffers
 public:
   CActiveAEStreamBuffers(const AEAudioFormat& inputFormat, const AEAudioFormat& outputFormat, AEQuality quality);
   virtual ~CActiveAEStreamBuffers();
-  bool Create(unsigned int totaltime, bool remap, bool upmix, bool normalize = true, bool useDSP = false);
+  bool Create(unsigned int totaltime, bool remap, bool upmix, bool normalize = true);
   void SetExtraData(int profile, enum AVMatrixEncoding matrix_encoding, enum AVAudioServiceType audio_service_type);
   bool ProcessBuffers();
-  void ConfigureResampler(bool normalizelevels, bool dspenabled, bool stereoupmix, AEQuality quality);
+  void ConfigureResampler(bool normalizelevels, bool stereoupmix, AEQuality quality);
   bool HasInputLevel(int level);
   float GetDelay();
   void Flush();
@@ -116,11 +105,10 @@ public:
   void FillBuffer();
   bool DoesNormalize();
   void ForceResampler(bool force);
-  void SetDSPConfig(bool usedsp, bool bypassdsp);
   bool HasWork();
   CActiveAEBufferPool *GetResampleBuffers();
   CActiveAEBufferPool *GetAtempoBuffers();
-  
+
   AEAudioFormat m_inputFormat;
   std::deque<CSampleBuffer*> m_outputSamples;
   std::deque<CSampleBuffer*> m_inputSamples;
@@ -152,7 +140,7 @@ protected:
 
 public:
   unsigned int GetSpace() override;
-  unsigned int AddData(const uint8_t* const *data, unsigned int offset, unsigned int frames, double pts = 0.0) override;
+  unsigned int AddData(const uint8_t* const *data, unsigned int offset, unsigned int frames, ExtData *extData) override;
   double GetDelay() override;
   CAESyncInfo GetSyncInfo() override;
   bool IsBuffering() override;
@@ -177,10 +165,10 @@ public:
 
   unsigned int GetFrameSize() const override;
   unsigned int GetChannelCount() const override;
-  
+
   unsigned int GetSampleRate() const override ;
   enum AEDataFormat GetDataFormat() const override;
-  
+
   double GetResampleRatio() override;
   void SetResampleRatio(double ratio) override;
   void SetResampleMode(int mode) override;
@@ -189,7 +177,6 @@ public:
   void FadeVolume(float from, float to, unsigned int time) override;
   bool IsFading() override;
   void RegisterSlave(IAEStream *stream) override;
-  bool HasDSP() override;
 
 protected:
 
@@ -208,7 +195,6 @@ protected:
   int m_streamFreeBuffers;
   bool m_streamIsBuffering;
   bool m_streamIsFlushed;
-  bool m_bypassDSP;
   IAEStream *m_streamSlave;
   CCriticalSection m_streamLock;
   CCriticalSection m_statsLock;

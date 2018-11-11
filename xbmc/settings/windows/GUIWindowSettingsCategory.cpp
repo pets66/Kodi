@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <string>
@@ -27,6 +15,7 @@
 #include "input/Key.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/lib/SettingSection.h"
 #include "settings/windows/GUIControlSettings.h"
 #include "utils/log.h"
@@ -59,9 +48,7 @@ static const SettingGroup s_settingGroupMap[] = { { SETTINGS_SYSTEM,      "syste
 
 CGUIWindowSettingsCategory::CGUIWindowSettingsCategory()
     : CGUIDialogSettingsManagerBase(WINDOW_SETTINGS_SYSTEM, "SettingsCategory.xml"),
-      m_settings(CServiceBroker::GetSettings()),
-      m_iSection(0),
-      m_returningFromSkinLoad(false)
+      m_settings(CServiceBroker::GetSettingsComponent()->GetSettings())
 {
   // set the correct ID range...
   m_idRange.clear();
@@ -82,7 +69,7 @@ bool CGUIWindowSettingsCategory::OnMessage(CGUIMessage &message)
   {
     case GUI_MSG_WINDOW_INIT:
     {
-      m_iSection = (int)message.GetParam2() - (int)CGUIDialogSettingsManagerBase::GetID();
+      m_iSection = message.GetParam2() - CGUIDialogSettingsManagerBase::GetID();
       CGUIDialogSettingsManagerBase::OnMessage(message);
       m_returningFromSkinLoad = false;
 
@@ -91,7 +78,7 @@ bool CGUIWindowSettingsCategory::OnMessage(CGUIMessage &message)
 
       return true;
     }
-    
+
     case GUI_MSG_FOCUSED:
     {
       if (!m_returningFromSkinLoad)
@@ -110,9 +97,9 @@ bool CGUIWindowSettingsCategory::OnMessage(CGUIMessage &message)
     {
       if (message.GetParam1() == GUI_MSG_WINDOW_RESIZE)
       {
-        if (IsActive() && CDisplaySettings::GetInstance().GetCurrentResolution() != g_graphicsContext.GetVideoResolution())
+        if (IsActive() && CDisplaySettings::GetInstance().GetCurrentResolution() != CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution())
         {
-          CDisplaySettings::GetInstance().SetCurrentResolution(g_graphicsContext.GetVideoResolution(), true);
+          CDisplaySettings::GetInstance().SetCurrentResolution(CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution(), true);
           CreateSettings();
         }
       }
@@ -132,9 +119,9 @@ bool CGUIWindowSettingsCategory::OnAction(const CAction &action)
       //Test if we can access the new level
       if (!g_passwordManager.CheckSettingLevelLock(CViewStateSettings::GetInstance().GetNextSettingLevel(), true))
         return false;
-      
+
       CViewStateSettings::GetInstance().CycleSettingLevel();
-      CServiceBroker::GetSettings().Save();
+      CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
 
       // try to keep the current position
       std::string oldCategory;
@@ -189,10 +176,10 @@ int CGUIWindowSettingsCategory::GetSettingLevel() const
 
 SettingSectionPtr CGUIWindowSettingsCategory::GetSection()
 {
-  for (size_t index = 0; index < SettingGroupSize; index++)
+  for (const SettingGroup& settingGroup : s_settingGroupMap)
   {
-    if (s_settingGroupMap[index].id == m_iSection)
-      return m_settings.GetSection(s_settingGroupMap[index].name);
+    if (settingGroup.id == m_iSection)
+      return m_settings->GetSection(settingGroup.name);
   }
 
   return NULL;
@@ -200,12 +187,12 @@ SettingSectionPtr CGUIWindowSettingsCategory::GetSection()
 
 void CGUIWindowSettingsCategory::Save()
 {
-  m_settings.Save();
+  m_settings->Save();
 }
 
 CSettingsManager* CGUIWindowSettingsCategory::GetSettingsManager() const
 {
-  return m_settings.GetSettingsManager();
+  return m_settings->GetSettingsManager();
 }
 
 void CGUIWindowSettingsCategory::FocusElement(const std::string& elementId)

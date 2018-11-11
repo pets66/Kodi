@@ -27,6 +27,7 @@
     !defined(__SH4__) && \
     !defined(__sparc__) && \
     !defined(__arc__) && \
+    !defined(__or1k__) && \
     !defined(__xtensa__)
 
 #include "ldt_keeper.h"
@@ -178,7 +179,7 @@ ldt_fs_t* Setup_LDT_Keeper(void)
   if (getenv("DYLD_BIND_AT_LAUNCH") == NULL)
     printf("DYLD_BIND_AT_LAUNCH");
 #endif // TARGET_DARWIN
-    
+
   sret = sysconf(_SC_PAGE_SIZE);
   if (sret == -1)
   {
@@ -270,7 +271,7 @@ void Restore_LDT_Keeper(ldt_fs_t* ldt_fs)
 	  return;
   if (ldt_fs->prev_struct)
 	  free(ldt_fs->prev_struct);
-  
+
   int sret = sysconf(_SC_PAGE_SIZE);
   if (sret != -1)
     munmap((char*)ldt_fs->fs_seg, sret);

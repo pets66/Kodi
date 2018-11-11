@@ -1,52 +1,35 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "SettingConditions.h"
 #include "Application.h"
-#include "GUIPassword.h"
+#include "LockType.h"
 #include "Util.h"
 #include "addons/AddonManager.h"
 #include "addons/binary-addons/BinaryAddonManager.h"
-#include "addons/BinaryAddonCache.h"
 #include "addons/Skin.h"
 #if defined(TARGET_ANDROID)
 #include "platform/android/activity/AndroidFeatures.h"
 #endif // defined(TARGET_ANDROID)
 #include "cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.h"
 #include "ServiceBroker.h"
-#include "cores/AudioEngine/Interfaces/AE.h"
-#include "guilib/LocalizeStrings.h"
+#include "GUIPassword.h"
 #if defined(HAS_WEB_SERVER)
 #include "network/WebServer.h"
 #endif
 #include "peripherals/Peripherals.h"
-#include "profiles/ProfilesManager.h"
-#include "pvr/PVRGUIActions.h"
-#include "pvr/PVRManager.h"
-#include "pvr/PVRSettings.h"
+#include "profiles/ProfileManager.h"
 #include "settings/SettingAddon.h"
+#include "settings/SettingsComponent.h"
 #if defined(HAS_LIBAMCODEC)
 #include "utils/AMLUtils.h"
 #endif // defined(HAS_LIBAMCODEC)
 #include "utils/StringUtils.h"
-#include "utils/SystemInfo.h"
 #if defined(TARGET_DARWIN_OSX)
 #include "platform/darwin/DarwinUtils.h"
 #endif// defined(TARGET_DARWIN_OSX)
@@ -76,11 +59,6 @@ bool CheckMasterLock(const std::string &condition, const std::string &value, Set
   return g_passwordManager.IsMasterLockUnlocked(StringUtils::EqualsNoCase(value, "true"));
 }
 
-bool CheckPVRParentalPin(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
-{
-  return CServiceBroker::GetPVRManager().GUIActions()->CheckParentalPIN();
-}
-
 bool HasPeripherals(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
 {
   return CServiceBroker::GetPeripherals().GetNumberOfPeripherals() > 0;
@@ -108,7 +86,7 @@ bool HasPowerOffFeature(const std::string &condition, const std::string &value, 
 
 bool IsFullscreen(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
 {
-  return CServiceBroker::GetWinSystem().IsFullScreen();
+  return CServiceBroker::GetWinSystem()->IsFullScreen();
 }
 
 bool IsMasterUser(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
@@ -268,16 +246,14 @@ bool LessThanOrEqual(const std::string &condition, const std::string &value, Set
   return lhs <= rhs;
 }
 
-const CProfilesManager *CSettingConditions::m_profileManager = nullptr;
+const CProfileManager *CSettingConditions::m_profileManager = nullptr;
 std::set<std::string> CSettingConditions::m_simpleConditions;
 std::map<std::string, SettingConditionCheck> CSettingConditions::m_complexConditions;
 
-void CSettingConditions::Initialize(const CProfilesManager &profileManager)
+void CSettingConditions::Initialize()
 {
   if (!m_simpleConditions.empty())
     return;
-
-  m_profileManager = &profileManager;
 
   // add simple conditions
   m_simpleConditions.insert("true");
@@ -329,6 +305,12 @@ void CSettingConditions::Initialize(const CProfilesManager &profileManager)
 #ifdef TARGET_DARWIN
   m_simpleConditions.insert("HasVTB");
 #endif
+#ifdef TARGET_DARWIN_OSX
+  m_simpleConditions.insert("have_osx");
+#endif
+#ifdef TARGET_DARWIN_IOS
+  m_simpleConditions.insert("have_ios");
+#endif
 #ifdef HAS_LIBAMCODEC
   if (aml_present())
     m_simpleConditions.insert("have_amcodec");
@@ -358,7 +340,6 @@ void CSettingConditions::Initialize(const CProfilesManager &profileManager)
   // add complex conditions
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("addonhassettings",              AddonHasSettings));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("checkmasterlock",               CheckMasterLock));
-  m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("checkpvrparentalpin",           CheckPVRParentalPin));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("hasperipherals",                HasPeripherals));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("hasperipherallibraries",        HasPeripheralLibraries));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("hasrumblefeature",              HasRumbleFeature));
@@ -385,7 +366,6 @@ void CSettingConditions::Initialize(const CProfilesManager &profileManager)
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("gte",                           GreaterThanOrEqual));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("lt",                            LessThan));
   m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("lte",                           LessThanOrEqual));
-  m_complexConditions.insert(std::pair<std::string, SettingConditionCheck>("pvrsettingvisible",             PVR::CPVRSettings::IsSettingVisible));
 }
 
 void CSettingConditions::Deinitialize()
@@ -395,6 +375,9 @@ void CSettingConditions::Deinitialize()
 
 const CProfile& CSettingConditions::GetCurrentProfile()
 {
+  if (!m_profileManager)
+    m_profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager().get();
+
   if (m_profileManager)
     return m_profileManager->GetCurrentProfile();
 

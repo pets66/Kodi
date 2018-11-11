@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #ifdef TARGET_POSIX
 #define _onexit_t void*
@@ -131,13 +119,6 @@ extern "C"
   void dll_clearerr(FILE* stream);
   int dll_initterm(PFV * start, PFV * end);
   uintptr_t dll_beginthread(void( *start_address )( void * ),unsigned stack_size,void *arglist);
-  HANDLE dll_beginthreadex(LPSECURITY_ATTRIBUTES lpThreadAttributes, DWORD dwStackSize,
-                           LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, DWORD dwCreationFlags,
-#ifdef TARGET_FREEBSD
-                           long* lpThreadId);
-#else
-                           unsigned int lpThreadId);
-#endif
   int dll_stati64(const char *path, struct _stati64 *buffer);
   int dll_stat64(const char *path, struct __stat64 *buffer);
 #ifdef TARGET_WINDOWS
@@ -150,7 +131,7 @@ extern "C"
   void dllperror(const char* s);
   char* dllstrerror(int iErr);
   int dll_mkdir(const char* dir);
-  char* dll_getcwd(char *buffer, int maxlen);
+  const char* dll_getcwd(char *buffer, int maxlen);
   int dll_putenv(const char* envstring);
   int dll_ctype(int i);
   int dll_system(const char *command);

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUITextureGLES.h"
@@ -25,7 +13,8 @@
 #include "utils/GLUtils.h"
 #include "utils/MathUtils.h"
 #include "rendering/gles/RenderSystemGLES.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
+#include "windowing/WinSystem.h"
 
 #include <cstddef>
 
@@ -33,10 +22,10 @@
 CGUITextureGLES::CGUITextureGLES(float posX, float posY, float width, float height, const CTextureInfo &texture)
 : CGUITextureBase(posX, posY, width, height, texture)
 {
-  m_renderSystem = dynamic_cast<CRenderSystemGLES*>(&CServiceBroker::GetRenderSystem());
+  m_renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
 }
 
-void CGUITextureGLES::Begin(color_t color)
+void CGUITextureGLES::Begin(UTILS::Color color)
 {
   CBaseTexture* texture = m_texture.m_textures[m_currentFrame];
   texture->LoadToGPU();
@@ -50,6 +39,13 @@ void CGUITextureGLES::Begin(color_t color)
   m_col[1] = (GLubyte)GET_G(color);
   m_col[2] = (GLubyte)GET_B(color);
   m_col[3] = (GLubyte)GET_A(color);
+
+  if (CServiceBroker::GetWinSystem()->UseLimitedColor())
+  {
+    m_col[0] = (235 - 16) * m_col[0] / 255 + 16;
+    m_col[1] = (235 - 16) * m_col[1] / 255 + 16;
+    m_col[2] = (235 - 16) * m_col[2] / 255 + 16;
+  }
 
   bool hasAlpha = m_texture.m_textures[m_currentFrame]->HasAlpha() || m_col[3] < 255;
 
@@ -218,9 +214,9 @@ void CGUITextureGLES::Draw(float *x, float *y, float *z, const CRect &texture, c
   }
 }
 
-void CGUITextureGLES::DrawQuad(const CRect &rect, color_t color, CBaseTexture *texture, const CRect *texCoords)
+void CGUITextureGLES::DrawQuad(const CRect &rect, UTILS::Color color, CBaseTexture *texture, const CRect *texCoords)
 {
-  CRenderSystemGLES *renderSystem = dynamic_cast<CRenderSystemGLES*>(&CServiceBroker::GetRenderSystem());
+  CRenderSystemGLES *renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
   if (texture)
   {
     texture->LoadToGPU();

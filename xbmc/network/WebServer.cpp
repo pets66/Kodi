@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WebServer.h"
@@ -34,11 +22,11 @@
 #include "network/httprequesthandler/IHTTPRequestHandler.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "ServiceBroker.h"
 #include "threads/SingleLock.h"
-#include "URL.h"
 #include "Util.h"
-#include "utils/Base64.h"
+#include "utils/FileUtils.h"
 #include "utils/log.h"
 #include "utils/Mime.h"
 #include "utils/StringUtils.h"
@@ -76,13 +64,7 @@ typedef struct {
 } HttpFileDownloadContext;
 
 CWebServer::CWebServer()
-  : m_port(0),
-    m_daemon_ip6(nullptr),
-    m_daemon_ip4(nullptr),
-    m_running(false),
-    m_thread_stacksize(0),
-    m_authenticationRequired(false),
-    m_authenticationUsername("kodi"),
+  : m_authenticationUsername("kodi"),
     m_authenticationPassword(""),
     m_key(),
     m_cert()
@@ -101,14 +83,15 @@ CWebServer::CWebServer()
 #endif
 }
 
-static MHD_Response* create_response(size_t size, void* data, int free, int copy)
+static MHD_Response* create_response(size_t size, const void* data, int free, int copy)
 {
   MHD_ResponseMemoryMode mode = MHD_RESPMEM_PERSISTENT;
   if (copy)
     mode = MHD_RESPMEM_MUST_COPY;
   else if (free)
     mode = MHD_RESPMEM_MUST_FREE;
-  return MHD_create_response_from_buffer(size, data, mode);
+  //! @bug libmicrohttpd isn't const correct
+  return MHD_create_response_from_buffer(size, const_cast<void*>(data), mode);
 }
 
 int CWebServer::AskForAuthentication(const HTTPRequest& request) const
@@ -200,7 +183,7 @@ int CWebServer::HandlePartialRequest(struct MHD_Connection *connection, Connecti
   // reset con_cls and set it if still necessary
   *con_cls = nullptr;
 
-  if (!IsAuthenticated(request)) 
+  if (!IsAuthenticated(request))
     return AskForAuthentication(request);
 
   // check if this is the first call to AnswerToConnection for this request
@@ -381,7 +364,7 @@ int CWebServer::FinalizeRequest(const std::shared_ptr<IHTTPRequestHandler>& hand
   const HTTPRequest &request = handler->GetRequest();
   const HTTPResponseDetails &responseDetails = handler->GetResponseDetails();
 
-  // if the request handler has set a content type and it hasn't been set as a header, add it 
+  // if the request handler has set a content type and it hasn't been set as a header, add it
   if (!responseDetails.contentType.empty())
     handler->AddResponseHeader(MHD_HTTP_HEADER_CONTENT_TYPE, responseDetails.contentType);
 
@@ -750,6 +733,10 @@ int CWebServer::CreateFileDownloadResponse(const std::shared_ptr<IHTTPRequestHan
   std::shared_ptr<XFILE::CFile> file = std::make_shared<XFILE::CFile>();
   std::string filePath = handler->GetResponseFile();
 
+  // access check
+  if (!CFileUtils::CheckFileAccessAllowed(filePath))
+    return SendErrorResponse(request, MHD_HTTP_NOT_FOUND, request.method);
+
   if (!file->Open(filePath, XFILE::READ_NO_CACHE))
   {
     CLog::Log(LOGERROR, "CWebServer[%hu]: Failed to open %s", m_port, filePath.c_str());
@@ -874,7 +861,7 @@ int CWebServer::CreateFileDownloadResponse(const std::shared_ptr<IHTTPRequestHan
 int CWebServer::CreateErrorResponse(struct MHD_Connection *connection, int responseType, HTTPMethod method, struct MHD_Response *&response) const
 {
   size_t payloadSize = 0;
-  void *payload = nullptr;
+  const void *payload = nullptr;
 
   if (method != HEAD)
   {
@@ -882,12 +869,12 @@ int CWebServer::CreateErrorResponse(struct MHD_Connection *connection, int respo
     {
       case MHD_HTTP_NOT_FOUND:
         payloadSize = strlen(PAGE_FILE_NOT_FOUND);
-        payload = (void *)PAGE_FILE_NOT_FOUND;
+        payload = (const void *)PAGE_FILE_NOT_FOUND;
         break;
 
       case MHD_HTTP_NOT_IMPLEMENTED:
         payloadSize = strlen(NOT_SUPPORTED);
-        payload = (void *)NOT_SUPPORTED;
+        payload = (const void *)NOT_SUPPORTED;
         break;
     }
   }
@@ -1021,7 +1008,7 @@ ssize_t CWebServer::ContentReaderCallback(void *cls, uint64_t pos, char *buf, si
 
   // seek to the position if necessary
   if (context->file->GetPosition() < 0 || context->writePosition != static_cast<uint64_t>(context->file->GetPosition()))
-    context->file->Seek(static_cast<uint64_t>(context->writePosition));
+    context->file->Seek(context->writePosition);
 
   // read data from the file
   ssize_t res = context->file->Read(buf, static_cast<size_t>(maximum));
@@ -1077,7 +1064,7 @@ static void logFromMHD(void* unused, const char* fmt, va_list ap)
     {
       if (errDsc.at(errDsc.length() - 1) == '\n')
         errDsc.erase(errDsc.length() - 1);
-      
+
       // Most common error is "aborted connection", so log it at LOGDEBUG level
       CLog::Log(LOGDEBUG, "CWebServer [MHD]: %s", errDsc.c_str());
     }
@@ -1127,7 +1114,7 @@ struct MHD_Daemon* CWebServer::StartMHD(unsigned int flags, int port)
 
   MHD_set_panic_func(&panicHandlerForMHD, nullptr);
 
-  if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_SERVICES_WEBSERVERSSL) &&
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_SERVICES_WEBSERVERSSL) &&
       MHD_is_feature_supported(MHD_FEATURE_SSL) == MHD_YES &&
       LoadCert(m_key, m_cert))
     // SSL enabled
@@ -1195,7 +1182,7 @@ bool CWebServer::Start(uint16_t port, const std::string &username, const std::st
       m_daemon_ip6 = StartMHD(MHD_USE_IPv6, port);
     }
     m_daemon_ip4 = StartMHD(0, port);
-    
+
     m_running = (m_daemon_ip6 != nullptr) || (m_daemon_ip4 != nullptr);
     if (m_running)
     {
@@ -1219,7 +1206,7 @@ bool CWebServer::Stop()
 
   if (m_daemon_ip4 != nullptr)
     MHD_stop_daemon(m_daemon_ip4);
-    
+
   m_running = false;
   CLog::Log(LOGNOTICE, "CWebServer[%hu]: Stopped", m_port);
   m_port = 0;
@@ -1270,7 +1257,7 @@ void CWebServer::UnregisterRequestHandler(IHTTPRequestHandler *handler)
 
 void CWebServer::LogRequest(const HTTPRequest& request) const
 {
-  if (!g_advancedSettings.CanLogComponent(LOGWEBSERVER))
+  if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGWEBSERVER))
     return;
 
   std::multimap<std::string, std::string> headerValues;
@@ -1295,7 +1282,7 @@ void CWebServer::LogRequest(const HTTPRequest& request) const
 
 void CWebServer::LogResponse(const HTTPRequest& request, int responseStatus) const
 {
-  if (!g_advancedSettings.CanLogComponent(LOGWEBSERVER))
+  if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGWEBSERVER))
     return;
 
   std::multimap<std::string, std::string> headerValues;

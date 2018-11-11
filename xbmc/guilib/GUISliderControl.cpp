@@ -1,34 +1,25 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
+#include "ServiceBroker.h"
+#include "GUIComponent.h"
 #include "GUISliderControl.h"
 #include "GUIInfoManager.h"
 #include "input/Key.h"
 #include "utils/MathUtils.h"
 #include "utils/StringUtils.h"
-#include "guiinfo/GUIInfoLabels.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "GUIWindowManager.h"
 
 static const SliderAction actions[] = {
-  {"seek",    "PlayerControl(SeekPercentage(%2f))", PLAYER_PROGRESS, false},
-  {"volume",  "SetVolume(%2f)",                     PLAYER_VOLUME,   true}
+  {"seek",     "PlayerControl(SeekPercentage(%2f))", PLAYER_PROGRESS,                 false},
+  {"pvr.seek", "PVR.SeekPercentage(%2f)",            PVR_TIMESHIFT_PROGRESS_PLAY_POS, false},
+  {"volume",   "SetVolume(%2f)",                     PLAYER_VOLUME,                   true}
  };
 
 CGUISliderControl::CGUISliderControl(int parentID, int controlID, float posX, float posY, float width, float height, const CTextureInfo& backGroundTexture, const CTextureInfo& nibTexture, const CTextureInfo& nibTextureFocus, int iType, ORIENTATION orientation)
@@ -74,7 +65,7 @@ void CGUISliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
   if (infoCode)
   {
     int val;
-    if (g_infoManager.GetInt(val, infoCode))
+    if (CServiceBroker::GetGUI()->GetInfoManager().GetInt(val, infoCode))
       SetIntValue(val);
   }
 
@@ -306,7 +297,7 @@ void CGUISliderControl::SendClick()
     std::string action = StringUtils::Format(m_action->formatString, percent);
     CGUIMessage message(GUI_MSG_EXECUTE, m_controlID, m_parentID);
     message.SetStringParam(action);
-    g_windowManager.SendMessage(message);    
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(message);
   }
 }
 
@@ -631,7 +622,7 @@ EVENT_RESULT CGUISliderControl::OnMouseEvent(const CPoint &point, const CMouseEv
   else if (event.m_id == ACTION_GESTURE_NOTIFY)
   {
     return EVENT_RESULT_PAN_HORIZONTAL_WITHOUT_INERTIA;
-  }  
+  }
   else if (event.m_id == ACTION_GESTURE_BEGIN)
   { // grab exclusive access
     CGUIMessage msg(GUI_MSG_EXCLUSIVE_MOUSE, GetID(), GetParentID());
@@ -639,7 +630,7 @@ EVENT_RESULT CGUISliderControl::OnMouseEvent(const CPoint &point, const CMouseEv
     return EVENT_RESULT_HANDLED;
   }
   else if (event.m_id == ACTION_GESTURE_PAN)
-  { // do the drag 
+  { // do the drag
     SetFromPosition(point);
     return EVENT_RESULT_HANDLED;
   }
@@ -709,11 +700,11 @@ float CGUISliderControl::GetProportion(RangeSelector selector /* = RangeSelector
 
 void CGUISliderControl::SetAction(const std::string &action)
 {
-  for (size_t i = 0; i < sizeof(actions)/sizeof(SliderAction); i++)
+  for (const SliderAction& a : actions)
   {
-    if (StringUtils::EqualsNoCase(action, actions[i].action))
+    if (StringUtils::EqualsNoCase(action, a.action))
     {
-      m_action = &actions[i];
+      m_action = &a;
       return;
     }
   }

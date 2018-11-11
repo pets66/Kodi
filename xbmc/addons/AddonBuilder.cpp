@@ -1,40 +1,24 @@
 /*
- *      Copyright (C) 2016 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ServiceBroker.h"
 #include "addons/AddonBuilder.h"
 #include "addons/ContextMenuAddon.h"
 #include "addons/GameResource.h"
-#include "addons/ImageDecoder.h"
 #include "addons/FontResource.h"
 #include "addons/ImageResource.h"
 #include "addons/LanguageResource.h"
 #include "addons/PluginSource.h"
 #include "addons/Repository.h"
 #include "addons/Scraper.h"
-#include "addons/ScreenSaver.h"
 #include "addons/Service.h"
 #include "addons/Skin.h"
 #include "addons/UISoundsResource.h"
-#include "addons/VFSEntry.h"
-#include "addons/Visualization.h"
 #include "addons/Webinterface.h"
 #include "games/addons/GameClient.h"
 #include "games/controllers/Controller.h"
@@ -85,7 +69,6 @@ std::shared_ptr<IAddon> CAddonBuilder::Build()
   if (type == ADDON_VIZ ||
       type == ADDON_SCREENSAVER ||
       type == ADDON_PVRDLL ||
-      type == ADDON_ADSPDLL ||
       type == ADDON_AUDIOENCODER ||
       type == ADDON_AUDIODECODER ||
       type == ADDON_VFS ||
@@ -121,7 +104,6 @@ std::shared_ptr<IAddon> CAddonBuilder::Build()
     case ADDON_SCRAPER_TVSHOWS:
     case ADDON_SCRAPER_LIBRARY:
       return CScraper::FromExtension(std::move(m_addonInfo), m_extPoint);
-    case ADDON_ADSPDLL:
     case ADDON_AUDIODECODER:
     case ADDON_AUDIOENCODER:
     case ADDON_IMAGEDECODER:
@@ -189,7 +171,6 @@ AddonPtr CAddonBuilder::FromProps(CAddonInfo addonInfo)
       return AddonPtr(new CScraper(std::move(addonInfo)));
     case ADDON_SKIN:
       return AddonPtr(new CSkinInfo(std::move(addonInfo)));
-    case ADDON_ADSPDLL:
     case ADDON_AUDIODECODER:
     case ADDON_AUDIOENCODER:
     case ADDON_IMAGEDECODER:

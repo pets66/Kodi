@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIViewStatePVR.h"
@@ -23,6 +11,7 @@
 #include "FileItem.h"
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "view/ViewStateSettings.h"
 
 #include "pvr/recordings/PVRRecordingsPath.h"
@@ -33,8 +22,8 @@ using namespace PVR;
 CGUIViewStateWindowPVRChannels::CGUIViewStateWindowPVRChannels(const int windowId, const CFileItemList& items) : CGUIViewStatePVR(windowId, items)
 {
   AddSortMethod(SortByChannelNumber, 549, LABEL_MASKS("%L", "", "%L", ""));      // "Number"      : Filename, empty | Foldername, empty
-  AddSortMethod(SortByLabel,         551, LABEL_MASKS("%L", "", "%L", ""));      // "Name"        : Filename, empty | Foldername, empty
-  AddSortMethod(SortByLastPlayed,    568, LABEL_MASKS( "%L", "%p", "%L", "%p")); // "Last played" : Filename, LastPlayed | Foldername, LastPlayed
+  AddSortMethod(SortByChannel,       551, LABEL_MASKS("%L", "", "%L", ""));      // "Name"        : Filename, empty | Foldername, empty
+  AddSortMethod(SortByLastPlayed,    568, LABEL_MASKS("%L", "%p", "%L", "%p"));  // "Last played" : Filename, LastPlayed | Foldername, LastPlayed
 
   // Default sorting
   SetSortMethod(SortByChannelNumber);
@@ -50,7 +39,7 @@ void CGUIViewStateWindowPVRChannels::SaveViewState(void)
 CGUIViewStateWindowPVRRecordings::CGUIViewStateWindowPVRRecordings(const int windowId, const CFileItemList& items) : CGUIViewStatePVR(windowId, items)
 {
   AddSortMethod(SortByLabel, 551, LABEL_MASKS("%L", "%d", "%L", ""),    // "Name"     : Filename, DateTime | Foldername, empty
-                CServiceBroker::GetSettings().GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING)
+                CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING)
                   ? SortAttributeIgnoreArticle
                   : SortAttributeNone);
   AddSortMethod(SortByDate,  552, LABEL_MASKS("%L", "%d", "%L", "%d")); // "Date"     : Filename, DateTime | Foldername, DateTime
@@ -75,6 +64,13 @@ bool CGUIViewStateWindowPVRRecordings::HideParentDirItems(void)
 
 CGUIViewStateWindowPVRGuide::CGUIViewStateWindowPVRGuide(const int windowId, const CFileItemList& items) : CGUIViewStatePVR(windowId, items)
 {
+  AddSortMethod(SortByChannelNumber,                           549, LABEL_MASKS("%L", "", "%L", ""));     // "Number"      : Filename, empty | Foldername, empty
+  AddSortMethod(SortByChannel,                                 551, LABEL_MASKS("%L", "", "%L", ""));     // "Name"        : Filename, empty | Foldername, empty
+  AddSortMethod(SortByLastPlayed,    SortAttributeIgnoreLabel, 568, LABEL_MASKS("%L", "%p", "%L", "%p")); // "Last played" : Filename, LastPlayed | Foldername, LastPlayed
+
+  // Default sorting
+  SetSortMethod(SortByChannelNumber);
+
   LoadViewState("pvr://guide/", m_windowId);
 }
 
@@ -85,7 +81,7 @@ void CGUIViewStateWindowPVRGuide::SaveViewState(void)
 
 CGUIViewStateWindowPVRTimers::CGUIViewStateWindowPVRTimers(const int windowId, const CFileItemList& items) : CGUIViewStatePVR(windowId, items)
 {
-  int sortAttributes(CServiceBroker::GetSettings().GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING) ? SortAttributeIgnoreArticle : SortAttributeNone);
+  int sortAttributes(CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING) ? SortAttributeIgnoreArticle : SortAttributeNone);
   sortAttributes |= SortAttributeIgnoreFolders;
   AddSortMethod(SortByLabel, static_cast<SortAttribute>(sortAttributes), 551, LABEL_MASKS("%L", "", "%L", ""));     // "Name" : Filename, empty | Foldername, empty
   AddSortMethod(SortByDate,  static_cast<SortAttribute>(sortAttributes), 552, LABEL_MASKS("%L", "%d", "%L", "%d")); // "Date" : Filename, DateTime | Foldername, DateTime

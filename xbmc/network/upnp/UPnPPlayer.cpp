@@ -1,22 +1,10 @@
 /*
- *      Copyright (c) 2006 elupus (Joakim Plate)
- *      Copyright (C) 2006-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (c) 2006 elupus (Joakim Plate)
+ *  Copyright (C) 2006-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include <Platinum/Source/Platinum/Platinum.h>
 #include <Platinum/Source/Devices/MediaRenderer/PltMediaController.h>
@@ -32,6 +20,7 @@
 #include "utils/TimeUtils.h"
 #include "utils/Variant.h"
 #include "GUIInfoManager.h"
+#include "guilib/GUIComponent.h"
 #include "ThumbLoader.h"
 #include "video/VideoThumbLoader.h"
 #include "music/MusicThumbLoader.h"
@@ -181,12 +170,12 @@ CUPnPPlayer::CUPnPPlayer(IPlayerCallback& callback, const char* uuid)
   else
     CLog::Log(LOGERROR, "UPNP: CUPnPPlayer couldn't find device as %s", uuid);
 
-  CServiceBroker::GetWinSystem().RegisterRenderLoop(this);
+  CServiceBroker::GetWinSystem()->RegisterRenderLoop(this);
 }
 
 CUPnPPlayer::~CUPnPPlayer()
 {
-  CServiceBroker::GetWinSystem().UnregisterRenderLoop(this);
+  CServiceBroker::GetWinSystem()->UnregisterRenderLoop(this);
   CloseFile();
   CUPnP::UnregisterUserdata(m_delegate);
   delete m_delegate;
@@ -374,6 +363,7 @@ bool CUPnPPlayer::OpenFile(const CFileItem& file, const CPlayerOptions& options)
   m_stopremote = true;
   m_started = true;
   m_callback.OnPlayBackStarted(file);
+  m_callback.OnAVStarted(file);
   NPT_CHECK_LABEL_SEVERE(m_control->GetPositionInfo(m_delegate->m_device
                                                   , m_delegate->m_instance
                                                   , m_delegate), failed);
@@ -485,7 +475,7 @@ void CUPnPPlayer::SeekTime(int64_t ms)
                                 , "REL_TIME", PLT_Didl::FormatTimeStamp((NPT_UInt32)(ms / 1000))
                                 , m_delegate), failed);
 
-  g_infoManager.SetDisplayAfterSeek();
+  CServiceBroker::GetGUI()->GetInfoManager().GetInfoProviders().GetPlayerInfoProvider().SetDisplayAfterSeek();
   return;
 failed:
   CLog::Log(LOGERROR, "UPNP: CUPnPPlayer::SeekTime - unable to seek playback");
@@ -601,7 +591,7 @@ bool CUPnPPlayer::OnAction(const CAction &action)
       {
         //stop on remote system
         m_stopremote = HELPERS::ShowYesNoDialogText(CVariant{37022}, CVariant{37023}) == DialogResponse::YES;
-        
+
         return false; /* let normal code handle the action */
       }
     default:

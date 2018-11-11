@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ServiceBroker.h"
 #include "filesystem/File.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "test/TestUtils.h"
 #include "utils/StringUtils.h"
 
@@ -32,28 +21,25 @@ class TestFileFactory : public testing::Test
 protected:
   TestFileFactory()
   {
-    if (CServiceBroker::GetSettings().Initialize())
-    {
-      std::vector<std::string> advancedsettings =
-        CXBMCTestUtils::Instance().getAdvancedSettingsFiles();
-      std::vector<std::string> guisettings =
-        CXBMCTestUtils::Instance().getGUISettingsFiles();
+    std::vector<std::string> advancedsettings =
+      CXBMCTestUtils::Instance().getAdvancedSettingsFiles();
+    std::vector<std::string> guisettings =
+      CXBMCTestUtils::Instance().getGUISettingsFiles();
 
-      for (const auto& it : guisettings)
-        CServiceBroker::GetSettings().Load(it);
+    const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+    for (const auto& it : guisettings)
+      settings->Load(it);
 
-      for (const auto& it : advancedsettings)
-        g_advancedSettings.ParseSettingsFile(it);
+    const std::shared_ptr<CAdvancedSettings> advancedSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+    for (const auto& it : advancedsettings)
+      advancedSettings->ParseSettingsFile(it);
 
-      CServiceBroker::GetSettings().SetLoaded();
-    }
+    settings->SetLoaded();
   }
 
   ~TestFileFactory() override
   {
-    g_advancedSettings.Clear();
-    CServiceBroker::GetSettings().Unload();
-    CServiceBroker::GetSettings().Uninitialize();
+    CServiceBroker::GetSettingsComponent()->GetSettings()->Unload();
   }
 };
 

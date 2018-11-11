@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <climits>
 #include <cmath>
@@ -25,6 +14,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "MediaSource.h" // Definition of VECSOURCES
+#include "utils/Digest.h"
 
 #define ARRAY_SIZE(X)         (sizeof(X)/sizeof((X)[0]))
 
@@ -40,9 +30,7 @@ struct ExternalStreamInfo
 {
   std::string name;
   std::string language;
-  unsigned int flag;
-
-  ExternalStreamInfo() : flag(0){};
+  unsigned int flag = 0;
 };
 
 class CUtil
@@ -76,7 +64,7 @@ public:
    \param strPath - path to the file to MD5sum
    \return md5 sum of the file
    */
-  static std::string GetFileMD5(const std::string& strPath);
+  static std::string GetFileDigest(const std::string& strPath, KODI::UTILITY::CDigest::Type type);
   static bool GetDirectoryName(const std::string& strFileName, std::string& strDescription);
   static void GetDVDDriveIcon(const std::string& strPath, std::string& strIcon);
   static void RemoveTempFiles();
@@ -95,7 +83,7 @@ public:
   static bool IsVobSub(const std::vector<std::string>& vecSubtitles, const std::string& strSubPath);
   static std::string GetVobSubSubFromIdx(const std::string& vobSubIdx);
   static std::string GetVobSubIdxFromSub(const std::string& vobSub);
-  
+
   /** \brief Retrieves paths of external audio files for a given video.
   *   \param[in] videoPath The full path of the video file.
   *   \param[out] vecAudio A vector containing the full paths of all found external audio files.
@@ -123,7 +111,7 @@ public:
   static std::string MakeLegalPath(const std::string &strPath, int LegalType=LEGAL_NONE);
 #endif
   static std::string ValidatePath(const std::string &path, bool bFixDoubleSlashes = false); ///< return a validated path, with correct directory separators.
-  
+
   static bool IsUsingTTFSubtitles();
 
   /*! \brief Split a comma separated parameter list into separate parameters.

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AudioSinkAE.h"
@@ -26,7 +14,7 @@
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
-#include "settings/MediaSettings.h"
+#include "cores/AudioEngine/Utils/AEStreamData.h"
 #ifdef TARGET_POSIX
 #include "platform/linux/XTimeUtils.h"
 #endif
@@ -48,7 +36,7 @@ CAudioSinkAE::~CAudioSinkAE()
 {
   CSingleLock lock (m_critSection);
   if (m_pAudioStream)
-    CServiceBroker::GetActiveAE().FreeStream(m_pAudioStream);
+    CServiceBroker::GetActiveAE()->FreeStream(m_pAudioStream, true);
 }
 
 bool CAudioSinkAE::Create(const DVDAudioFrame &audioframe, AVCodecID codec, bool needresampler)
@@ -67,7 +55,7 @@ bool CAudioSinkAE::Create(const DVDAudioFrame &audioframe, AVCodecID codec, bool
   options |= AESTREAM_PAUSED;
 
   AEAudioFormat format = audioframe.format;
-  m_pAudioStream = CServiceBroker::GetActiveAE().MakeStream(
+  m_pAudioStream = CServiceBroker::GetActiveAE()->MakeStream(
     format,
     options,
     this
@@ -80,19 +68,17 @@ bool CAudioSinkAE::Create(const DVDAudioFrame &audioframe, AVCodecID codec, bool
   m_iBitsPerSample = audioframe.bits_per_sample;
   m_bPassthrough = audioframe.passthrough;
   m_channelLayout = audioframe.format.m_channelLayout;
-
-  if (m_pAudioStream->HasDSP())
-    m_pAudioStream->SetFFmpegInfo(audioframe.profile, audioframe.matrix_encoding, audioframe.audio_service_type);
+  m_dataType = audioframe.format.m_streamInfo.m_type;
 
   return true;
 }
 
-void CAudioSinkAE::Destroy()
+void CAudioSinkAE::Destroy(bool finish)
 {
   CSingleLock lock (m_critSection);
 
   if (m_pAudioStream)
-    CServiceBroker::GetActiveAE().FreeStream(m_pAudioStream);
+    CServiceBroker::GetActiveAE()->FreeStream(m_pAudioStream, finish);
 
   m_pAudioStream = NULL;
   m_sampleRate = 0;
@@ -139,8 +125,17 @@ unsigned int CAudioSinkAE::AddPackets(const DVDAudioFrame &audioframe)
   unsigned int offset = audioframe.framesOut;
   do
   {
-    double pts = (offset == 0) ? audioframe.pts / DVD_TIME_BASE * 1000 : 0.0;
-    unsigned int copied = m_pAudioStream->AddData(audioframe.data, offset, frames, pts);
+    IAEStream::ExtData ext;
+    if (offset == 0)
+    {
+      ext.pts = audioframe.pts / DVD_TIME_BASE * 1000;
+    }
+    if (audioframe.hasDownmix)
+    {
+      ext.hasDownmix = true;
+      ext.centerMixLevel = audioframe.centerMixLevel;
+    }
+    unsigned int copied = m_pAudioStream->AddData(audioframe.data, offset, frames, &ext);
     offset += copied;
     frames -= copied;
     if (frames <= 0)
@@ -244,6 +239,10 @@ bool CAudioSinkAE::IsValidFormat(const DVDAudioFrame &audioframe)
       m_sampleRate != audioframe.format.m_sampleRate ||
       m_iBitsPerSample != audioframe.bits_per_sample ||
       m_channelLayout != audioframe.format.m_channelLayout)
+    return false;
+
+  if (m_bPassthrough &&
+      m_dataType != audioframe.format.m_streamInfo.m_type)
     return false;
 
   return true;
@@ -370,12 +369,12 @@ CAEStreamInfo::DataType CAudioSinkAE::GetPassthroughStreamType(AVCodecID codecId
       format.m_streamInfo.m_type = CAEStreamInfo::STREAM_TYPE_NULL;
   }
 
-  bool supports = CServiceBroker::GetActiveAE().SupportsRaw(format);
+  bool supports = CServiceBroker::GetActiveAE()->SupportsRaw(format);
 
   if (!supports && codecId == AV_CODEC_ID_DTS)
   {
     format.m_streamInfo.m_type = CAEStreamInfo::STREAM_TYPE_DTSHD_CORE;
-    supports = CServiceBroker::GetActiveAE().SupportsRaw(format);
+    supports = CServiceBroker::GetActiveAE()->SupportsRaw(format);
   }
 
   if (supports)

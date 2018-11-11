@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "threads/SingleLock.h"
@@ -48,7 +36,6 @@ CActiveAEStream::CActiveAEStream(AEAudioFormat *format, unsigned int streamid, C
   m_streamFreeBuffers = 0;
   m_streamIsBuffering = false;
   m_streamIsFlushed = false;
-  m_bypassDSP = false;
   m_streamSlave = NULL;
   m_leftoverBuffer = new uint8_t[m_format.m_frameSize];
   m_leftoverBytes = 0;
@@ -150,20 +137,25 @@ void CActiveAEStream::InitRemapper()
     }
 
     // initialize resampler for only doing remapping
-    m_remapper->Init(avLayout,
-                     m_format.m_channelLayout.Count(),
-                     m_format.m_sampleRate,
-                     CAEUtil::GetAVSampleFormat(m_format.m_dataFormat),
-                     CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat),
-                     CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat),
-                     avLayout,
-                     m_format.m_channelLayout.Count(),
-                     m_format.m_sampleRate,
-                     CAEUtil::GetAVSampleFormat(m_format.m_dataFormat),
-                     CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat),
-                     CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat),
+    SampleConfig dstConfig, srcConfig;
+    dstConfig.channel_layout = avLayout;
+    dstConfig.channels = m_format.m_channelLayout.Count();
+    dstConfig.sample_rate = m_format.m_sampleRate;
+    dstConfig.fmt = CAEUtil::GetAVSampleFormat(m_format.m_dataFormat);
+    dstConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat);
+    dstConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat);
+
+    srcConfig.channel_layout = avLayout;
+    srcConfig.channels = m_format.m_channelLayout.Count();
+    srcConfig.sample_rate = m_format.m_sampleRate;
+    srcConfig.fmt = CAEUtil::GetAVSampleFormat(m_format.m_dataFormat);
+    srcConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat);
+    srcConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat);
+
+    m_remapper->Init(dstConfig, srcConfig,
                      false,
                      false,
+                     M_SQRT1_2,
                      &remapLayout,
                      AE_QUALITY_LOW, // not used for remapping
                      false);
@@ -239,12 +231,18 @@ unsigned int CActiveAEStream::GetSpace()
     return m_streamFreeBuffers * m_streamSpace;
 }
 
-unsigned int CActiveAEStream::AddData(const uint8_t* const *data, unsigned int offset, unsigned int frames, double pts)
+unsigned int CActiveAEStream::AddData(const uint8_t* const *data, unsigned int offset, unsigned int frames, ExtData *extData)
 {
   Message *msg;
   unsigned int copied = 0;
   int sourceFrames = frames;
   const uint8_t* const *buf = data;
+  double pts = 0;
+
+  if (extData)
+  {
+    pts = extData->pts;
+  }
 
   m_streamIsFlushed = false;
 
@@ -292,6 +290,9 @@ unsigned int CActiveAEStream::AddData(const uint8_t* const *data, unsigned int o
       }
       copied += minFrames;
 
+      if (extData && extData->hasDownmix)
+        m_currentBuffer->centerMixLevel = extData->centerMixLevel;
+
       bool rawPktComplete = false;
       {
         CSingleLock lock(m_statsLock);
@@ -315,7 +316,7 @@ unsigned int CActiveAEStream::AddData(const uint8_t* const *data, unsigned int o
         msgData.stream = this;
         RemapBuffer();
         m_streamPort->SendOutMessage(CActiveAEDataProtocol::STREAMSAMPLE, &msgData, sizeof(MsgStreamSample));
-        m_currentBuffer = NULL;
+        m_currentBuffer = nullptr;
       }
       continue;
     }
@@ -543,11 +544,6 @@ bool CActiveAEStream::IsFading()
   return m_streamFading;
 }
 
-bool CActiveAEStream::HasDSP()
-{
-  return false;
-}
-
 unsigned int CActiveAEStream::GetFrameSize() const
 {
   return m_format.m_frameSize;
@@ -608,7 +604,7 @@ bool CActiveAEStreamBuffers::HasInputLevel(int level)
     return false;
 }
 
-bool CActiveAEStreamBuffers::Create(unsigned int totaltime, bool remap, bool upmix, bool normalize, bool useDSP)
+bool CActiveAEStreamBuffers::Create(unsigned int totaltime, bool remap, bool upmix, bool normalize)
 {
   if (!m_resampleBuffers->Create(totaltime, remap, upmix, normalize))
     return false;
@@ -660,7 +656,7 @@ bool CActiveAEStreamBuffers::ProcessBuffers()
   return busy;
 }
 
-void CActiveAEStreamBuffers::ConfigureResampler(bool normalizelevels, bool dspenabled, bool stereoupmix, AEQuality quality)
+void CActiveAEStreamBuffers::ConfigureResampler(bool normalizelevels, bool stereoupmix, AEQuality quality)
 {
   m_resampleBuffers->ConfigureResampler(normalizelevels, stereoupmix, quality);
 }
@@ -756,11 +752,6 @@ bool CActiveAEStreamBuffers::DoesNormalize()
 void CActiveAEStreamBuffers::ForceResampler(bool force)
 {
   m_resampleBuffers->ForceResampler(force);
-}
-
-void CActiveAEStreamBuffers::SetDSPConfig(bool usedsp, bool bypassdsp)
-{
- /*! @todo Implement set dsp config with new AudioDSP buffer implementation */
 }
 
 CActiveAEBufferPool* CActiveAEStreamBuffers::GetResampleBuffers()

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <algorithm>
@@ -112,7 +100,7 @@ bool CSettingGroup::Deserialize(const TiXmlNode *node, bool update /* = false */
       SettingPtr setting;
       if (settingIt != m_settings.end())
         setting = *settingIt;
-      
+
       update = (setting != nullptr);
       if (!update)
       {
@@ -127,7 +115,7 @@ bool CSettingGroup::Deserialize(const TiXmlNode *node, bool update /* = false */
         if (setting == nullptr)
           CLog::Log(LOGERROR, "CSettingGroup: unknown setting type \"%s\" of \"%s\"", settingType, settingId.c_str());
       }
-      
+
       if (setting == nullptr)
         CLog::Log(LOGERROR, "CSettingGroup: unable to create new setting \"%s\"", settingId.c_str());
       else if (!setting->Deserialize(settingElement, update))
@@ -135,10 +123,10 @@ bool CSettingGroup::Deserialize(const TiXmlNode *node, bool update /* = false */
       else if (!update)
         addISetting(settingElement, setting, m_settings);
     }
-      
+
     settingElement = settingElement->NextSiblingElement(SETTING_XML_ELM_SETTING);
   }
-    
+
   return true;
 }
 
@@ -197,7 +185,7 @@ bool CSettingCategory::Deserialize(const TiXmlNode *node, bool update /* = false
   auto accessNode = node->FirstChild(SETTING_XML_ELM_ACCESS);
   if (accessNode != nullptr && !m_accessCondition.Deserialize(accessNode))
     return false;
-    
+
   auto groupNode = node->FirstChild(SETTING_XML_ELM_GROUP);
   while (groupNode != nullptr)
   {
@@ -213,7 +201,7 @@ bool CSettingCategory::Deserialize(const TiXmlNode *node, bool update /* = false
       SettingGroupPtr group;
       if (groupIt != m_groups.end())
         group = *groupIt;
-      
+
       update = (group != nullptr);
       if (!update)
         group = std::make_shared<CSettingGroup>(groupId, m_settingsManager);
@@ -226,10 +214,10 @@ bool CSettingCategory::Deserialize(const TiXmlNode *node, bool update /* = false
       else
         CLog::Log(LOGWARNING, "CSettingCategory: unable to read group \"%s\"", groupId.c_str());
     }
-      
+
     groupNode = groupNode->NextSibling(SETTING_XML_ELM_GROUP);
   }
-    
+
   return true;
 }
 
@@ -264,13 +252,13 @@ void CSettingCategory::AddGroups(const SettingGroupList &groups)
 CSettingSection::CSettingSection(const std::string &id, CSettingsManager *settingsManager /* = nullptr */)
   : ISetting(id, settingsManager)
 { }
-  
+
 bool CSettingSection::Deserialize(const TiXmlNode *node, bool update /* = false */)
 {
   // handle <visible> conditions
   if (!ISetting::Deserialize(node, update))
     return false;
-    
+
   auto categoryNode = node->FirstChild(SETTING_XML_ELM_CATEGORY);
   while (categoryNode != nullptr)
   {
@@ -286,7 +274,7 @@ bool CSettingSection::Deserialize(const TiXmlNode *node, bool update /* = false 
       SettingCategoryPtr category;
       if (categoryIt != m_categories.end())
         category = *categoryIt;
-      
+
       update = (category != nullptr);
       if (!update)
         category = std::make_shared<CSettingCategory>(categoryId, m_settingsManager);
@@ -299,10 +287,10 @@ bool CSettingSection::Deserialize(const TiXmlNode *node, bool update /* = false 
       else
         CLog::Log(LOGWARNING, "CSettingSection: unable to read category \"%s\"", categoryId.c_str());
     }
-      
+
     categoryNode = categoryNode->NextSibling(SETTING_XML_ELM_CATEGORY);
   }
-    
+
   return true;
 }
 

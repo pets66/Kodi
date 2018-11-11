@@ -1,25 +1,14 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
 
+#include "utils/Color.h"
 #include "utils/Geometry.h"
 #include "GUIColorManager.h"
 
@@ -50,6 +39,12 @@ public:
 
   virtual void OnDestroyDevice(bool fatal)=0;
   virtual void OnCreateDevice()=0;
+
+protected:
+  void Register();
+  void Unregister();
+
+  bool m_bRegistered = false;
 };
 
 class CD3DHelper
@@ -116,16 +111,16 @@ public:
   void GenerateMipmaps();
 
   // static methods
-  static void DrawQuad(const CPoint points[4], color_t color, CD3DTexture *texture, const CRect *texCoords,
+  static void DrawQuad(const CPoint points[4], UTILS::Color color, CD3DTexture *texture, const CRect *texCoords,
     SHADER_METHOD options = SHADER_METHOD_RENDER_TEXTURE_BLEND);
 
-  static void DrawQuad(const CPoint points[4], color_t color, unsigned numViews, ID3D11ShaderResourceView **view, const CRect *texCoords,
+  static void DrawQuad(const CPoint points[4], UTILS::Color color, unsigned numViews, ID3D11ShaderResourceView **view, const CRect *texCoords,
     SHADER_METHOD options = SHADER_METHOD_RENDER_TEXTURE_BLEND);
 
-  static void DrawQuad(const CRect &coords, color_t color, CD3DTexture *texture, const CRect *texCoords,
+  static void DrawQuad(const CRect &coords, UTILS::Color color, CD3DTexture *texture, const CRect *texCoords,
     SHADER_METHOD options = SHADER_METHOD_RENDER_TEXTURE_BLEND);
 
-  static void DrawQuad(const CRect &coords, color_t color, unsigned numViews, ID3D11ShaderResourceView **view, const CRect *texCoords,
+  static void DrawQuad(const CRect &coords, UTILS::Color color, unsigned numViews, ID3D11ShaderResourceView **view, const CRect *texCoords,
     SHADER_METHOD options = SHADER_METHOD_RENDER_TEXTURE_BLEND);
 
   void OnDestroyDevice(bool fatal) override;

@@ -1,30 +1,14 @@
 /**********************************************************************
- * Copyright (c) 2004, Leo Seib, Hannover
+ *  Copyright (C) 2004, Leo Seib, Hannover
  *
- * Project:SQLiteDataset C++ Dynamic Library
- * Module: SQLiteDataset class realisation file
- * Author: Leo Seib      E-Mail: leoseib@web.de 
- * Begin: 5/04/2002
+ *  Project:SQLiteDataset C++ Dynamic Library
+ *  Module: SQLiteDataset class realisation file
+ *  Author: Leo Seib      E-Mail: leoseib@web.de
+ *  Begin: 5/04/2002
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- **********************************************************************/
+ *  SPDX-License-Identifier: MIT
+ *  See LICENSES/README.md for more information.
+ */
 
 #include <iostream>
 #include <string>
@@ -59,7 +43,7 @@ int callback(void* res_ptr,int ncol, char** result,char** cols)
     sql_record *rec = new sql_record;
     rec->resize(ncol);
     for (int i=0; i<ncol; i++)
-    { 
+    {
       field_value &v = rec->at(i);
       if (result[i] == NULL)
       {
@@ -73,7 +57,7 @@ int callback(void* res_ptr,int ncol, char** result,char** cols)
     }
     r->records.push_back(rec);
   }
-  return 0;  
+  return 0;
 }
 
 static int busy_callback(void*, int busyCount)
@@ -86,7 +70,7 @@ static int busy_callback(void*, int busyCount)
 
 SqliteDatabase::SqliteDatabase() {
 
-  active = false;  
+  active = false;
   _in_transaction = false;    // for transaction
 
   error = "Unknown database error";//S_NO_CONNECTION;
@@ -216,7 +200,13 @@ int SqliteDatabase::connect(bool create) {
     int flags = SQLITE_OPEN_READWRITE;
     if (create)
       flags |= SQLITE_OPEN_CREATE;
-    if (sqlite3_open_v2(db_fullpath.c_str(), &conn, flags, NULL)==SQLITE_OK)
+    int errorCode = sqlite3_open_v2(db_fullpath.c_str(), &conn, flags, NULL);
+    if (create && errorCode == SQLITE_CANTOPEN)
+    {
+      CLog::Log(LOGFATAL, "SqliteDatabase: can't open %s", db_fullpath.c_str());
+      throw std::runtime_error("SqliteDatabase: can't open " + db_fullpath);
+    }
+    else if (errorCode == SQLITE_OK)
     {
       sqlite3_busy_handler(conn, busy_callback, NULL);
       char* err=NULL;
@@ -224,13 +214,18 @@ int SqliteDatabase::connect(bool create) {
       {
         throw DbErrors(getErrorMsg());
       }
+      else if (sqlite3_db_readonly(conn, nullptr) == 1)
+      {
+        CLog::Log(LOGFATAL, "SqliteDatabase: %s is read only", db_fullpath.c_str());
+        throw std::runtime_error("SqliteDatabase: " + db_fullpath + " is read only");
+      }
       active = true;
       return DB_CONNECTION_OK;
     }
 
     return DB_CONNECTION_NONE;
   }
-  catch(...)
+  catch(const DbErrors&)
   {
   }
   return DB_CONNECTION_NONE;
@@ -407,7 +402,7 @@ void SqliteDatabase::rollback_transaction() {
   if (active) {
     sqlite3_exec(conn,"rollback",NULL,NULL,NULL);
     _in_transaction = false;
-  }  
+  }
 }
 
 
@@ -437,6 +432,40 @@ std::string SqliteDatabase::vprepare(const char *format, va_list args)
   {
     strResult = p;
     sqlite3_free(p);
+  }
+
+  // Strip SEPARATOR from all GROUP_CONCAT statements:
+  // before: GROUP_CONCAT(field SEPARATOR '; ')
+  // after:  GROUP_CONCAT(field, '; ')
+  pos = strResult.find("GROUP_CONCAT(");
+  while (pos != std::string::npos)
+  {
+    size_t pos2 = strResult.find(" SEPARATOR ", pos + 1);
+    if (pos2 != std::string::npos)
+      strResult.replace(pos2, 10, ",");
+    pos = strResult.find("GROUP_CONCAT(", pos + 1);
+  }
+  // Replace CONCAT with || to concatenate text fields:
+  // before: CONCAT(field1, field2)
+  // after:  field1 || field2
+  pos = strResult.find("CONCAT(");
+  while (pos != std::string::npos)
+  {
+    if (pos == 0 || strResult[pos - 1] == ' ') // Not GROUP_CONCAT
+    {
+      size_t pos2 = strResult.find(",", pos + 1);
+      if (pos2 != std::string::npos)
+      {
+        size_t pos3 = strResult.find(")", pos2 + 1);
+        if (pos3 != std::string::npos)
+        {
+          strResult.erase(pos3, 1);
+          strResult.replace(pos2, 1, " || ");
+          strResult.erase(pos, 7);
+        }
+      }
+    }
+    pos = strResult.find("CONCAT(", pos + 1);
   }
 
   return strResult;
@@ -491,7 +520,7 @@ void SqliteDataset::make_query(StringList &_sql) {
 
   for (std::list<std::string>::iterator i =_sql.begin(); i!=_sql.end(); ++i) {
   query = *i;
-  char* err=NULL; 
+  char* err=NULL;
   Dataset::parse_sql(query);
   if (db->setErr(sqlite3_exec(this->handle(),query.c_str(),NULL,NULL,&err),query.c_str())!=SQLITE_OK) {
     throw DbErrors(db->getErrorMsg());
@@ -502,7 +531,7 @@ void SqliteDataset::make_query(StringList &_sql) {
   if (db->in_transaction() && autocommit) db->commit_transaction();
 
   active = true;
-  ds_state = dsSelect;    
+  ds_state = dsSelect;
   if (autorefresh)
     refresh();
 
@@ -640,8 +669,8 @@ bool SqliteDataset::query(const std::string &query) {
     std::string qry = query;
     int fs = qry.find("select");
     int fS = qry.find("SELECT");
-    if (!( fs >= 0 || fS >=0))                                 
-         throw DbErrors("MUST be select SQL!"); 
+    if (!( fs >= 0 || fS >=0))
+         throw DbErrors("MUST be select SQL!");
 
   close();
 
@@ -696,7 +725,7 @@ bool SqliteDataset::query(const std::string &query) {
   else
   {
     throw DbErrors(db->getErrorMsg());
-  }  
+  }
 }
 
 void SqliteDataset::open(const std::string &sql) {
@@ -706,7 +735,7 @@ void SqliteDataset::open(const std::string &sql) {
 
 void SqliteDataset::open() {
   if (select_sql.size()) {
-    query(select_sql); 
+    query(select_sql);
   }
   else {
     ds_state = dsInactive;
@@ -766,7 +795,7 @@ void SqliteDataset::prev(void) {
 
 void SqliteDataset::next(void) {
   Dataset::next();
-  if (!eof()) 
+  if (!eof())
       fill_fields();
 }
 
@@ -787,7 +816,7 @@ bool SqliteDataset::seek(int pos) {
   if (ds_state == dsSelect) {
     Dataset::seek(pos);
     fill_fields();
-    return true;  
+    return true;
     }
   return false;
 }

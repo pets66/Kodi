@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include <Platinum/Source/Platinum/Platinum.h>
 
@@ -32,14 +20,15 @@
 #include "filesystem/MusicDatabaseDirectory.h"
 #include "filesystem/SpecialProtocol.h"
 #include "filesystem/VideoDatabaseDirectory.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/WindowIDs.h"
 #include "guilib/LocalizeStrings.h"
 #include "music/tags/MusicInfoTag.h"
-#include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "utils/Digest.h"
 #include "utils/FileExtensionProvider.h"
 #include "utils/log.h"
-#include "utils/md5.h"
 #include "utils/SortUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
@@ -56,6 +45,7 @@ NPT_SET_LOCAL_LOGGER("xbmc.upnp.server")
 
 using namespace ANNOUNCEMENT;
 using namespace XFILE;
+using KODI::UTILITY::CDigest;
 
 namespace UPNP
 {
@@ -81,7 +71,7 @@ CUPnPServer::CUPnPServer(const char* friendly_name, const char* uuid /*= NULL*/,
 
 CUPnPServer::~CUPnPServer()
 {
-    ANNOUNCEMENT::CAnnouncementManager::GetInstance().RemoveAnnouncer(this);
+    CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
 }
 
 /*----------------------------------------------------------------------
@@ -118,7 +108,7 @@ CUPnPServer::SetupServices()
     OnScanCompleted(VideoLibrary);
 
     // now safe to start passing on new notifications
-    ANNOUNCEMENT::CAnnouncementManager::GetInstance().AddAnnouncer(this);
+    CServiceBroker::GetAnnouncementManager()->AddAnnouncer(this);
 
     return result;
 }
@@ -130,12 +120,12 @@ void
 CUPnPServer::OnScanCompleted(int type)
 {
     if (type == AudioLibrary) {
-        for (size_t i = 0; i < ARRAY_SIZE(audio_containers); i++)
-            UpdateContainer(audio_containers[i]);
+        for (const char* const audio_container : audio_containers)
+            UpdateContainer(audio_container);
     }
     else if (type == VideoLibrary) {
-        for (size_t i = 0; i < ARRAY_SIZE(video_containers); i++)
-            UpdateContainer(video_containers[i]);
+        for (const char* const video_container : video_containers)
+            UpdateContainer(video_container);
     }
     else
         return;
@@ -168,7 +158,7 @@ CUPnPServer::PropagateUpdates()
     std::string buffer;
     std::map<std::string, std::pair<bool, unsigned long> >::iterator itr;
 
-    if (m_scanning || !CServiceBroker::GetSettings().GetBool(CSettings::SETTING_SERVICES_UPNPANNOUNCE))
+    if (m_scanning || !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_SERVICES_UPNPANNOUNCE))
         return;
 
     NPT_CHECK_LABEL(FindServiceById("urn:upnp-org:serviceId:ContentDirectory", service), failed);
@@ -250,7 +240,7 @@ NPT_String CUPnPServer::BuildSafeResourceUri(const NPT_HttpUrl &rooturi,
       filename = URIUtils::GetFileName(mapped_file_path);
 
     filename = CURL::Encode(filename);
-    md5 = XBMC::XBMC_MD5::GetMD5(mapped_file_path);
+    md5 = CDigest::Calculate(CDigest::Type::MD5, mapped_file_path);
     md5 += "/" + filename;
     { NPT_AutoLock lock(m_FileMutex);
       NPT_CHECK(m_FileMap.Put(md5.c_str(), mapped_file_path.c_str()));
@@ -288,7 +278,7 @@ CUPnPServer::Build(CFileItemPtr                  item,
             object->m_ObjectID = "0";
             object->m_ParentID = "-1";
             // root has 5 children
-            
+
             //This is dead code because of the HACK a few lines up setting with_count to false
             //if (with_count) {
             //    ((PLT_MediaContainer*)object)->m_ChildrenCount = 5;
@@ -547,7 +537,7 @@ CUPnPServer::OnBrowseMetadata(PLT_ActionReference&          action,
     CFileItemPtr                   item;
     NPT_Reference<CThumbLoader>    thumb_loader;
 
-    CLog::Log(LOGINFO, "Received UPnP Browse Metadata request for object '%s'", (const char*)object_id);
+    CLog::Log(LOGINFO, "Received UPnP Browse Metadata request for object '%s'", object_id);
 
     if(NPT_FAILED(ObjectIDValidate(id))) {
         action->SetError(701, "Incorrect ObjectID.");
@@ -689,7 +679,7 @@ CUPnPServer::OnBrowseDirectChildren(PLT_ActionReference&          action,
                                   + CServiceBroker::GetFileExtensionProvider().GetVideoExtensions() + "|"
                                   + CServiceBroker::GetFileExtensionProvider().GetMusicExtensions() + "|"
                                   + CServiceBroker::GetFileExtensionProvider().GetPictureExtensions();
-            CDirectory::GetDirectory((const char*)parent_id, items, supported);
+            CDirectory::GetDirectory((const char*)parent_id, items, supported, DIR_FLAG_DEFAULTS);
             DefaultSortItems(items);
         }
 
@@ -746,7 +736,7 @@ CUPnPServer::BuildResponse(PLT_ActionReference&          action,
     NPT_COMPILER_UNUSED(sort_criteria);
 
     CLog::Log(LOGDEBUG, "Building UPnP response with filter '%s', starting @ %d with %d requested",
-        (const char*)filter,
+        filter,
         starting_index,
         requested_count);
 
@@ -855,8 +845,8 @@ CUPnPServer::OnSearchContainer(PLT_ActionReference&          action,
                                const PLT_HttpRequestContext& context)
 {
     CLog::Log(LOGDEBUG, "Received Search request for object '%s' with search '%s'",
-        (const char*)object_id,
-        (const char*)search_criteria);
+        object_id,
+        search_criteria);
 
     NPT_String id = object_id;
     if (id.StartsWith("musicdb://")) {
@@ -1086,7 +1076,7 @@ CUPnPServer::OnUpdateObject(PLT_ActionReference&             action,
               CVariant data;
               data["id"] = updated.GetVideoInfoTag()->m_iDbId;
               data["type"] = updated.GetVideoInfoTag()->m_type;
-              ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
+              CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
             }
             updatelisting = true;
         }
@@ -1123,8 +1113,8 @@ CUPnPServer::OnUpdateObject(PLT_ActionReference&             action,
              CUtil::DeleteMusicDatabaseDirectoryCache();
 
         CFileItemPtr msgItem(new CFileItem(updated));
-        CGUIMessage message(GUI_MSG_NOTIFY_ALL, g_windowManager.GetActiveWindow(), 0, GUI_MSG_UPDATE_ITEM, 1, msgItem);
-        g_windowManager.SendThreadMessage(message);
+        CGUIMessage message(GUI_MSG_NOTIFY_ALL, CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow(), 0, GUI_MSG_UPDATE_ITEM, 1, msgItem);
+        CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message);
     }
 
     NPT_CHECK_LABEL(service->PauseEventing(false), error);
@@ -1208,13 +1198,13 @@ CUPnPServer::ServeFile(const NPT_HttpRequest&              request,
 
     // set getCaptionInfo.sec - sets subtitle uri for Samsung devices
     const NPT_String* captionInfoHeader = request.GetHeaders().GetHeaderValue("getCaptionInfo.sec");
-    if (captionInfoHeader) 
+    if (captionInfoHeader)
     {
       NPT_String *sub_uri, movie;
       movie = "subtitle://" + md5;
 
       NPT_AutoLock lock(m_FileMutex);
-      if (NPT_SUCCEEDED(m_FileMap.Get(movie, sub_uri))) 
+      if (NPT_SUCCEEDED(m_FileMap.Get(movie, sub_uri)))
       {
         response.GetHeaders().SetHeader("CaptionInfo.sec", sub_uri->GetChars(), false);
       }

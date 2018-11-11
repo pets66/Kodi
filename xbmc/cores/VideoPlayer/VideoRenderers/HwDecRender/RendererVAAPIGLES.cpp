@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2007-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RendererVAAPIGLES.h"
@@ -42,6 +30,8 @@ CBaseRenderer* CRendererVAAPI::Create(CVideoBuffer *buffer)
 
 void CRendererVAAPI::Register(IVaapiWinSystem *winSystem, VADisplay vaDpy, EGLDisplay eglDisplay, bool &general, bool &deepColor)
 {
+  general = deepColor = false;
+
   int major_version, minor_version;
   if (vaInitialize(vaDpy, &major_version, &minor_version) != VA_STATUS_SUCCESS)
   {
@@ -49,7 +39,6 @@ void CRendererVAAPI::Register(IVaapiWinSystem *winSystem, VADisplay vaDpy, EGLDi
     return;
   }
 
-  general = deepColor = false;
   CVaapi2Texture::TestInterop(vaDpy, eglDisplay, general, deepColor);
   CLog::Log(LOGDEBUG, "Vaapi2 EGL interop test results: general %s, deepColor %s", general ? "yes" : "no", deepColor ? "yes" : "no");
   if (!general)
@@ -162,14 +151,14 @@ bool CRendererVAAPI::CreateTexture(int index)
     return CreateNV12Texture(index);
   }
 
-  YUVBUFFER &buf = m_buffers[index];
+  CPictureBuffer &buf = m_buffers[index];
   YuvImage &im = buf.image;
-  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
+  CYuvPlane (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
 
   DeleteTexture(index);
 
-  memset(&im, 0, sizeof(im));
-  memset(&planes, 0, sizeof(YUVPLANE[YuvImage::MAX_PLANES]));
+  im = {};
+  std::fill(std::begin(planes), std::end(planes), CYuvPlane{});
   im.height = m_sourceHeight;
   im.width  = m_sourceWidth;
   im.cshift_x = 1;
@@ -190,7 +179,7 @@ void CRendererVAAPI::DeleteTexture(int index)
     return;
   }
 
-  YUVBUFFER &buf = m_buffers[index];
+  CPictureBuffer &buf = m_buffers[index];
   buf.fields[FIELD_FULL][0].id = 0;
   buf.fields[FIELD_FULL][1].id = 0;
   buf.fields[FIELD_FULL][2].id = 0;
@@ -203,7 +192,7 @@ bool CRendererVAAPI::UploadTexture(int index)
     return UploadNV12Texture(index);
   }
 
-  YUVBUFFER &buf = m_buffers[index];
+  CPictureBuffer &buf = m_buffers[index];
 
   CVaapiRenderPicture *pic = dynamic_cast<CVaapiRenderPicture*>(buf.videoBuffer);
 
@@ -215,7 +204,7 @@ bool CRendererVAAPI::UploadTexture(int index)
   m_vaapiTextures[index]->Map(pic);
 
   YuvImage &im = buf.image;
-  YUVPLANE (&planes)[3] = buf.fields[0];
+  CYuvPlane (&planes)[3] = buf.fields[0];
 
   auto size = m_vaapiTextures[index]->GetTextureSize();
   planes[0].texwidth  = size.Width();
@@ -291,6 +280,9 @@ void CRendererVAAPI::ReleaseBuffer(int idx)
     glDeleteSync(m_fences[idx]);
     m_fences[idx] = GL_NONE;
   }
-  m_vaapiTextures[idx]->Unmap();
+  if (m_isVAAPIBuffer)
+  {
+    m_vaapiTextures[idx]->Unmap();
+  }
   CLinuxRendererGLES::ReleaseBuffer(idx);
 }

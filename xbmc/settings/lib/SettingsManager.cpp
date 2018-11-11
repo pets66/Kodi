@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "SettingsManager.h"
@@ -131,7 +119,7 @@ bool CSettingsManager::Initialize(const TiXmlElement *root)
         CLog::Log(LOGWARNING, "CSettingsManager: unable to read section \"%s\"", sectionId.c_str());
       }
     }
-      
+
     sectionNode = sectionNode->NextSibling(SETTING_XML_ELM_SECTION);
   }
 
@@ -530,7 +518,7 @@ void* CSettingsManager::GetSettingOptionsFiller(SettingConstPtr setting)
 
       break;
     }
-    
+
     case SettingOptionsFillerType::String:
     {
       if (setting->GetType() != SettingType::String)
@@ -714,6 +702,14 @@ bool CSettingsManager::SetList(const std::string &id, const std::vector< std::sh
   return std::static_pointer_cast<CSettingList>(setting)->SetValue(value);
 }
 
+bool CSettingsManager::FindIntInList(const std::string &id, int value) const
+{
+  CSharedLock lock(m_settingsCritical);
+  std::shared_ptr<CSettingList> setting(std::dynamic_pointer_cast<CSettingList>(GetSetting(id)));
+
+  return setting && setting->FindIntInList(value);
+}
+
 bool CSettingsManager::SetDefault(const std::string &id)
 {
   CSharedLock lock(m_settingsCritical);
@@ -741,15 +737,24 @@ void CSettingsManager::AddCondition(const std::string &condition)
   m_conditions.AddCondition(condition);
 }
 
-void CSettingsManager::AddCondition(const std::string &identifier, SettingConditionCheck condition, void *data /*= nullptr*/)
+void CSettingsManager::AddDynamicCondition(const std::string &identifier, SettingConditionCheck condition, void *data /*= nullptr*/)
 {
   CExclusiveLock lock(m_critical);
   if (identifier.empty() || condition == nullptr)
     return;
 
-  m_conditions.AddCondition(identifier, condition, data);
+  m_conditions.AddDynamicCondition(identifier, condition, data);
 }
-  
+
+void CSettingsManager::RemoveDynamicCondition(const std::string &identifier)
+{
+  CExclusiveLock lock(m_critical);
+  if (identifier.empty())
+    return;
+
+  m_conditions.RemoveDynamicCondition(identifier);
+}
+
 bool CSettingsManager::Serialize(TiXmlNode *parent) const
 {
   if (parent == nullptr)
@@ -782,7 +787,7 @@ bool CSettingsManager::Serialize(TiXmlNode *parent) const
 
   return true;
 }
-  
+
 bool CSettingsManager::Deserialize(const TiXmlNode *node, bool &updated, std::map<std::string, SettingPtr> *loadedSettings /* = nullptr */)
 {
   updated = false;
@@ -833,13 +838,13 @@ bool CSettingsManager::OnSettingChanging(std::shared_ptr<const CSetting> setting
 
   return true;
 }
-  
+
 void CSettingsManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
 {
   CSharedLock lock(m_settingsCritical);
   if (!m_loaded || setting == nullptr)
     return;
-    
+
   auto settingIt = FindSetting(setting->GetId());
   if (settingIt == m_settings.end())
     return;
@@ -1075,7 +1080,7 @@ bool CSettingsManager::LoadSetting(const TiXmlNode *node, SettingPtr setting, bo
 
       settingElement = settingElement->NextSiblingElement(SETTING_XML_ELM_SETTING);
     }
-  } 
+  }
 
   if (settingElement == nullptr)
     return false;
@@ -1165,7 +1170,7 @@ void CSettingsManager::UpdateSettingByDependency(const std::string &settingId, S
 
     case SettingDependencyType::Update:
     {
-      SettingType type = (SettingType)setting->GetType();
+      SettingType type = setting->GetType();
       if (type == SettingType::Integer)
       {
         auto settingInt = std::static_pointer_cast<CSettingInt>(setting);

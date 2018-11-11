@@ -6,16 +6,16 @@ endif
 
 DEPENDS = \
 	pcre expat gettext sqlite3 libgpg-error \
-	libgcrypt bzip2 liblzo2 libzip freetype2 fontconfig \
+	libgcrypt bzip2 libfstrcmp liblzo2 libzip freetype2 fontconfig \
 	openssl gmp nettle gnutls curl \
 	libjpeg-turbo libpng fribidi libass \
 	libxml2 rapidjson libmicrohttpd mariadb libffi \
 	python27 libshairplay libfmt \
 	libplist libcec libbluray tinyxml \
-	libssh taglib libusb libnfs \
+	taglib libusb libnfs \
 	pythonmodule-pil pythonmodule-pycryptodome pythonmodule-setuptools \
 	libxslt ffmpeg platform crossguid \
-        libdvdread libdvdnav libdvdcss p8-platform
+	libdvdread libdvdnav libdvdcss p8-platform flatbuffers
 
 
 FFMPEG_DEPENDS = gnutls
@@ -27,12 +27,11 @@ else
 endif
 
 ifeq ($(OS),ios)
-  EXCLUDED_DEPENDS = libcec libusb libdvdcss
+  EXCLUDED_DEPENDS = libcec libusb
   ifeq ($(TARGET_PLATFORM),appletvos)
     DEPENDS += boblight
   endif
-else
-  DVDREAD_DEPS = libdvdcss
+  DEPENDS += iosentitlements
 endif
 
 ifeq ($(OS),osx)
@@ -73,6 +72,9 @@ ifeq ($(OS),linux)
   DEPENDS += alsa-lib
   ALSA_LIB = alsa-lib
   CROSSGUID_DEPS = libuuid
+  ifeq ($(TARGET_PLATFORM),$(filter $(TARGET_PLATFORM),raspberry-pi aml gbm))
+    DEPENDS += libxkbcommon libinput libudev libevdev mtdev
+  endif
 endif
 
 ifeq ($(TARGET_PLATFORM),wayland)
@@ -96,7 +98,6 @@ libcdio: $(ICONV)
 libcdio-gplv3: $(ICONV)
 libplist: $(ZLIB)
 libbluray: $(ICONV) libxml2
-libssh: libgcrypt openssl $(ZLIB)
 mariadb: openssl $(ICONV) $(ZLIB)
 libzip: $(ZLIB)
 libpng: $(ZLIB)
@@ -112,10 +113,12 @@ platform: p8-platform
 libcec: p8-platform
 crossguid: $(CROSSGUID_DEPS)
 libdvdnav: libdvdread
-libdvdread: $(DVDREAD_DEPS)
+libdvdread: libdvdcss
 wayland: expat libffi
 waylandpp: wayland $(WAYLANDPP_DEPS)
 dbus: expat
+libinput: mtdev libevdev
+libevdev: libudev
 
 .installed-$(PLATFORM): $(DEPENDS)
 	touch $@

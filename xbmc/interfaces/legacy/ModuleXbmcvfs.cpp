@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ModuleXbmcvfs.h"
@@ -50,7 +38,7 @@ namespace XBMCAddon
     {
       DelayedCallGuard dg;
       return XFILE::CFile::Rename(file,newFile);
-    }  
+    }
 
     // check for a file or folder existence, mimics Pythons os.path.exists()
     bool exists(const String& path)
@@ -59,14 +47,14 @@ namespace XBMCAddon
       if (URIUtils::HasSlashAtEnd(path, true))
         return XFILE::CDirectory::Exists(path, false);
       return XFILE::CFile::Exists(path, false);
-    }      
+    }
 
     // make a directory
     bool mkdir(const String& path)
     {
       DelayedCallGuard dg;
       return XFILE::CDirectory::Create(path);
-    }      
+    }
 
     // make all directories along the path
     bool mkdirs(const String& path)
@@ -78,8 +66,12 @@ namespace XBMCAddon
     bool rmdir(const String& path, bool force)
     {
       DelayedCallGuard dg;
-      return (force ? CFileUtils::DeleteItem(path,force) : XFILE::CDirectory::Remove(path));
-    }      
+
+      if (force)
+        return CFileUtils::DeleteItem(path);
+      else
+        return XFILE::CDirectory::Remove(path);
+    }
 
     Tuple<std::vector<String>, std::vector<String> > listdir(const String& path)
     {
@@ -96,7 +88,7 @@ namespace XBMCAddon
       for (int i=0; i < items.Size(); i++)
       {
         std::string itemPath = items[i]->GetPath();
-        
+
         if (URIUtils::HasSlashAtEnd(itemPath)) // folder
         {
           URIUtils::RemoveSlashAtEnd(itemPath);

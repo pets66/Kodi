@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDVideoCodecDRMPRIME.h"
@@ -23,16 +11,18 @@
 #include "ServiceBroker.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
-
-#include <xf86drm.h>
-#include <xf86drmMode.h>
+#include "windowing/gbm/WinSystemGbm.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/pixdesc.h"
 }
+
+using namespace KODI::WINDOWING::GBM;
 
 //------------------------------------------------------------------------------
 // Video Buffers
@@ -57,23 +47,42 @@ void CVideoBufferDRMPRIME::SetRef(AVFrame* frame)
 
 void CVideoBufferDRMPRIME::Unref()
 {
-  if (m_fb_id)
-  {
-    drmModeRmFB(m_drm_fd, m_fb_id);
-    m_fb_id = 0;
-  }
-
-  for (int i = 0; i < AV_DRM_MAX_PLANES; i++)
-  {
-    if (m_handles[i])
-    {
-      struct drm_gem_close gem_close = { .handle = m_handles[i] };
-      drmIoctl(m_drm_fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
-      m_handles[i] = 0;
-    }
-  }
-
   av_frame_unref(m_pFrame);
+}
+
+int CVideoBufferDRMPRIME::GetColorEncoding() const
+{
+  switch (m_pFrame->colorspace)
+  {
+    case AVCOL_SPC_BT2020_CL:
+    case AVCOL_SPC_BT2020_NCL:
+      return DRM_COLOR_YCBCR_BT2020;
+    case AVCOL_SPC_SMPTE170M:
+    case AVCOL_SPC_BT470BG:
+    case AVCOL_SPC_FCC:
+      return DRM_COLOR_YCBCR_BT601;
+    case AVCOL_SPC_BT709:
+      return DRM_COLOR_YCBCR_BT709;
+    case AVCOL_SPC_RESERVED:
+    case AVCOL_SPC_UNSPECIFIED:
+    default:
+      if (m_pFrame->width > 1024 || m_pFrame->height >= 600)
+        return DRM_COLOR_YCBCR_BT709;
+      else
+        return DRM_COLOR_YCBCR_BT601;
+  }
+}
+
+int CVideoBufferDRMPRIME::GetColorRange() const
+{
+  switch (m_pFrame->color_range)
+  {
+    case AVCOL_RANGE_JPEG:
+      return DRM_COLOR_YCBCR_FULL_RANGE;
+    case AVCOL_RANGE_MPEG:
+    default:
+      return DRM_COLOR_YCBCR_LIMITED_RANGE;
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -82,7 +91,7 @@ class CVideoBufferPoolDRMPRIME
   : public IVideoBufferPool
 {
 public:
-  ~CVideoBufferPoolDRMPRIME() override;
+  ~CVideoBufferPoolDRMPRIME();
   void Return(int id) override;
   CVideoBuffer* Get() override;
 
@@ -161,39 +170,68 @@ CDVDVideoCodecDRMPRIME::~CDVDVideoCodecDRMPRIME()
 
 CDVDVideoCodec* CDVDVideoCodecDRMPRIME::Create(CProcessInfo& processInfo)
 {
-  if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEPRIMEDECODER))
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEPRIMEDECODER))
     return new CDVDVideoCodecDRMPRIME(processInfo);
   return nullptr;
 }
 
 void CDVDVideoCodecDRMPRIME::Register()
 {
+  CServiceBroker::GetSettingsComponent()->GetSettings()->GetSetting(CSettings::SETTING_VIDEOPLAYER_USEPRIMEDECODER)->SetVisible(true);
   CDVDFactoryCodec::RegisterHWVideoCodec("drm_prime", CDVDVideoCodecDRMPRIME::Create);
 }
 
-AVCodec* CDVDVideoCodecDRMPRIME::FindDecoder(CDVDStreamInfo& hints)
+static const AVCodecHWConfig* FindHWConfig(const AVCodec* codec)
 {
-  AVCodec* codec = nullptr;
-  while ((codec = av_codec_next(codec)))
+  const AVCodecHWConfig* config = nullptr;
+  for (int n = 0; (config = avcodec_get_hw_config(codec, n)); n++)
   {
-    if (av_codec_is_decoder(codec) && codec->id == hints.codec && codec->pix_fmts)
-    {
-      const AVPixelFormat* fmt = codec->pix_fmts;
-      while (*fmt != AV_PIX_FMT_NONE)
-      {
-        if (*fmt == AV_PIX_FMT_DRM_PRIME)
-          return codec;
-        fmt++;
-      }
-    }
+    if (config->pix_fmt != AV_PIX_FMT_DRM_PRIME)
+      continue;
+
+    if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
+        config->device_type == AV_HWDEVICE_TYPE_DRM)
+      return config;
+
+    if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_INTERNAL))
+      return config;
   }
 
   return nullptr;
 }
 
+static const AVCodec* FindDecoder(CDVDStreamInfo& hints)
+{
+  const AVCodec* codec = nullptr;
+  void *i = 0;
+
+  while ((codec = av_codec_iterate(&i)))
+  {
+    if (!av_codec_is_decoder(codec))
+      continue;
+    if (codec->id != hints.codec)
+      continue;
+
+    const AVCodecHWConfig* config = FindHWConfig(codec);
+    if (config)
+      return codec;
+  }
+
+  return nullptr;
+}
+
+static enum AVPixelFormat GetFormat(struct AVCodecContext* avctx, const enum AVPixelFormat* fmt)
+{
+  for (int n = 0; fmt[n] != AV_PIX_FMT_NONE; n++)
+    if (fmt[n] == AV_PIX_FMT_DRM_PRIME)
+      return fmt[n];
+
+  return AV_PIX_FMT_NONE;
+}
+
 bool CDVDVideoCodecDRMPRIME::Open(CDVDStreamInfo& hints, CDVDCodecOptions& options)
 {
-  AVCodec* pCodec = FindDecoder(hints);
+  const AVCodec* pCodec = FindDecoder(hints);
   if (!pCodec)
   {
     CLog::Log(LOGDEBUG, "CDVDVideoCodecDRMPRIME::%s - unable to find decoder for codec %d", __FUNCTION__, hints.codec);
@@ -206,6 +244,22 @@ bool CDVDVideoCodecDRMPRIME::Open(CDVDStreamInfo& hints, CDVDCodecOptions& optio
   if (!m_pCodecContext)
     return false;
 
+  const AVCodecHWConfig* pConfig = FindHWConfig(pCodec);
+  if (pConfig &&
+      (pConfig->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
+      pConfig->device_type == AV_HWDEVICE_TYPE_DRM)
+  {
+    CWinSystemGbm* winSystem = dynamic_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
+    if (av_hwdevice_ctx_create(&m_pCodecContext->hw_device_ctx, AV_HWDEVICE_TYPE_DRM, drmGetDeviceNameFromFd2(winSystem->GetDrm()->GetFileDescriptor()), nullptr, 0) < 0)
+    {
+      CLog::Log(LOGNOTICE, "CDVDVideoCodecDRMPRIME::%s - unable to create hwdevice context", __FUNCTION__);
+      avcodec_free_context(&m_pCodecContext);
+      return false;
+    }
+  }
+
+  m_pCodecContext->pix_fmt = AV_PIX_FMT_DRM_PRIME;
+  m_pCodecContext->get_format = GetFormat;
   m_pCodecContext->codec_tag = hints.codec_tag;
   m_pCodecContext->coded_width = hints.width;
   m_pCodecContext->coded_height = hints.height;
@@ -223,6 +277,13 @@ bool CDVDVideoCodecDRMPRIME::Open(CDVDStreamInfo& hints, CDVDCodecOptions& optio
   if (avcodec_open2(m_pCodecContext, pCodec, nullptr) < 0)
   {
     CLog::Log(LOGNOTICE, "CDVDVideoCodecDRMPRIME::%s - unable to open codec", __FUNCTION__);
+    avcodec_free_context(&m_pCodecContext);
+    return false;
+  }
+
+  if (m_pCodecContext->pix_fmt != AV_PIX_FMT_DRM_PRIME)
+  {
+    CLog::Log(LOGNOTICE, "CDVDVideoCodecDRMPRIME::%s - unexpected pix fmt %s", __FUNCTION__, av_get_pix_fmt_name(m_pCodecContext->pix_fmt));
     avcodec_free_context(&m_pCodecContext);
     return false;
   }
@@ -254,8 +315,8 @@ bool CDVDVideoCodecDRMPRIME::AddData(const DemuxPacket& packet)
   avpkt.size = packet.iSize;
   avpkt.dts = (packet.dts == DVD_NOPTS_VALUE) ? AV_NOPTS_VALUE : static_cast<int64_t>(packet.dts / DVD_TIME_BASE * AV_TIME_BASE);
   avpkt.pts = (packet.pts == DVD_NOPTS_VALUE) ? AV_NOPTS_VALUE : static_cast<int64_t>(packet.pts / DVD_TIME_BASE * AV_TIME_BASE);
-  // TODO: avpkt.side_data = static_cast<AVPacketSideData*>(packet.pSideData);
-  // TODO: avpkt.side_data_elems = packet.iSideDataElems;
+  avpkt.side_data = static_cast<AVPacketSideData*>(packet.pSideData);
+  avpkt.side_data_elems = packet.iSideDataElems;
 
   int ret = avcodec_send_packet(m_pCodecContext, &avpkt);
   if (ret == AVERROR(EAGAIN))
@@ -295,7 +356,14 @@ void CDVDVideoCodecDRMPRIME::SetPictureParams(VideoPicture* pVideoPicture)
   pVideoPicture->iWidth = m_pFrame->width;
   pVideoPicture->iHeight = m_pFrame->height;
 
-  double aspect_ratio = (float)pVideoPicture->iWidth / (float)pVideoPicture->iHeight;
+  double aspect_ratio = 0;
+  AVRational pixel_aspect = m_pFrame->sample_aspect_ratio;
+  if (pixel_aspect.num)
+    aspect_ratio = av_q2d(pixel_aspect) * pVideoPicture->iWidth / pVideoPicture->iHeight;
+
+  if (aspect_ratio <= 0.0)
+    aspect_ratio = (float)pVideoPicture->iWidth / (float)pVideoPicture->iHeight;
+
   pVideoPicture->iDisplayWidth = ((int)lrint(pVideoPicture->iHeight * aspect_ratio)) & -3;
   pVideoPicture->iDisplayHeight = pVideoPicture->iHeight;
   if (pVideoPicture->iDisplayWidth > pVideoPicture->iWidth)
@@ -304,11 +372,12 @@ void CDVDVideoCodecDRMPRIME::SetPictureParams(VideoPicture* pVideoPicture)
     pVideoPicture->iDisplayHeight = ((int)lrint(pVideoPicture->iWidth / aspect_ratio)) & -3;
   }
 
-  pVideoPicture->color_range = m_pFrame->color_range;
+  pVideoPicture->color_range = m_pFrame->color_range == AVCOL_RANGE_JPEG ? 1 : 0;
   pVideoPicture->color_primaries = m_pFrame->color_primaries;
   pVideoPicture->color_transfer = m_pFrame->color_trc;
   pVideoPicture->color_space = m_pFrame->colorspace;
 
+  pVideoPicture->iRepeatPicture = 0;
   pVideoPicture->iFlags = 0;
   pVideoPicture->iFlags |= m_pFrame->interlaced_frame ? DVP_FLAG_INTERLACED : 0;
   pVideoPicture->iFlags |= m_pFrame->top_field_first ? DVP_FLAG_TOP_FIELD_FIRST: 0;
@@ -316,7 +385,7 @@ void CDVDVideoCodecDRMPRIME::SetPictureParams(VideoPicture* pVideoPicture)
 
   int64_t pts = m_pFrame->pts;
   if (pts == AV_NOPTS_VALUE)
-    pts = av_frame_get_best_effort_timestamp(m_pFrame);
+    pts = m_pFrame->best_effort_timestamp;
   pVideoPicture->pts = (pts == AV_NOPTS_VALUE) ? DVD_NOPTS_VALUE : (double)pts * DVD_TIME_BASE / AV_TIME_BASE;
   pVideoPicture->dts = DVD_NOPTS_VALUE;
 }

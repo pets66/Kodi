@@ -1,33 +1,23 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowPVRRecordings.h"
 
 #include "GUIInfoManager.h"
 #include "ServiceBroker.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIRadioButtonControl.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "input/Key.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/URIUtils.h"
 #include "video/windows/GUIWindowVideoNav.h"
@@ -47,12 +37,12 @@ CGUIWindowPVRRecordingsBase::CGUIWindowPVRRecordingsBase(bool bRadio, int id, co
     CSettings::SETTING_MYVIDEOS_SELECTACTION
   })
 {
-  g_infoManager.RegisterObserver(this);
+  CServiceBroker::GetGUI()->GetInfoManager().RegisterObserver(this);
 }
 
 CGUIWindowPVRRecordingsBase::~CGUIWindowPVRRecordingsBase()
 {
-  g_infoManager.UnregisterObserver(this);
+  CServiceBroker::GetGUI()->GetInfoManager().UnregisterObserver(this);
 }
 
 void CGUIWindowPVRRecordingsBase::OnWindowLoaded()
@@ -212,7 +202,7 @@ bool CGUIWindowPVRRecordingsBase::OnMessage(CGUIMessage &message)
               if (path.IsValid() && path.IsRecordingsRoot() && item->IsParentFolder())
               {
                 // handle special 'go home' item.
-                g_windowManager.ActivateWindow(WINDOW_HOME);
+                CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_HOME);
                 bReturn = true;
                 break;
               }
@@ -277,8 +267,9 @@ bool CGUIWindowPVRRecordingsBase::OnMessage(CGUIMessage &message)
       }
       else if (message.GetSenderId() == CONTROL_BTNGROUPITEMS)
       {
-        CServiceBroker::GetSettings().ToggleBool(CSettings::SETTING_PVRRECORD_GROUPRECORDINGS);
-        CServiceBroker::GetSettings().Save();
+        const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+        settings->ToggleBool(CSettings::SETTING_PVRRECORD_GROUPRECORDINGS);
+        settings->Save();
         Refresh(true);
       }
       else if (message.GetSenderId() == CONTROL_BTNSHOWDELETED)
@@ -294,7 +285,7 @@ bool CGUIWindowPVRRecordingsBase::OnMessage(CGUIMessage &message)
       else if (message.GetSenderId() == CONTROL_BTNSHOWMODE)
       {
         CMediaSettings::GetInstance().CycleWatchedMode("recordings");
-        CServiceBroker::GetSettings().Save();
+        CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
         OnFilterItems(GetProperty("filter").asString());
         UpdateButtons();
         return true;
@@ -342,11 +333,10 @@ void CGUIWindowPVRRecordingsBase::OnPrepareFileItems(CFileItemList& items)
     return;
 
   CFileItemList files;
-  VECFILEITEMS vecItems = items.GetList();
-  for (VECFILEITEMS::const_iterator it = vecItems.begin(); it != vecItems.end(); ++it)
+  for (const auto& item : items)
   {
-    if (!(*it)->m_bIsFolder)
-      files.Add((*it));
+    if (!item->m_bIsFolder)
+      files.Add(item);
   }
 
   if (!files.IsEmpty())

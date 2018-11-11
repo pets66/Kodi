@@ -1,41 +1,42 @@
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DeviceResources.h"
 #include "DirectXHelper.h"
 #include "RenderContext.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "messaging/ApplicationMessenger.h"
 #include "platform/win32/CharsetConverter.h"
+#include "ServiceBroker.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
+#include "utils/SystemInfo.h"
+
+#ifdef _DEBUG
+#include <dxgidebug.h>
+#pragma comment(lib, "dxgi.lib")
+#endif // _DEBUG
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
-using namespace Windows::Foundation;
-using namespace concurrency;
+using namespace Concurrency;
+namespace winrt
+{
+  using namespace Windows::Foundation;
+}
 
 #ifdef _DEBUG
 #define breakOnDebug __debugbreak()
 #else
-#define breakOnDebug 
+#define breakOnDebug
 #endif
 #define LOG_HR(hr) CLog::LogF(LOGERROR, "function call at line %d ends with error: %s", __LINE__, DX::GetErrorDescription(hr).c_str());
 #define CHECK_ERR() if (FAILED(hr)) { LOG_HR(hr); breakOnDebug; return; }
@@ -78,18 +79,17 @@ DX::DeviceResources::DeviceResources()
 {
 }
 
-DX::DeviceResources::~DeviceResources()
-{
-  if (m_bDeviceCreated)
-    Release();
-}
+DX::DeviceResources::~DeviceResources() = default;
 
 void DX::DeviceResources::Release()
 {
+  if (!m_bDeviceCreated)
+    return;
+
   ReleaseBackBuffer();
   OnDeviceLost(true);
 
-  // leave fullscreen before destroying 
+  // leave fullscreen before destroying
   BOOL bFullScreen;
   m_swapChain->GetFullscreenState(&bFullScreen, nullptr);
   if (!!bFullScreen)
@@ -199,7 +199,7 @@ bool DX::DeviceResources::SetFullScreen(bool fullscreen, RESOLUTION_INFO& res)
              m_outputSize.Height);
 
   BOOL bFullScreen;
-  bool recreate = m_stereoEnabled != (g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_HARDWAREBASED);
+  bool recreate = m_stereoEnabled != (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_HARDWAREBASED);
 
   m_swapChain->GetFullscreenState(&bFullScreen, nullptr);
   if (!!bFullScreen && !fullscreen)
@@ -228,7 +228,7 @@ bool DX::DeviceResources::SetFullScreen(bool fullscreen, RESOLUTION_INFO& res)
         || is_interlaced != (res.dwFlags & D3DPRESENTFLAG_INTERLACED ? true : false)
         // force resolution change for stereo mode
         // some drivers unable to create stereo swapchain if mode does not match @23.976
-        || g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_HARDWAREBASED)
+        || CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_HARDWAREBASED)
       {
         CLog::Log(LOGDEBUG, __FUNCTION__": changing display mode to %dx%d@%0.3f", res.iWidth, res.iHeight, res.fRefreshRate,
                   res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
@@ -285,9 +285,11 @@ void DX::DeviceResources::CreateDeviceIndependentResources()
 }
 
 // Configures the Direct3D device, and stores handles to it and the device context.
-void DX::DeviceResources::CreateDeviceResources() 
+void DX::DeviceResources::CreateDeviceResources()
 {
   CLog::LogF(LOGDEBUG, "creating DirectX 11 device.");
+
+  CreateFactory();
 
   UINT creationFlags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
 #if defined(_DEBUG)
@@ -302,16 +304,16 @@ void DX::DeviceResources::CreateDeviceResources()
   // Note the ordering should be preserved.
   // Don't forget to declare your application's minimum required feature level in its
   // description.  All applications are assumed to support 9.1 unless otherwise stated.
-  D3D_FEATURE_LEVEL featureLevels[] =
-  {
-    D3D_FEATURE_LEVEL_11_1,
-    D3D_FEATURE_LEVEL_11_0,
-    D3D_FEATURE_LEVEL_10_1,
-    D3D_FEATURE_LEVEL_10_0,
-    D3D_FEATURE_LEVEL_9_3,
-    D3D_FEATURE_LEVEL_9_2,
-    D3D_FEATURE_LEVEL_9_1
-  };
+  std::vector<D3D_FEATURE_LEVEL> featureLevels;
+  if (CSysInfo::IsWindowsVersionAtLeast(CSysInfo::WindowsVersionWin8))
+    featureLevels.push_back(D3D_FEATURE_LEVEL_11_1);
+
+  featureLevels.push_back(D3D_FEATURE_LEVEL_11_0);
+  featureLevels.push_back(D3D_FEATURE_LEVEL_10_1);
+  featureLevels.push_back(D3D_FEATURE_LEVEL_10_0);
+  featureLevels.push_back(D3D_FEATURE_LEVEL_9_3);
+  featureLevels.push_back(D3D_FEATURE_LEVEL_9_2);
+  featureLevels.push_back(D3D_FEATURE_LEVEL_9_1);
 
   // Create the Direct3D 11 API device object and a corresponding context.
   ComPtr<ID3D11Device> device;
@@ -323,8 +325,8 @@ void DX::DeviceResources::CreateDeviceResources()
       drivertType,               // Create a device using scepcified driver.
       nullptr,                   // Should be 0 unless the driver is D3D_DRIVER_TYPE_SOFTWARE.
       creationFlags,             // Set debug and Direct2D compatibility flags.
-      featureLevels,             // List of feature levels this app can support.
-      ARRAYSIZE(featureLevels),  // Size of the list above.
+      featureLevels.data(),      // List of feature levels this app can support.
+      featureLevels.size(),      // Size of the list above.
       D3D11_SDK_VERSION,         // Always set this to D3D11_SDK_VERSION for Windows Store apps.
       &device,                   // Returns the Direct3D device created.
       &m_d3dFeatureLevel,        // Returns feature level of device created.
@@ -339,8 +341,8 @@ void DX::DeviceResources::CreateDeviceResources()
         D3D_DRIVER_TYPE_WARP, // Create a WARP device instead of a hardware device.
         nullptr,
         creationFlags,
-        featureLevels,
-        ARRAYSIZE(featureLevels),
+        featureLevels.data(),
+        featureLevels.size(),
         D3D11_SDK_VERSION,
         &device,
         &m_d3dFeatureLevel,
@@ -367,7 +369,7 @@ void DX::DeviceResources::CreateDeviceResources()
     ComPtr<ID3D11InfoQueue> d3dInfoQueue;
     if (SUCCEEDED(m_d3dDebug.As(&d3dInfoQueue)))
     {
-      D3D11_MESSAGE_ID hide[] =
+      std::vector<D3D11_MESSAGE_ID> hide =
       {
         D3D11_MESSAGE_ID_GETVIDEOPROCESSORFILTERRANGE_UNSUPPORTED,        // avoid GETVIDEOPROCESSORFILTERRANGE_UNSUPPORTED (dx bug)
         D3D11_MESSAGE_ID_DEVICE_RSSETSCISSORRECTS_NEGATIVESCISSOR         // avoid warning for some labels out of screen
@@ -376,8 +378,8 @@ void DX::DeviceResources::CreateDeviceResources()
 
       D3D11_INFO_QUEUE_FILTER filter;
       ZeroMemory(&filter, sizeof(filter));
-      filter.DenyList.NumIDs = _countof(hide);
-      filter.DenyList.pIDList = hide;
+      filter.DenyList.NumIDs = hide.size();
+      filter.DenyList.pIDList = hide.data();
       d3dInfoQueue->AddStorageFilterEntries(&filter);
     }
   }
@@ -394,7 +396,6 @@ void DX::DeviceResources::CreateDeviceResources()
     hr = dxgiDevice->GetAdapter(&adapter); CHECK_ERR();
     hr = adapter.As(&m_adapter); CHECK_ERR();
   }
-  hr = m_adapter->GetParent(IID_PPV_ARGS(&m_dxgiFactory)); CHECK_ERR();
 
   DXGI_ADAPTER_DESC aDesc;
   m_adapter->GetDesc(&aDesc);
@@ -409,20 +410,23 @@ void DX::DeviceResources::ReleaseBackBuffer()
 {
   CLog::LogF(LOGDEBUG, "release buffers.");
 
-  // Clear the previous window size specific context.
-  ID3D11RenderTargetView* nullViews[] = { nullptr, nullptr, nullptr, nullptr };
-  m_deferrContext->OMSetRenderTargets(4, nullViews, nullptr);
-  FinishCommandList(false);
-
   m_backBufferTex.Release();
   m_d3dDepthStencilView = nullptr;
-  m_deferrContext->Flush();
-  m_d3dContext->Flush();
+  if (m_deferrContext)
+  {
+    // Clear the previous window size specific context.
+    ID3D11RenderTargetView* nullViews[] = { nullptr, nullptr, nullptr, nullptr };
+    m_deferrContext->OMSetRenderTargets(4, nullViews, nullptr);
+    FinishCommandList(false);
+
+    m_deferrContext->Flush();
+    m_d3dContext->Flush();
+  }
 }
 
 void DX::DeviceResources::CreateBackBuffer()
 {
-  if (!m_bDeviceCreated)
+  if (!m_bDeviceCreated || !m_swapChain)
     return;
 
   CLog::LogF(LOGDEBUG, "create buffers.");
@@ -485,11 +489,11 @@ HRESULT DX::DeviceResources::CreateSwapChain(DXGI_SWAP_CHAIN_DESC1& desc, DXGI_S
     nullptr,
     ppSwapChain
   ); RETURN_ERR(hr);
-  hr = m_dxgiFactory->MakeWindowAssociation(m_window, /*DXGI_MWA_NO_WINDOW_CHANGES |*/ DXGI_MWA_NO_ALT_ENTER); 
+  hr = m_dxgiFactory->MakeWindowAssociation(m_window, /*DXGI_MWA_NO_WINDOW_CHANGES |*/ DXGI_MWA_NO_ALT_ENTER);
 #else
   hr = m_dxgiFactory->CreateSwapChainForCoreWindow(
     m_d3dDevice.Get(),
-    reinterpret_cast<IUnknown*>(m_coreWindow.Get()),
+    winrt::get_unknown(m_coreWindow),
     &desc,
     nullptr,
     ppSwapChain
@@ -505,8 +509,9 @@ void DX::DeviceResources::ResizeBuffers()
 
   CLog::LogF(LOGDEBUG, "resize buffers.");
 
-  bool bHWStereoEnabled = RENDER_STEREO_MODE_HARDWAREBASED == g_graphicsContext.GetStereoMode();
+  bool bHWStereoEnabled = RENDER_STEREO_MODE_HARDWAREBASED == CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode();
   bool windowed = true;
+  HRESULT hr = E_FAIL;
 
   DXGI_SWAP_CHAIN_DESC1 scDesc = { 0 };
   if (m_swapChain)
@@ -534,7 +539,7 @@ void DX::DeviceResources::ResizeBuffers()
   {
     // If the swap chain already exists, resize it.
     m_swapChain->GetDesc1(&scDesc);
-    HRESULT hr = m_swapChain->ResizeBuffers(
+    hr = m_swapChain->ResizeBuffers(
       scDesc.BufferCount,
       lround(m_outputSize.Width),
       lround(m_outputSize.Height),
@@ -547,7 +552,7 @@ void DX::DeviceResources::ResizeBuffers()
       // If the device was removed for any reason, a new device and swap chain will need to be created.
       HandleDeviceLost(hr == DXGI_ERROR_DEVICE_REMOVED);
 
-      // Everything is set up now. Do not continue execution of this method. HandleDeviceLost will reenter this method 
+      // Everything is set up now. Do not continue execution of this method. HandleDeviceLost will reenter this method
       // and correctly set up the new device.
       return;
     }
@@ -557,7 +562,6 @@ void DX::DeviceResources::ResizeBuffers()
   {
     // Otherwise, create a new one using the same adapter as the existing Direct3D device.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
-
     swapChainDesc.Width = lround(m_outputSize.Width);
     swapChainDesc.Height = lround(m_outputSize.Height);
     swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -575,7 +579,21 @@ void DX::DeviceResources::ResizeBuffers()
     scFSDesc.Windowed = windowed;
 
     ComPtr<IDXGISwapChain1> swapChain;
-    HRESULT hr = CreateSwapChain(swapChainDesc, scFSDesc, &swapChain);
+    if ( m_d3dFeatureLevel >= D3D_FEATURE_LEVEL_11_0
+      && !bHWStereoEnabled
+      && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_bTry10bitOutput)
+    {
+      swapChainDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+      hr = CreateSwapChain(swapChainDesc, scFSDesc, &swapChain);
+      if (FAILED(hr))
+      {
+        CLog::LogF(LOGWARNING, "creating 10bit swapchain failed, fallback to 8bit.");
+        swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+      }
+    }
+
+    if (!swapChain)
+      hr = CreateSwapChain(swapChainDesc, scFSDesc, &swapChain);
 
     if (FAILED(hr) && bHWStereoEnabled)
     {
@@ -589,7 +607,13 @@ void DX::DeviceResources::ResizeBuffers()
       hr = CreateSwapChain(swapChainDesc, scFSDesc, &swapChain); CHECK_ERR();
 
       // fallback to split_horizontal mode.
-      g_graphicsContext.SetStereoMode(RENDER_STEREO_MODE_SPLIT_HORIZONTAL);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetStereoMode(RENDER_STEREO_MODE_SPLIT_HORIZONTAL);
+    }
+
+    if (FAILED(hr))
+    {
+      CLog::LogF(LOGERROR, "unable to create swapchain.");
+      return;
     }
 
     hr = swapChain.As(&m_swapChain); CHECK_ERR();
@@ -604,7 +628,7 @@ void DX::DeviceResources::ResizeBuffers()
 }
 
 // These resources need to be recreated every time the window size is changed.
-void DX::DeviceResources::CreateWindowSizeDependentResources() 
+void DX::DeviceResources::CreateWindowSizeDependentResources()
 {
   ReleaseBackBuffer();
 
@@ -682,7 +706,7 @@ void DX::DeviceResources::SetLogicalSize(float width, float height)
 #if defined(TARGET_WINDOWS_DESKTOP)
   (!m_window)
 #else
-  (!m_coreWindow.Get())
+  (!m_coreWindow)
 #endif
     return;
 
@@ -692,7 +716,7 @@ void DX::DeviceResources::SetLogicalSize(float width, float height)
   {
     CLog::LogF(LOGDEBUG, "change logical size to %f x %f", width, height);
 
-    m_logicalSize = Size(width, height);
+    m_logicalSize = winrt::Size(width, height);
 
     UpdateRenderTargetSize();
     ResizeBuffers();
@@ -747,8 +771,8 @@ void DX::DeviceResources::ValidateDevice()
   // If the adapter LUIDs don't match, or if the device reports that it has been removed,
   // a new D3D device must be created.
   HRESULT hr = m_d3dDevice->GetDeviceRemovedReason();
-  if ( previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart 
-    || previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart 
+  if ( previousDesc.AdapterLuid.LowPart != currentDesc.AdapterLuid.LowPart
+    || previousDesc.AdapterLuid.HighPart != currentDesc.AdapterLuid.HighPart
     || FAILED(hr))
   {
     // Release references to resources related to the old device.
@@ -763,12 +787,14 @@ void DX::DeviceResources::ValidateDevice()
 
 void DX::DeviceResources::OnDeviceLost(bool removed)
 {
-  g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_LOST);
+  auto pGUI = CServiceBroker::GetGUI();
+  if (pGUI)
+    pGUI->GetWindowManager().SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_LOST);
 
   // tell any shared resources
   for (auto res : m_resources)
   {
-    // the most of resources like textures and buffers try to 
+    // the most of resources like textures and buffers try to
     // receive and save their status from current device.
     // `removed` means that we have no possibility
     // to use the device anymore, tell all resouces about this.
@@ -782,7 +808,9 @@ void DX::DeviceResources::OnDeviceRestored()
   for (auto res : m_resources)
     res->OnCreateDevice();
 
-  g_windowManager.SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
+  auto pGUI = CServiceBroker::GetGUI();
+  if (pGUI)
+    pGUI->GetWindowManager().SendMessage(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_RENDERER_RESET);
 }
 
 // Recreate all device resources and set them back to the current state.
@@ -817,7 +845,7 @@ bool DX::DeviceResources::Begin()
 {
   HRESULT hr = m_swapChain->Present(0, DXGI_PRESENT_TEST);
 
-  // If the device was removed either by a disconnection or a driver upgrade, we 
+  // If the device was removed either by a disconnection or a driver upgrade, we
   // must recreate all device resources.
   if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
   {
@@ -838,10 +866,9 @@ bool DX::DeviceResources::Begin()
 }
 
 // Present the contents of the swap chain to the screen.
-void DX::DeviceResources::Present() 
+void DX::DeviceResources::Present()
 {
   FinishCommandList();
-  m_d3dContext->Flush();
 
   // The first argument instructs DXGI to block until VSync, putting the application
   // to sleep until the next VSync. This ensures we don't waste any cycles rendering
@@ -849,7 +876,7 @@ void DX::DeviceResources::Present()
   DXGI_PRESENT_PARAMETERS parameters = { 0 };
   HRESULT hr = m_swapChain->Present1(1, 0, &parameters);
 
-  // If the device was removed either by a disconnection or a driver upgrade, we 
+  // If the device was removed either by a disconnection or a driver upgrade, we
   // must recreate all device resources.
   if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
   {
@@ -862,6 +889,8 @@ void DX::DeviceResources::Present()
     {
       CreateWindowSizeDependentResources();
     }
+    if (!m_dxgiFactory->IsCurrent())
+      CreateFactory();
   }
 
   if (m_d3dContext == m_deferrContext)
@@ -912,7 +941,7 @@ void DX::DeviceResources::HandleOutputChange(const std::function<bool(DXGI_OUTPU
           CLog::LogF(LOGDEBUG, "selected {} adapter. ",
                      KODI::PLATFORM::WINDOWS::FromW(foundDesc.Description));
           // (re)init hooks into new driver
-          Windowing().InitHooks(output.Get());
+          Windowing()->InitHooks(output.Get());
           // recreate d3d11 device on new adapter
           if (m_d3dDevice)
             HandleDeviceLost(false);
@@ -923,10 +952,35 @@ void DX::DeviceResources::HandleOutputChange(const std::function<bool(DXGI_OUTPU
   }
 }
 
+bool DX::DeviceResources::CreateFactory()
+{
+  HRESULT hr;
+#if defined(_DEBUG) && defined(TARGET_WINDOWS_STORE)
+  bool debugDXGI = false;
+  {
+    ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiInfoQueue.GetAddressOf()))))
+    {
+      debugDXGI = true;
+
+      hr = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(m_dxgiFactory.ReleaseAndGetAddressOf())); RETURN_ERR(false);
+
+      dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+      dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+    }
+  }
+
+  if (!debugDXGI)
+#endif
+  hr = CreateDXGIFactory1(IID_PPV_ARGS(m_dxgiFactory.ReleaseAndGetAddressOf())); RETURN_ERR(false);
+
+  return true;
+}
+
 void DX::DeviceResources::SetMonitor(HMONITOR monitor)
 {
-  HandleOutputChange([monitor](DXGI_OUTPUT_DESC outputDesc) { 
-    return outputDesc.Monitor == monitor; 
+  HandleOutputChange([monitor](DXGI_OUTPUT_DESC outputDesc) {
+    return outputDesc.Monitor == monitor;
   });
 }
 
@@ -959,6 +1013,15 @@ bool DX::DeviceResources::IsStereoAvailable() const
   return false;
 }
 
+bool DX::DeviceResources::DoesTextureSharingWork()
+{
+  if (m_d3dFeatureLevel < D3D_FEATURE_LEVEL_10_0)
+    return false;
+
+  // @todo proper check in run-time
+  return CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_allowUseSeparateDeviceForDecoding;
+}
+
 #if defined(TARGET_WINDOWS_DESKTOP)
 // This method is called when the window (WND) is created (or re-created).
 void DX::DeviceResources::SetWindow(HWND window)
@@ -970,21 +1033,24 @@ void DX::DeviceResources::SetWindow(HWND window)
 }
 #elif defined(TARGET_WINDOWS_STORE)
 // This method is called when the CoreWindow is created (or re-created).
-void DX::DeviceResources::SetWindow(Windows::UI::Core::CoreWindow^ window)
+void DX::DeviceResources::SetWindow(const winrt::Windows::UI::Core::CoreWindow& window)
 {
+  using namespace winrt::Windows::UI::Core;
+  using namespace winrt::Windows::Graphics::Display;
+
   m_coreWindow = window;
-  auto dispatcher = m_coreWindow->Dispatcher;
-  auto handler = ref new Windows::UI::Core::DispatchedHandler([&]()
+  auto dispatcher = m_coreWindow.Dispatcher();
+  DispatchedHandler handler([&]()
   {
-    auto coreWindow = Windows::UI::Core::CoreWindow::GetForCurrentThread();
-    m_logicalSize = Windows::Foundation::Size(coreWindow->Bounds.Width, coreWindow->Bounds.Height);
-    m_dpi = Windows::Graphics::Display::DisplayInformation::GetForCurrentView()->LogicalDpi;
-    SetWindowPos(coreWindow->Bounds);
+    auto coreWindow = CoreWindow::GetForCurrentThread();
+    m_logicalSize = winrt::Size(coreWindow.Bounds().Width, coreWindow.Bounds().Height);
+    m_dpi = DisplayInformation::GetForCurrentView().LogicalDpi();
+    SetWindowPos(coreWindow.Bounds());
   });
-  if (dispatcher->HasThreadAccess)
-    handler->Invoke();
+  if (dispatcher.HasThreadAccess())
+    handler();
   else
-    Concurrency::create_task(dispatcher->RunAsync(Windows::UI::Core::CoreDispatcherPriority::High, handler)).wait();
+    dispatcher.RunAsync(CoreDispatcherPriority::High, handler).get();
 
   CreateDeviceIndependentResources();
   CreateDeviceResources();
@@ -992,7 +1058,7 @@ void DX::DeviceResources::SetWindow(Windows::UI::Core::CoreWindow^ window)
   CreateWindowSizeDependentResources();
 }
 
-void DX::DeviceResources::SetWindowPos(Windows::Foundation::Rect rect)
+void DX::DeviceResources::SetWindowPos(winrt::Rect rect)
 {
   int centerX = rect.X + rect.Width / 2;
   int centerY = rect.Y + rect.Height / 2;
@@ -1004,7 +1070,7 @@ void DX::DeviceResources::SetWindowPos(Windows::Foundation::Rect rect)
   });
 }
 
-// Call this method when the app suspends. It provides a hint to the driver that the app 
+// Call this method when the app suspends. It provides a hint to the driver that the app
 // is entering an idle state and that temporary buffers can be reclaimed for use by other apps.
 void DX::DeviceResources::Trim() const
 {

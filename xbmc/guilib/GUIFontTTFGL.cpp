@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIFont.h"
@@ -23,7 +11,7 @@
 #include "GUIFontManager.h"
 #include "Texture.h"
 #include "TextureManager.h"
-#include "GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "ServiceBroker.h"
 #include "gui3d.h"
 #include "utils/log.h"
@@ -33,7 +21,7 @@
 #elif HAS_GLES
 #include "rendering/gles/RenderSystemGLES.h"
 #endif
-#include "guilib/MatrixGLES.h"
+#include "rendering/MatrixGL.h"
 
 // stuff for freetype
 #include <ft2build.h>
@@ -65,14 +53,23 @@ bool CGUIFontTTFGL::FirstBegin()
 {
 #if defined(HAS_GL)
   GLenum pixformat = GL_RED;
+  GLenum internalFormat;
+  unsigned int major, minor;
+  CRenderSystemGL* renderSystem = dynamic_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
+  renderSystem->GetRenderVersion(major, minor);
+  if (major >= 3)
+    internalFormat = GL_R8;
+  else
+    internalFormat = GL_LUMINANCE;
 #else
   GLenum pixformat = GL_ALPHA; // deprecated
+  GLenum internalFormat = GL_ALPHA;
 #endif
 
   if (m_textureStatus == TEXTURE_REALLOCATED)
   {
     if (glIsTexture(m_nTexture))
-      g_TextureManager.ReleaseHwTexture(m_nTexture);
+      CServiceBroker::GetGUI()->GetTextureManager().ReleaseHwTexture(m_nTexture);
     m_textureStatus = TEXTURE_VOID;
   }
 
@@ -89,7 +86,7 @@ bool CGUIFontTTFGL::FirstBegin()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Set the texture image -- THIS WORKS, so the pixels must be wrong.
-    glTexImage2D(GL_TEXTURE_2D, 0, pixformat, m_texture->GetWidth(), m_texture->GetHeight(), 0,
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_texture->GetWidth(), m_texture->GetHeight(), 0,
         pixformat, GL_UNSIGNED_BYTE, 0);
 
     VerifyGLState();
@@ -117,13 +114,13 @@ bool CGUIFontTTFGL::FirstBegin()
 void CGUIFontTTFGL::LastEnd()
 {
 #ifdef HAS_GL
-  CRenderSystemGL& renderSystem = dynamic_cast<CRenderSystemGL&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableShader(SM_FONTS);
+  CRenderSystemGL* renderSystem = dynamic_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableShader(SM_FONTS);
 
-  GLint posLoc = renderSystem.ShaderGetPos();
-  GLint colLoc = renderSystem.ShaderGetCol();
-  GLint tex0Loc = renderSystem.ShaderGetCoord0();
-  GLint modelLoc = renderSystem.ShaderGetModel();
+  GLint posLoc = renderSystem->ShaderGetPos();
+  GLint colLoc = renderSystem->ShaderGetCol();
+  GLint tex0Loc = renderSystem->ShaderGetCoord0();
+  GLint modelLoc = renderSystem->ShaderGetModel();
 
   CreateStaticVertexBuffers();
 
@@ -168,13 +165,13 @@ void CGUIFontTTFGL::LastEnd()
 
 #else
   // GLES 2.0 version.
-  CRenderSystemGLES& renderSystem = dynamic_cast<CRenderSystemGLES&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableGUIShader(SM_FONTS);
+  CRenderSystemGLES* renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableGUIShader(SM_FONTS);
 
-  GLint posLoc  = renderSystem.GUIShaderGetPos();
-  GLint colLoc  = renderSystem.GUIShaderGetCol();
-  GLint tex0Loc = renderSystem.GUIShaderGetCoord0();
-  GLint modelLoc = renderSystem.GUIShaderGetModel();
+  GLint posLoc  = renderSystem->GUIShaderGetPos();
+  GLint colLoc  = renderSystem->GUIShaderGetCol();
+  GLint tex0Loc = renderSystem->GUIShaderGetCoord0();
+  GLint modelLoc = renderSystem->GUIShaderGetModel();
 
 
   CreateStaticVertexBuffers();
@@ -218,12 +215,12 @@ void CGUIFontTTFGL::LastEnd()
     // Bind our pre-calculated array to GL_ELEMENT_ARRAY_BUFFER
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_elementArrayHandle);
     // Store current scissor
-    CRect scissor = g_graphicsContext.StereoCorrection(g_graphicsContext.GetScissors());
+    CRect scissor = CServiceBroker::GetWinSystem()->GetGfxContext().StereoCorrection(CServiceBroker::GetWinSystem()->GetGfxContext().GetScissors());
 
     for (size_t i = 0; i < m_vertexTrans.size(); i++)
     {
       // Apply the clip rectangle
-      CRect clip = renderSystem.ClipRectToScissorRect(m_vertexTrans[i].clip);
+      CRect clip = renderSystem->ClipRectToScissorRect(m_vertexTrans[i].clip);
       if (!clip.IsEmpty())
       {
         // intersect with current scissor
@@ -231,7 +228,7 @@ void CGUIFontTTFGL::LastEnd()
         // skip empty clip
         if (clip.IsEmpty())
           continue;
-        renderSystem.SetScissors(clip);
+        renderSystem->SetScissors(clip);
       }
 
       // Apply the translation to the currently active (top-of-stack) model view matrix
@@ -261,7 +258,7 @@ void CGUIFontTTFGL::LastEnd()
       glMatrixModview.Pop();
     }
     // Restore the original scissor rectangle
-    renderSystem.SetScissors(scissor);
+    renderSystem->SetScissors(scissor);
     // Restore the original model view matrix
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glMatrixModview.Get());
     // Unbind GL_ARRAY_BUFFER and GL_ELEMENT_ARRAY_BUFFER
@@ -275,9 +272,9 @@ void CGUIFontTTFGL::LastEnd()
   glDisableVertexAttribArray(tex0Loc);
 
 #ifdef HAS_GL
-  renderSystem.DisableShader();
+  renderSystem->DisableShader();
 #else
-  renderSystem.DisableGUIShader();
+  renderSystem->DisableGUIShader();
 #endif
 }
 
@@ -335,8 +332,8 @@ CBaseTexture* CGUIFontTTFGL::ReallocTexture(unsigned int& newHeight)
     m_updateY1 = 0;
     m_updateY2 = m_texture->GetHeight();
 
-    unsigned char* src = (unsigned char*) m_texture->GetPixels();
-    unsigned char* dst = (unsigned char*) newTexture->GetPixels();
+    unsigned char* src = m_texture->GetPixels();
+    unsigned char* dst = newTexture->GetPixels();
     for (unsigned int y = 0; y < m_texture->GetHeight(); y++)
     {
       memcpy(dst, src, m_texture->GetPitch());
@@ -355,8 +352,8 @@ bool CGUIFontTTFGL::CopyCharToTexture(FT_BitmapGlyph bitGlyph, unsigned int x1, 
 {
   FT_Bitmap bitmap = bitGlyph->bitmap;
 
-  unsigned char* source = (unsigned char*) bitmap.buffer;
-  unsigned char* target = (unsigned char*) m_texture->GetPixels() + y1 * m_texture->GetPitch() + x1;
+  unsigned char* source = bitmap.buffer;
+  unsigned char* target = m_texture->GetPixels() + y1 * m_texture->GetPitch() + x1;
 
   for (unsigned int y = y1; y < y2; y++)
   {
@@ -364,7 +361,7 @@ bool CGUIFontTTFGL::CopyCharToTexture(FT_BitmapGlyph bitGlyph, unsigned int x1, 
     source += bitmap.width;
     target += m_texture->GetPitch();
   }
-  
+
   switch (m_textureStatus)
   {
   case TEXTURE_UPDATED:
@@ -373,7 +370,7 @@ bool CGUIFontTTFGL::CopyCharToTexture(FT_BitmapGlyph bitGlyph, unsigned int x1, 
       m_updateY2 = std::max(m_updateY2, y2);
     }
     break;
-      
+
   case TEXTURE_READY:
     {
       m_updateY1 = y1;
@@ -381,7 +378,7 @@ bool CGUIFontTTFGL::CopyCharToTexture(FT_BitmapGlyph bitGlyph, unsigned int x1, 
       m_textureStatus = TEXTURE_UPDATED;
     }
     break;
-      
+
   case TEXTURE_REALLOCATED:
     {
       m_updateY2 = std::max(m_updateY2, y2);
@@ -392,7 +389,7 @@ bool CGUIFontTTFGL::CopyCharToTexture(FT_BitmapGlyph bitGlyph, unsigned int x1, 
   default:
     break;
   }
-  
+
   return true;
 }
 
@@ -401,7 +398,7 @@ void CGUIFontTTFGL::DeleteHardwareTexture()
   if (m_textureStatus != TEXTURE_VOID)
   {
     if (glIsTexture(m_nTexture))
-      g_TextureManager.ReleaseHwTexture(m_nTexture);
+      CServiceBroker::GetGUI()->GetTextureManager().ReleaseHwTexture(m_nTexture);
 
     m_textureStatus = TEXTURE_VOID;
     m_updateY1 = m_updateY2 = 0;

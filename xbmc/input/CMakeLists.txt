@@ -1,6 +1,4 @@
-set(SOURCES Action.cpp
-            ActionTranslator.cpp
-            AppTranslator.cpp
+set(SOURCES AppTranslator.cpp
             ButtonTranslator.cpp
             CustomControllerTranslator.cpp
             GamepadTranslator.cpp
@@ -26,11 +24,7 @@ set(SOURCES Action.cpp
             XBMC_keytable.cpp)
 
 set(HEADERS hardware/IHardwareInput.h
-            remote/IRemoteControl.h
             remote/IRRemote.h
-            Action.h
-            ActionIDs.h
-            ActionTranslator.h
             AppTranslator.h
             ButtonTranslator.h
             CustomControllerTranslator.h

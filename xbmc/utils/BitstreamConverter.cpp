@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "utils/log.h"
@@ -28,6 +16,8 @@
 #include "BitstreamConverter.h"
 #include "BitstreamReader.h"
 #include "BitstreamWriter.h"
+
+#include <algorithm>
 
 enum {
   AVC_NAL_SLICE=1,
@@ -101,14 +91,15 @@ enum {
   SEI_TONE_MAPPING
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
-// GStreamer h264 parser
-// Copyright (C) 2005 Michal Benes <michal.benes@itonis.tv>
-//           (C) 2008 Wim Taymans <wim.taymans@gmail.com>
-// gsth264parse.c:
-//  * License as published by the Free Software Foundation; either
-//  * version 2.1 of the License, or (at your option) any later version.
+/*
+ *  GStreamer h264 parser
+ *  Copyright (C) 2005 Michal Benes <michal.benes@itonis.tv>
+ *            (C) 2008 Wim Taymans <wim.taymans@gmail.com>
+ *  gsth264parse.c
+ *  
+ *  SPDX-License-Identifier: LGPL-2.1-or-later
+ *  See LICENSES/README.md for more information.
+ */
 static void nal_bs_init(nal_bitstream *bs, const uint8_t *data, size_t size)
 {
   bs->data = data;
@@ -1053,7 +1044,7 @@ int CBitstreamConverter::isom_write_avcc(AVIOContext *pb, const uint8_t *data, i
       {
         uint32_t size;
         uint8_t  nal_type;
-        size = FFMIN(BS_RB32(buf), end - buf - 4);
+        size = std::min<uint32_t>(BS_RB32(buf), end - buf - 4);
         buf += 4;
         nal_type = buf[0] & 0x1f;
         if (nal_type == 7) /* SPS */
@@ -1224,86 +1215,3 @@ bool CBitstreamConverter::mpeg2_sequence_header(const uint8_t *data, const uint3
   return changed;
 }
 
-void CBitstreamConverter::parseh264_sps(const uint8_t *sps, const uint32_t sps_size, bool *interlaced, int32_t *max_ref_frames)
-{
-  nal_bitstream bs;
-  sps_info_struct sps_info;
-
-  nal_bs_init(&bs, sps, sps_size);
-
-  sps_info.profile_idc  = nal_bs_read(&bs, 8);
-  nal_bs_read(&bs, 1);  // constraint_set0_flag
-  nal_bs_read(&bs, 1);  // constraint_set1_flag
-  nal_bs_read(&bs, 1);  // constraint_set2_flag
-  nal_bs_read(&bs, 1);  // constraint_set3_flag
-  nal_bs_read(&bs, 4);  // reserved
-  sps_info.level_idc    = nal_bs_read(&bs, 8);
-  sps_info.sps_id       = nal_bs_read_ue(&bs);
-
-  if (sps_info.profile_idc == 100 ||
-      sps_info.profile_idc == 110 ||
-      sps_info.profile_idc == 122 ||
-      sps_info.profile_idc == 244 ||
-      sps_info.profile_idc == 44  ||
-      sps_info.profile_idc == 83  ||
-      sps_info.profile_idc == 86)
-  {
-    sps_info.chroma_format_idc                    = nal_bs_read_ue(&bs);
-    if (sps_info.chroma_format_idc == 3)
-      sps_info.separate_colour_plane_flag         = nal_bs_read(&bs, 1);
-    sps_info.bit_depth_luma_minus8                = nal_bs_read_ue(&bs);
-    sps_info.bit_depth_chroma_minus8              = nal_bs_read_ue(&bs);
-    sps_info.qpprime_y_zero_transform_bypass_flag = nal_bs_read(&bs, 1);
-
-    sps_info.seq_scaling_matrix_present_flag = nal_bs_read (&bs, 1);
-    if (sps_info.seq_scaling_matrix_present_flag)
-    {
-      //! @todo unfinished
-    }
-  }
-  sps_info.log2_max_frame_num_minus4 = nal_bs_read_ue(&bs);
-  if (sps_info.log2_max_frame_num_minus4 > 12)
-  { // must be between 0 and 12
-    return;
-  }
-  sps_info.pic_order_cnt_type = nal_bs_read_ue(&bs);
-  if (sps_info.pic_order_cnt_type == 0)
-  {
-    sps_info.log2_max_pic_order_cnt_lsb_minus4 = nal_bs_read_ue(&bs);
-  }
-  else if (sps_info.pic_order_cnt_type == 1)
-  { //! @todo unfinished
-    /*
-    delta_pic_order_always_zero_flag = gst_nal_bs_read (bs, 1);
-    offset_for_non_ref_pic = gst_nal_bs_read_se (bs);
-    offset_for_top_to_bottom_field = gst_nal_bs_read_se (bs);
-
-    num_ref_frames_in_pic_order_cnt_cycle = gst_nal_bs_read_ue (bs);
-    for( i = 0; i < num_ref_frames_in_pic_order_cnt_cycle; i++ )
-    offset_for_ref_frame[i] = gst_nal_bs_read_se (bs);
-    */
-  }
-
-  sps_info.max_num_ref_frames             = nal_bs_read_ue(&bs);
-  sps_info.gaps_in_frame_num_value_allowed_flag = nal_bs_read(&bs, 1);
-  sps_info.pic_width_in_mbs_minus1        = nal_bs_read_ue(&bs);
-  sps_info.pic_height_in_map_units_minus1 = nal_bs_read_ue(&bs);
-
-  sps_info.frame_mbs_only_flag            = nal_bs_read(&bs, 1);
-  if (!sps_info.frame_mbs_only_flag)
-    sps_info.mb_adaptive_frame_field_flag = nal_bs_read(&bs, 1);
-
-  sps_info.direct_8x8_inference_flag      = nal_bs_read(&bs, 1);
-
-  sps_info.frame_cropping_flag            = nal_bs_read(&bs, 1);
-  if (sps_info.frame_cropping_flag)
-  {
-    sps_info.frame_crop_left_offset       = nal_bs_read_ue(&bs);
-    sps_info.frame_crop_right_offset      = nal_bs_read_ue(&bs);
-    sps_info.frame_crop_top_offset        = nal_bs_read_ue(&bs);
-    sps_info.frame_crop_bottom_offset     = nal_bs_read_ue(&bs);
-  }
-
-  *interlaced = !sps_info.frame_mbs_only_flag;
-  *max_ref_frames = sps_info.max_num_ref_frames;
-}

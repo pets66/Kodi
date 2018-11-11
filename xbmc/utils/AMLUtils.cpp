@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2011-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2011-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <unistd.h>
@@ -30,7 +18,7 @@
 #include "utils/log.h"
 #include "utils/SysfsUtils.h"
 #include "utils/StringUtils.h"
-#include "guilib/gui3d.h"
+#include "windowing/GraphicContext.h"
 #include "utils/RegExp.h"
 #include "filesystem/SpecialProtocol.h"
 #include "rendering/RenderSystem.h"
@@ -69,7 +57,7 @@ bool aml_wired_present()
 }
 
 bool aml_permissions()
-{  
+{
   if (!aml_present())
     return false;
 
@@ -118,6 +106,11 @@ bool aml_permissions()
       CLog::Log(LOGERROR, "AML: no rw on /sys/module/amlvideodri/parameters/freerun_mode");
       permissions_ok = 0;
     }
+    if (!SysfsUtils::HasRW("/sys/class/video/freerun_mode"))
+    {
+      CLog::Log(LOGERROR, "AML: no rw on /sys/class/video/freerun_mode");
+      permissions_ok = 0;
+    }
     if (!SysfsUtils::HasRW("/sys/class/audiodsp/digital_raw"))
     {
       CLog::Log(LOGERROR, "AML: no rw on /sys/class/audiodsp/digital_raw");
@@ -149,6 +142,14 @@ bool aml_permissions()
     if (aml_has_frac_rate_policy() && !SysfsUtils::HasRW("/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"))
     {
       CLog::Log(LOGERROR, "AML: no rw on /sys/class/amhdmitx/amhdmitx0/frac_rate_policy");
+    }
+    if (!SysfsUtils::HasRW("/sys/module/di/parameters/bypass_prog"))
+    {
+      CLog::Log(LOGERROR, "AML: no rw on /sys/module/di/parameters/bypass_prog");
+    }
+    if (!SysfsUtils::HasRW("/sys/class/display/mode"))
+    {
+      CLog::Log(LOGERROR, "AML: no rw on /sys/class/display/mode");
     }
   }
 
@@ -442,7 +443,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
     }
   }
 
-  res->iScreen       = 0;
   res->bFullScreen   = true;
   res->iSubtitles    = (int)(0.965 * res->iHeight);
   res->fPixelRatio   = 1.0f;
@@ -598,7 +598,7 @@ void aml_handle_scale(const RESOLUTION_INFO &res)
 void aml_handle_display_stereo_mode(const int stereo_mode)
 {
   static std::string lastHdmiTxConfig = "3doff";
-  
+
   std::string command = "3doff";
   switch (stereo_mode)
   {
@@ -612,7 +612,7 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
       // nothing - command is already initialised to "3doff"
       break;
   }
-  
+
   CLog::Log(LOGDEBUG, "AMLUtils::aml_handle_display_stereo_mode old mode %s new mode %s", lastHdmiTxConfig.c_str(), command.c_str());
   // there is no way to read back current mode from sysfs
   // so we track state internal. Because even
@@ -687,3 +687,75 @@ void aml_set_framebuffer_resolution(int width, int height, std::string framebuff
     close(fd0);
   }
 }
+
+bool aml_read_reg(const std::string &reg, uint32_t &reg_val)
+{
+  std::string path = "/sys/kernel/debug/aml_reg/paddr";
+  if (SysfsUtils::Has(path))
+  {
+    if (SysfsUtils::SetString(path, reg) == 0)
+    {
+      std::string val;
+      if (SysfsUtils::GetString(path, val) == 0)
+      {
+        CRegExp regexp;
+        regexp.RegComp("\\[0x(?<reg>.+)\\][\\s]+=[\\s]+(?<val>.+)");
+        if (regexp.RegFind(val) == 0)
+        {
+          std::string match;
+          if (regexp.GetNamedSubPattern("reg", match))
+          {
+            if (match == reg)
+            {
+              if (regexp.GetNamedSubPattern("val", match))
+              {
+                try
+                {
+                  reg_val = std::stoul(match, 0, 16);
+                  return true;
+                }
+                catch (...) {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool aml_has_capability_ignore_alpha()
+{
+  // AML is at least GXBB
+  uint32_t reg_val;
+  if (aml_read_reg("c8100220", reg_val))
+  {
+    if ((reg_val >> 24) >= 0x1f)
+      return true;
+  }
+  return false;
+}
+
+bool aml_set_reg_ignore_alpha()
+{
+  if (aml_has_capability_ignore_alpha())
+  {
+    std::string path = "/sys/kernel/debug/aml_reg/paddr";
+    if (SysfsUtils::SetString(path, "d01068b4 0x7fc0") == 0)
+      return true;
+  }
+  return false;
+}
+
+bool aml_unset_reg_ignore_alpha()
+{
+  if (aml_has_capability_ignore_alpha())
+  {
+    std::string path = "/sys/kernel/debug/aml_reg/paddr";
+    if (SysfsUtils::SetString(path, "d01068b4 0x3fc0") == 0)
+      return true;
+  }
+  return false;
+}
+

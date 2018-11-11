@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "VideoPlayer.h"
 #include "ServiceBroker.h"
-#include "settings/Settings.h"
 #include "settings/MediaSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "DVDInputStreams/DVDInputStream.h"
 #include "cores/omxplayer/OMXPlayerAudio.h"
 #include "cores/omxplayer/OMXPlayerVideo.h"
@@ -35,23 +24,27 @@
 
 bool OMXPlayerUnsuitable(bool m_HasVideo, bool m_HasAudio, CDVDDemux* m_pDemuxer, std::shared_ptr<CDVDInputStream> m_pInputStream, CSelectionStreams &m_SelectionStreams)
 {
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+
   // if no OMXPlayer acceleration then it is not suitable
-  if (!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEOMXPLAYER))
+  if (!settings->GetBool(CSettings::SETTING_VIDEOPLAYER_USEOMXPLAYER))
     return true;
   // if no MMAL acceleration stick with omxplayer regardless
-  if (!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEMMAL))
+  if (!settings->GetBool(CSettings::SETTING_VIDEOPLAYER_USEMMAL))
     return false;
 
   // omxplayer only handles Pi sink
-  if (CServiceBroker::GetSettings().GetString(CSettings::SETTING_AUDIOOUTPUT_AUDIODEVICE) != "PI:Analogue" &&
-      CServiceBroker::GetSettings().GetString(CSettings::SETTING_AUDIOOUTPUT_AUDIODEVICE) != "PI:HDMI" &&
-      CServiceBroker::GetSettings().GetString(CSettings::SETTING_AUDIOOUTPUT_AUDIODEVICE) != "PI:Both")
+  const std::string audioDevice = settings->GetString(CSettings::SETTING_AUDIOOUTPUT_AUDIODEVICE);
+  if (audioDevice != "PI:Analogue" &&
+      audioDevice != "PI:HDMI" &&
+      audioDevice != "PI:Both" &&
+      audioDevice != "Default")
   {
     CLog::Log(LOGNOTICE, "%s OMXPlayer unsuitable due to audio sink", __func__);
     return true;
   }
   // omxplayer doesn't handle ac3 transcode
-  if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_AUDIOOUTPUT_AC3TRANSCODE))
+  if (settings->GetBool(CSettings::SETTING_AUDIOOUTPUT_AC3TRANSCODE))
   {
     CLog::Log(LOGNOTICE, "%s OMXPlayer unsuitable due to ac3transcode", __func__);
     return true;

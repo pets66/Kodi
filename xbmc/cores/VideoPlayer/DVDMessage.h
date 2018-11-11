@@ -1,23 +1,10 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
-
 
 #pragma once
 
@@ -54,13 +41,14 @@ public:
     PLAYER_SET_SUBTITLESTREAM_VISIBLE, //
     PLAYER_SET_STATE,               // restore the VideoPlayer to a certain state
     PLAYER_SET_PROGRAM,
+    PLAYER_SET_UPDATE_STREAM_DETAILS, // player should update file item stream details with its current streams
     PLAYER_SEEK,                    //
     PLAYER_SEEK_CHAPTER,            //
     PLAYER_SETSPEED,                // set the playback speed
     PLAYER_REQUEST_STATE,
     PLAYER_OPENFILE,
     PLAYER_STARTED,                 // sent whenever a sub player has finished it's first frame after open
-    PLAYER_AVCHANGE,                // signal a change in audio or video parameters
+    PLAYER_AVCHANGE,                // signal a change in audio, video or subtitle parameters
     PLAYER_ABORT,
     PLAYER_REPORT_STATE,
     PLAYER_FRAME_ADVANCE,
@@ -251,8 +239,8 @@ public:
   , m_params(params)
   {}
 
-  float GetSpeed() const { return m_params.m_speed; }
-  float IsTempo() const { return m_params.m_isTempo; }
+  int GetSpeed() const { return m_params.m_speed; }
+  bool IsTempo() const { return m_params.m_isTempo; }
 
 private:
 

@@ -1,31 +1,20 @@
 /*
-*      Copyright (C) 2016 Team Kodi
-*      http://kodi.tv
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with Kodi; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
 
 #include "MusicFileItemListModifier.h"
 #include "ServiceBroker.h"
 #include "filesystem/MusicDatabaseDirectory/DirectoryNode.h"
 #include "FileItem.h"
-#include "music/MusicDbUrl.h"
-#include "settings/Settings.h"
 #include "guilib/LocalizeStrings.h"
+#include "music/MusicDbUrl.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 
 using namespace XFILE::MUSICDATABASEDIRECTORY;
 
@@ -59,7 +48,7 @@ void CMusicFileItemListModifier::AddQueuingFolder(CFileItemList& items)
     return;
 
   // always show "all" items by default
-  if (!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_SHOWALLITEMS))
+  if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_MUSICLIBRARY_SHOWALLITEMS))
     return;
 
   // no need for "all" item when only one item
@@ -78,6 +67,7 @@ void CMusicFileItemListModifier::AddQueuingFolder(CFileItemList& items)
     //  All album related nodes
   case NODE_TYPE_ALBUM:
     if (directoryNode->GetType() == NODE_TYPE_OVERVIEW) return;
+    break;
   case NODE_TYPE_ALBUM_RECENTLY_PLAYED:
   case NODE_TYPE_ALBUM_RECENTLY_ADDED:
   case NODE_TYPE_ALBUM_COMPILATIONS:
@@ -95,10 +85,10 @@ void CMusicFileItemListModifier::AddQueuingFolder(CFileItemList& items)
   if (pItem)
   {
     pItem->m_bIsFolder = true;
-    pItem->SetSpecialSort(g_advancedSettings.m_bMusicLibraryAllItemsOnBottom ? SortSpecialOnBottom : SortSpecialOnTop);
+    pItem->SetSpecialSort(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_bMusicLibraryAllItemsOnBottom ? SortSpecialOnBottom : SortSpecialOnTop);
     pItem->SetCanQueue(false);
     pItem->SetLabelPreformatted(true);
-    if (g_advancedSettings.m_bMusicLibraryAllItemsOnBottom)
+    if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_bMusicLibraryAllItemsOnBottom)
       items.Add(pItem);
     else
       items.AddFront(pItem, (items.Size() > 0 && items[0]->IsParentFolder()) ? 1 : 0);

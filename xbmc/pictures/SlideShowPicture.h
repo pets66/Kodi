@@ -1,32 +1,21 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "threads/CriticalSection.h"
 #include "guilib/DirtyRegion.h"
+#include "utils/Color.h"
 #include <string>
 #ifdef HAS_DX
 #include "guilib/GUIShaderDX.h"
 #include <wrl/client.h>
 #endif
-typedef uint32_t color_t;
 
 class CBaseTexture;
 
@@ -89,7 +78,7 @@ public:
 private:
   void SetTexture_Internal(int iSlideNumber, CBaseTexture* pTexture, DISPLAY_EFFECT dispEffect = EFFECT_RANDOM, TRANSITION_EFFECT transEffect = FADEIN_FADEOUT);
   void UpdateVertices(float cur_x[4], float cur_y[4], const float new_x[4], const float new_y[4], CDirtyRegionList &dirtyregions);
-  void Render(float *x, float *y, CBaseTexture* pTexture, color_t color);
+  void Render(float *x, float *y, CBaseTexture* pTexture, UTILS::Color color);
   CBaseTexture *m_pImage;
 
   int m_iOriginalWidth;
@@ -102,7 +91,7 @@ private:
   std::string m_strFileName;
   float m_fWidth;
   float m_fHeight;
-  color_t m_alpha;
+  UTILS::Color m_alpha = 0;
   // stuff relative to middle position
   float m_fPosX;
   float m_fPosY;

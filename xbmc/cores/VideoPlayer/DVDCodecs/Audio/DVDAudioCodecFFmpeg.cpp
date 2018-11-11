@@ -1,40 +1,24 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDAudioCodecFFmpeg.h"
-#ifdef TARGET_POSIX
-#include "XMemUtils.h"
-#include "platform/linux/XTimeUtils.h"
-#endif
+#include "ServiceBroker.h"
 #include "../../DVDStreamInfo.h"
 #include "utils/log.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "DVDCodecs/DVDCodecs.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
+
 extern "C" {
 #include "libavutil/opt.h"
 }
-
-#include "settings/Settings.h"
-#if defined(TARGET_DARWIN)
-#include "cores/AudioEngine/Utils/AEUtil.h"
-#endif
 
 CDVDAudioCodecFFmpeg::CDVDAudioCodecFFmpeg(CProcessInfo &processInfo) : CDVDAudioCodec(processInfo)
 {
@@ -55,6 +39,12 @@ CDVDAudioCodecFFmpeg::~CDVDAudioCodecFFmpeg()
 
 bool CDVDAudioCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
+  if (hints.cryptoSession)
+  {
+    CLog::Log(LOGERROR,"CDVDAudioCodecFFmpeg::Open() CryptoSessions unsuppoted!");
+    return false;
+  }
+
   AVCodec* pCodec = NULL;
   bool allowdtshddecode = true;
 
@@ -107,8 +97,9 @@ bool CDVDAudioCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
     }
   }
 
-  if (g_advancedSettings.m_audioApplyDrc >= 0.0)
-    av_opt_set_double(m_pCodecContext, "drc_scale", g_advancedSettings.m_audioApplyDrc, AV_OPT_SEARCH_CHILDREN);
+  float applyDrc = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_audioApplyDrc;
+  if (applyDrc >= 0.0)
+    av_opt_set_double(m_pCodecContext, "drc_scale", applyDrc, AV_OPT_SEARCH_CHILDREN);
 
   if (avcodec_open2(m_pCodecContext, pCodec, NULL) < 0)
   {
@@ -126,8 +117,12 @@ bool CDVDAudioCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
 
   m_iSampleFormat = AV_SAMPLE_FMT_NONE;
   m_matrixEncoding = AV_MATRIX_ENCODING_NONE;
+  m_hasDownmix = false;
 
-  m_processInfo.SetAudioDecoderName(m_pCodecContext->codec->name);
+  m_codecName = "ff-" + std::string(m_pCodecContext->codec->name);
+
+  CLog::Log(LOGNOTICE,"CDVDAudioCodecFFmpeg::Open() Successful opened audio decoder %s", m_pCodecContext->codec->name);
+
   return true;
 }
 
@@ -203,11 +198,17 @@ void CDVDAudioCodecFFmpeg::GetData(DVDAudioFrame &frame)
   else
     frame.duration = 0.0;
 
-  int64_t bpts = av_frame_get_best_effort_timestamp(m_pFrame);
+  int64_t bpts = m_pFrame->best_effort_timestamp;
   if(bpts != AV_NOPTS_VALUE)
     frame.pts = (double)bpts * DVD_TIME_BASE / AV_TIME_BASE;
   else
     frame.pts = DVD_NOPTS_VALUE;
+
+  frame.hasDownmix = m_hasDownmix;
+  if (frame.hasDownmix)
+  {
+    frame.centerMixLevel = m_downmixInfo.center_mix_level;
+  }
 }
 
 int CDVDAudioCodecFFmpeg::GetData(uint8_t** dst)
@@ -225,6 +226,11 @@ int CDVDAudioCodecFFmpeg::GetData(uint8_t** dst)
           if (sd->type == AV_FRAME_DATA_MATRIXENCODING)
           {
             m_matrixEncoding = *(enum AVMatrixEncoding*)sd->data;
+          }
+          else if (sd->type == AV_FRAME_DATA_DOWNMIX_INFO)
+          {
+            m_downmixInfo = *(AVDownmixInfo*)sd->data;
+            m_hasDownmix = true;
           }
         }
       }

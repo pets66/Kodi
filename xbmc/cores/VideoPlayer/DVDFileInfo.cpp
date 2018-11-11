@@ -1,27 +1,17 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDFileInfo.h"
+#include "ServiceBroker.h"
 #include "threads/SystemClock.h"
 #include "FileItem.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "pictures/Picture.h"
 #include "video/VideoInfoTag.h"
 #include "filesystem/StackDirectory.h"
@@ -37,8 +27,6 @@
 #include "DVDDemuxers/DVDDemux.h"
 #include "DVDDemuxers/DVDDemuxUtils.h"
 #include "DVDDemuxers/DVDFactoryDemuxer.h"
-#include "DVDDemuxers/DVDDemuxFFmpeg.h"
-#include "DVDCodecs/DVDCodecs.h"
 #include "DVDCodecs/DVDFactoryCodec.h"
 #include "DVDCodecs/Video/DVDVideoCodec.h"
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
@@ -98,14 +86,15 @@ int DegreeToOrientation(int degrees)
   }
 }
 
-bool CDVDFileInfo::ExtractThumb(const std::string &strPath,
+bool CDVDFileInfo::ExtractThumb(const CFileItem& fileItem,
                                 CTextureDetails &details,
-                                CStreamDetails *pStreamDetails, int pos)
+                                CStreamDetails *pStreamDetails,
+                                int64_t pos)
 {
-  std::string redactPath = CURL::GetRedacted(strPath);
+  const std::string redactPath = CURL::GetRedacted(fileItem.GetPath());
   unsigned int nTime = XbmcThreads::SystemClockMillis();
-  CFileItem item(strPath, false);
 
+  CFileItem item(fileItem);
   item.SetMimeTypeForInternetFile();
   auto pInputStream = CDVDFactoryInputStream::CreateInputStream(NULL, item);
   if (!pInputStream)
@@ -143,6 +132,7 @@ bool CDVDFileInfo::ExtractThumb(const std::string &strPath,
   if (pStreamDetails)
   {
 
+    const std::string strPath = item.GetPath();
     DemuxerToStreamDetails(pInputStream, pDemuxer, *pStreamDetails, strPath);
 
     //extern subtitles
@@ -210,7 +200,7 @@ bool CDVDFileInfo::ExtractThumb(const std::string &strPath,
     if (pVideoCodec)
     {
       int nTotalLen = pDemuxer->GetStreamLength();
-      int nSeekTo = (pos==-1) ? nTotalLen / 3 : pos;
+      int nSeekTo = (pos == -1) ? nTotalLen / 3 : pos;
 
       CLog::Log(LOGDEBUG,"%s - seeking to pos %dms (total: %dms) in %s", __FUNCTION__, nSeekTo, nTotalLen, redactPath.c_str());
       if (pDemuxer->SeekTime(nSeekTo, true))
@@ -254,7 +244,7 @@ bool CDVDFileInfo::ExtractThumb(const std::string &strPath,
         if (iDecoderState == CDVDVideoCodec::VC_PICTURE && !(picture.iFlags & DVP_FLAG_DROPPED))
         {
           {
-            unsigned int nWidth = std::min(picture.iDisplayWidth, g_advancedSettings.m_imageRes);
+            unsigned int nWidth = std::min(picture.iDisplayWidth, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_imageRes);
             double aspect = (double)picture.iDisplayWidth / (double)picture.iDisplayHeight;
             if(hint.forced_aspect && hint.aspect != 0)
               aspect = hint.aspect;

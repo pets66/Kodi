@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <string>
 
@@ -117,11 +106,6 @@ public:
   static const std::string SETTING_VIDEOPLAYER_USEVDPAUMPEG2;
   static const std::string SETTING_VIDEOPLAYER_USEVDPAUMPEG4;
   static const std::string SETTING_VIDEOPLAYER_USEVDPAUVC1;
-  static const std::string SETTING_VIDEOPLAYER_USEVAAPI;
-  static const std::string SETTING_VIDEOPLAYER_USEVAAPIMPEG2;
-  static const std::string SETTING_VIDEOPLAYER_USEVAAPIMPEG4;
-  static const std::string SETTING_VIDEOPLAYER_USEVAAPIVC1;
-  static const std::string SETTING_VIDEOPLAYER_PREFERVAAPIRENDER;
   static const std::string SETTING_VIDEOPLAYER_USEDXVA2;
   static const std::string SETTING_VIDEOPLAYER_USEOMXPLAYER;
   static const std::string SETTING_VIDEOPLAYER_USEVTB;
@@ -145,6 +129,8 @@ public:
   static const std::string SETTING_SUBTITLES_HEIGHT;
   static const std::string SETTING_SUBTITLES_STYLE;
   static const std::string SETTING_SUBTITLES_COLOR;
+  static const std::string SETTING_SUBTITLES_BGCOLOR;
+  static const std::string SETTING_SUBTITLES_BGOPACITY;
   static const std::string SETTING_SUBTITLES_CHARSET;
   static const std::string SETTING_SUBTITLES_OVERRIDEASSFONTS;
   static const std::string SETTING_SUBTITLES_LANGUAGES;
@@ -189,6 +175,7 @@ public:
   static const std::string SETTING_PVRPLAYBACK_SIGNALQUALITY;
   static const std::string SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH;
   static const std::string SETTING_PVRPLAYBACK_CHANNELENTRYTIMEOUT;
+  static const std::string SETTING_PVRPLAYBACK_DELAYMARKLASTWATCHED;
   static const std::string SETTING_PVRPLAYBACK_FPS;
   static const std::string SETTING_PVRRECORD_INSTANTRECORDACTION;
   static const std::string SETTING_PVRRECORD_INSTANTRECORDTIME;
@@ -208,8 +195,10 @@ public:
   static const std::string SETTING_PVRCLIENT_MENUHOOK;
   static const std::string SETTING_PVRTIMERS_HIDEDISABLEDTIMERS;
   static const std::string SETTING_MUSICLIBRARY_SHOWCOMPILATIONARTISTS;
+  static const std::string SETTING_MUSICLIBRARY_USEARTISTSORTNAME;
   static const std::string SETTING_MUSICLIBRARY_DOWNLOADINFO;
   static const std::string SETTING_MUSICLIBRARY_ARTISTSFOLDER;
+  static const std::string SETTING_MUSICLIBRARY_PREFERONLINEALBUMART;
   static const std::string SETTING_MUSICLIBRARY_ALBUMSSCRAPER;
   static const std::string SETTING_MUSICLIBRARY_ARTISTSSCRAPER;
   static const std::string SETTING_MUSICLIBRARY_OVERRIDETAGS;
@@ -263,6 +252,7 @@ public:
   static const std::string SETTING_WEATHER_ADDON;
   static const std::string SETTING_WEATHER_ADDONSETTINGS;
   static const std::string SETTING_SERVICES_DEVICENAME;
+  static const std::string SETTING_SERVICES_DEVICEUUID;
   static const std::string SETTING_SERVICES_UPNP;
   static const std::string SETTING_SERVICES_UPNPSERVER;
   static const std::string SETTING_SERVICES_UPNPANNOUNCE;
@@ -295,6 +285,7 @@ public:
   static const std::string SETTING_SMB_LEGACYSECURITY;
   static const std::string SETTING_VIDEOSCREEN_MONITOR;
   static const std::string SETTING_VIDEOSCREEN_SCREEN;
+  static const std::string SETTING_VIDEOSCREEN_WHITELIST;
   static const std::string SETTING_VIDEOSCREEN_RESOLUTION;
   static const std::string SETTING_VIDEOSCREEN_SCREENMODE;
   static const std::string SETTING_VIDEOSCREEN_FAKEFULLSCREEN;
@@ -318,9 +309,6 @@ public:
   static const std::string SETTING_AUDIOOUTPUT_ATEMPOTHRESHOLD;
   static const std::string SETTING_AUDIOOUTPUT_STREAMSILENCE;
   static const std::string SETTING_AUDIOOUTPUT_STREAMNOISE;
-  static const std::string SETTING_AUDIOOUTPUT_DSPADDONSENABLED;
-  static const std::string SETTING_AUDIOOUTPUT_DSPSETTINGS;
-  static const std::string SETTING_AUDIOOUTPUT_DSPRESETDB;
   static const std::string SETTING_AUDIOOUTPUT_GUISOUNDMODE;
   static const std::string SETTING_AUDIOOUTPUT_PASSTHROUGH;
   static const std::string SETTING_AUDIOOUTPUT_PASSTHROUGHDEVICE;
@@ -385,9 +373,6 @@ public:
   static const std::string SETTING_SOURCE_VIDEOS;
   static const std::string SETTING_SOURCE_MUSIC;
   static const std::string SETTING_SOURCE_PICTURES;
-  static const std::string SETTING_GAMES_ENABLE;
-  static const std::string SETTING_GAMES_ENABLEREWIND;
-  static const std::string SETTING_GAMES_REWINDTIME;
 
   /*!
    \brief Creates a new settings wrapper around a new settings manager.

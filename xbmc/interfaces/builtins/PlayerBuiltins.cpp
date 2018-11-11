@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PlayerBuiltins.h"
@@ -24,14 +12,15 @@
 #include "FileItem.h"
 #include "ServiceBroker.h"
 #include "filesystem/Directory.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "PartyModeManager.h"
 #include "PlayListPlayer.h"
 #include "SeekHandler.h"
-#include "settings/AdvancedSettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "storage/MediaManager.h"
 #include "utils/FileExtensionProvider.h"
 #include "utils/log.h"
@@ -282,18 +271,18 @@ static int PlayerControl(const std::vector<std::string>& params)
     {
       case PLAYLIST_MUSIC:
         CMediaSettings::GetInstance().SetMusicPlaylistShuffled(CServiceBroker::GetPlaylistPlayer().IsShuffled(iPlaylist));
-        CServiceBroker::GetSettings().Save();
+        CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
         break;
       case PLAYLIST_VIDEO:
         CMediaSettings::GetInstance().SetVideoPlaylistShuffled(CServiceBroker::GetPlaylistPlayer().IsShuffled(iPlaylist));
-        CServiceBroker::GetSettings().Save();
+        CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
       default:
         break;
     }
 
     // send message
     CGUIMessage msg(GUI_MSG_PLAYLISTPLAYER_RANDOM, 0, 0, iPlaylist, CServiceBroker::GetPlaylistPlayer().IsShuffled(iPlaylist));
-    g_windowManager.SendThreadMessage(msg);
+    CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(msg);
   }
   else if (StringUtils::StartsWithNoCase(params[0], "repeat"))
   {
@@ -330,16 +319,16 @@ static int PlayerControl(const std::vector<std::string>& params)
     {
       case PLAYLIST_MUSIC:
         CMediaSettings::GetInstance().SetMusicPlaylistRepeat(state == PLAYLIST::REPEAT_ALL);
-        CServiceBroker::GetSettings().Save();
+        CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
         break;
       case PLAYLIST_VIDEO:
         CMediaSettings::GetInstance().SetVideoPlaylistRepeat(state == PLAYLIST::REPEAT_ALL);
-        CServiceBroker::GetSettings().Save();
+        CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
     }
 
     // send messages so now playing window can get updated
     CGUIMessage msg(GUI_MSG_PLAYLISTPLAYER_REPEAT, 0, 0, iPlaylist, (int)state);
-    g_windowManager.SendThreadMessage(msg);
+    CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(msg);
   }
   else if (StringUtils::StartsWithNoCase(params[0], "resumelivetv"))
   {
@@ -396,11 +385,11 @@ static int PlayMedia(const std::vector<std::string>& params)
     item.m_bIsFolder = true;
 
   // restore to previous window if needed
-  if( g_windowManager.GetActiveWindow() == WINDOW_SLIDESHOW ||
-      g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO ||
-      g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_GAME ||
-      g_windowManager.GetActiveWindow() == WINDOW_VISUALISATION )
-    g_windowManager.PreviousWindow();
+  if( CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_SLIDESHOW ||
+      CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO ||
+      CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_FULLSCREEN_GAME ||
+      CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_VISUALISATION )
+    CServiceBroker::GetGUI()->GetWindowManager().PreviousWindow();
 
   // reset screensaver
   g_application.ResetScreenSaver();
@@ -440,45 +429,49 @@ static int PlayMedia(const std::vector<std::string>& params)
     if ( CGUIWindowVideoBase::ShowResumeMenu(item) == false )
       return false;
   }
-  if (item.m_bIsFolder)
+  if (item.m_bIsFolder || item.IsPlayList() || item.IsSmartPlayList())
   {
     CFileItemList items;
     std::string extensions = CServiceBroker::GetFileExtensionProvider().GetVideoExtensions() + "|" + CServiceBroker::GetFileExtensionProvider().GetMusicExtensions();
-    XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions);
+    XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
 
-    bool containsMusic = false, containsVideo = false;
-    for (int i = 0; i < items.Size(); i++)
+    if (!items.IsEmpty()) // fall through on non expandable playlist
     {
-      bool isVideo = items[i]->IsVideo();
-      containsMusic |= !isVideo;
-      containsVideo |= isVideo;
-
-      if (containsMusic && containsVideo)
-        break;
-    }
-
-    std::unique_ptr<CGUIViewState> state(CGUIViewState::GetViewState(containsVideo ? WINDOW_VIDEO_NAV : WINDOW_MUSIC_NAV, items));
-    if (state.get())
-      items.Sort(state->GetSortMethod());
-    else
-      items.Sort(SortByLabel, SortOrderAscending);
-
-    int playlist = containsVideo? PLAYLIST_VIDEO : PLAYLIST_MUSIC;;
-    if (containsMusic && containsVideo) //mixed content found in the folder
-    {
-      for (int i = items.Size() - 1; i >= 0; i--) //remove music entries
+      bool containsMusic = false, containsVideo = false;
+      for (int i = 0; i < items.Size(); i++)
       {
-        if (!items[i]->IsVideo())
-          items.Remove(i);
-      }
-    }
+        bool isVideo = items[i]->IsVideo();
+        containsMusic |= !isVideo;
+        containsVideo |= isVideo;
 
-    CServiceBroker::GetPlaylistPlayer().ClearPlaylist(playlist);
-    CServiceBroker::GetPlaylistPlayer().Add(playlist, items);
-    CServiceBroker::GetPlaylistPlayer().SetCurrentPlaylist(playlist);
-    CServiceBroker::GetPlaylistPlayer().Play(playOffset, "");
+        if (containsMusic && containsVideo)
+          break;
+      }
+
+      std::unique_ptr<CGUIViewState> state(CGUIViewState::GetViewState(containsVideo ? WINDOW_VIDEO_NAV : WINDOW_MUSIC_NAV, items));
+      if (state.get())
+        items.Sort(state->GetSortMethod());
+      else
+        items.Sort(SortByLabel, SortOrderAscending);
+
+      int playlist = containsVideo? PLAYLIST_VIDEO : PLAYLIST_MUSIC;;
+      if (containsMusic && containsVideo) //mixed content found in the folder
+      {
+        for (int i = items.Size() - 1; i >= 0; i--) //remove music entries
+        {
+          if (!items[i]->IsVideo())
+            items.Remove(i);
+        }
+      }
+
+      CServiceBroker::GetPlaylistPlayer().ClearPlaylist(playlist);
+      CServiceBroker::GetPlaylistPlayer().Add(playlist, items);
+      CServiceBroker::GetPlaylistPlayer().SetCurrentPlaylist(playlist);
+      CServiceBroker::GetPlaylistPlayer().Play(playOffset, "");
+      return 0;
+    }
   }
-  else if (item.IsAudio() || item.IsVideo())
+  if (item.IsAudio() || item.IsVideo())
     CServiceBroker::GetPlaylistPlayer().Play(std::make_shared<CFileItem>(item), "");
   else
     g_application.PlayMedia(item, "", PLAYLIST_NONE);
@@ -528,22 +521,45 @@ static int Seek(const std::vector<std::string>& params)
 ///     @param[in] param                 "restart" to restart from resume point (optional)
 ///   }
 ///   \table_row2_l{
-///     <b>`PlayerControl(command[\,param])`</b>
+///     <b>`PlayerControl(control[\,param])`</b>
 ///     ,
-///     Allows control of music and videos. The command may be one of Play\, Stop\,
-///     Forward\, Rewind\, Next\, Previous\, BigSkipForward\, BigSkipBackward\,
-///     SmallSkipForward\, SmallSkipBackward\, Random\, RandomOn\, RandomOff\,
-///     Repeat\, RepeatOne\, RepeatAll\, RepeatOff\, Partymode(music) or
-///     Partymode(video) or Partymode(path to .xsp file)\, and Record. Play will
-///     either pause\, resume\, or stop ffwding or rewinding. Random toggles random
-///     playback and Repeat cycles through the repeat modes (these both take an
-///     optional second parameter\, Notify\, that notifies the user of the new
-///     state). Partymode(music/video) toggles the appropriate partymode\,
-///     defaults to music if no parameter is given\, besides the default music or
-///     video partymode you can also pass a path to a custom smartplaylist (.xsp)
-///     as parameter.
+///     Allows control of music and videos. <br>
+///     <br>
+///     | Control                 | Video playback behaviour               | Audio playback behaviour    | Added in    |
+///     |:------------------------|:---------------------------------------|:----------------------------|:------------|
+///     | Play                    | Play/Pause                             | Play/Pause                  |             | 
+///     | Stop                    | Stop                                   | Stop                        |             |
+///     | Forward                 | Fast Forward                           | Fast Forward                |             |
+///     | Rewind                  | Rewind                                 | Rewind                      |             |
+///     | Next                    | Next chapter or movie in playlists     | Next track                  |             |
+///     | Previous                | Previous chapter or movie in playlists | Previous track              |             |
+///     | TempoUp                 | Increases playback speed               | none                        | Kodi v18    |
+///     | TempoDown               | Decreases playback speed               | none                        | Kodi v18    |
+///     | BigSkipForward          | Big Skip Forward                       | Big Skip Forward            | Kodi v15    |
+///     | BigSkipBackward         | Big Skip Backward                      | Big Skip Backward           | Kodi v15    |
+///     | SmallSkipForward        | Small Skip Forward                     | Small Skip Forward          | Kodi v15    |
+///     | SmallSkipBackward       | Small Skip Backward                    | Small Skip Backward         | Kodi v15    |
+///     | SeekPercentage(n)       | Seeks to given percentage              | Seeks to given percentage   |             |
+///     | Random *                | Toggle Random Playback                 | Toggle Random Playback      |             |
+///     | RandomOn                | Sets 'Random' to 'on'                  | Sets 'Random' to 'on'       |             |
+///     | RandomOff               | Sets 'Random' to 'off'                 | Sets 'Random' to 'off'      |             |
+///     | Repeat *                | Cycles through repeat modes            | Cycles through repeat modes |             |
+///     | RepeatOne               | Repeats a single video                 | Repeats a single track      |             |
+///     | RepeatAll               | Repeat all videos in a list            | Repeats all tracks in a list|             |
+///     | RepeatOff               | Sets 'Repeat' to 'off'                 | Sets 'Repeat' to 'off'      |             |
+///     | Partymode(music) **     | none                                   | Toggles music partymode     |             |
+///     | Partymode(video) **     | Toggles video partymode                | none                        |             |
+///     | Partymode(path to .xsp) | Partymode for *.xsp-file               | Partymode for *.xsp-file    |             |
+///     | ShowVideoMenu           | Shows the DVD/BR menu if available     | none                        |             |
+///     <br>
+///     '*' = For these controls\, the PlayerControl built-in function can make use of the 'notify'-parameter. For example: PlayerControl(random\, notify)
+///     '**' = If no argument is given for 'partymode'\, the control  will default to music.
+///     <br>
 ///     @param[in] control               Control to execute.
 ///     @param[in] param                 "notify" to notify user (optional\, certain controls).
+///
+///     @note 'TempoUp' or 'TempoDown' only works if "Sync playback to display" is enabled.
+///     @note 'Next' will behave differently while using video playlists. In those\, chapters will be ignored and the next movie will be played.
 ///   }
 ///   \table_row2_l{
 ///     <b>`Playlist.Clear`</b>
@@ -554,7 +570,7 @@ static int Seek(const std::vector<std::string>& params)
 ///   \table_row2_l{
 ///     <b>`Playlist.PlayOffset(positionType[\,position])`</b>
 ///     ,
-///     Start playing from a particular offset in the playlist 
+///     Start playing from a particular offset in the playlist
 ///     @param[in] positionType          Position in playlist or playlist type.
 ///     @param[in] position              Position in playlist if params[0] is playlist type (optional).
 ///   }

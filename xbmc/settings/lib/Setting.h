@@ -1,25 +1,13 @@
-#pragma once
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
-#include <map>
+#pragma once
+
 #include <memory>
 #include <set>
 #include <string>
@@ -117,7 +105,7 @@ protected:
   SettingDependencies m_dependencies;
   std::set<CSettingUpdate> m_updates;
   bool m_changed = false;
-  CSharedSection m_critical;
+  mutable CSharedSection m_critical;
 };
 
 template<typename TValue, SettingType TSettingType>
@@ -187,7 +175,7 @@ public:
   bool Equals(const std::string &value) const override;
   bool CheckValidity(const std::string &value) const override;
   void Reset() override;
-  
+
   SettingType GetElementType() const;
   std::shared_ptr<CSetting> GetDefinition() { return m_definition; }
   std::shared_ptr<const CSetting> GetDefinition() const { return m_definition; }
@@ -199,13 +187,14 @@ public:
   void SetMinimumItems(int minimumItems) { m_minimumItems = minimumItems; }
   int GetMaximumItems() const { return m_maximumItems; }
   void SetMaximumItems(int maximumItems) { m_maximumItems = maximumItems; }
-  
+
   bool FromString(const std::vector<std::string> &value);
 
   const SettingList& GetValue() const { return m_values; }
   bool SetValue(const SettingList &values);
   const SettingList& GetDefault() const { return m_defaults; }
   void SetDefault(const SettingList &values);
+  bool FindIntInList(int value) const;
 
 protected:
   void copy(const CSettingList &setting);

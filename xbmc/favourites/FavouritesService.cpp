@@ -1,33 +1,22 @@
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "FavouritesService.h"
+#include "ServiceBroker.h"
 #include "filesystem/File.h"
 #include "Util.h"
-#include "profiles/ProfilesManager.h"
 #include "FileItem.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "video/VideoInfoTag.h"
 #include "music/tags/MusicInfoTag.h"
 #include "URL.h"
@@ -195,7 +184,7 @@ std::string CFavouritesService::GetExecutePath(const CFileItem &item, const std:
     const CURL url(item.GetPath());
     execute = CURL::Decode(url.GetHostName());
   }
-  else if (item.m_bIsFolder && (g_advancedSettings.m_playlistAsFolders ||
+  else if (item.m_bIsFolder && (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_playlistAsFolders ||
                                 !(item.IsSmartPlayList() || item.IsPlayList())))
   {
     if (!contextWindow.empty())
@@ -207,7 +196,10 @@ std::string CFavouritesService::GetExecutePath(const CFileItem &item, const std:
   else if (item.IsAddonsPath() && item.GetPath().size() > 9) // addons://<foo>
   {
     CURL url(item.GetPath());
-    execute = StringUtils::Format("RunAddon(%s)", url.GetFileName().c_str());
+    if (url.GetHostName() == "install")
+      execute = "installfromzip";
+    else
+      execute = StringUtils::Format("RunAddon(%s)", url.GetFileName().c_str());
   }
   else if (item.IsAndroidApp() && item.GetPath().size() > 26) // androidapp://sources/apps/<foo>
     execute = StringUtils::Format("StartAndroidActivity(%s)", StringUtils::Paramify(item.GetPath().substr(26)).c_str());

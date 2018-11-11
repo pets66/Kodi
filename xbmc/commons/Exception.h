@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -99,14 +87,14 @@ namespace XbmcCommons
    * This class forms the base class for unchecked exceptions. Unchecked exceptions
    * are those that really shouldn't be handled explicitly. For example, on windows
    * when a access violation is converted to a win32_exception, there's nothing
-   * that can be done in most code. The outer most stack frame might try to 
+   * that can be done in most code. The outer most stack frame might try to
    * do some error logging prior to shutting down, but that's really it.
    */
   XBMCCOMMONS_STANDARD_EXCEPTION(UncheckedException);
 
 /**
- * In cases where you catch(...){} you will (may) inadvertently be 
- * catching UncheckedException's. Therefore this macro will allow 
+ * In cases where you catch(...){} you will (may) inadvertently be
+ * catching UncheckedException's. Therefore this macro will allow
  * you to do something equivalent to:
  *    catch (anything except UncheckedException) {}
  *

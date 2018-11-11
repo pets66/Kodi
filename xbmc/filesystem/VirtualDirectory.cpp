@@ -1,24 +1,13 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "VirtualDirectory.h"
+#include "DirectoryFactory.h"
 #include "URL.h"
 #include "Util.h"
 #include "utils/URIUtils.h"
@@ -37,7 +26,6 @@ CVirtualDirectory::CVirtualDirectory(void)
 {
   m_flags = DIR_FLAG_ALLOW_PROMPT;
   m_allowNonLocalSources = true;
-  m_allowThreads = true;
 }
 
 CVirtualDirectory::~CVirtualDirectory(void) = default;
@@ -63,16 +51,25 @@ void CVirtualDirectory::SetSources(const VECSOURCES& vecSources)
 
 bool CVirtualDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 {
-  return GetDirectory(url,items,true);
+  return GetDirectory(url, items, true, false);
 }
-bool CVirtualDirectory::GetDirectory(const CURL& url, CFileItemList &items, bool bUseFileDirectories)
+
+bool CVirtualDirectory::GetDirectory(const CURL& url, CFileItemList &items, bool bUseFileDirectories, bool keepImpl)
 {
   std::string strPath = url.Get();
   int flags = m_flags;
   if (!bUseFileDirectories)
     flags |= DIR_FLAG_NO_FILE_DIRS;
   if (!strPath.empty() && strPath != "files://")
-    return CDirectory::GetDirectory(strPath, items, m_strFileMask, flags, m_allowThreads);
+  {
+    CURL realURL = URIUtils::SubstitutePath(url);
+    if (!m_pDir)
+      m_pDir.reset(CDirectoryFactory::Create(realURL));
+    bool ret = CDirectory::GetDirectory(strPath, m_pDir, items, m_strFileMask, flags);
+    if (!keepImpl)
+      m_pDir.reset();
+    return ret;
+  }
 
   // if strPath is blank, clear the list (to avoid parent items showing up)
   if (strPath.empty())
@@ -86,6 +83,12 @@ bool CVirtualDirectory::GetDirectory(const CURL& url, CFileItemList &items, bool
   GetSources(shares);
   CSourcesDirectory dir;
   return dir.GetDirectory(shares, items);
+}
+
+void CVirtualDirectory::CancelDirectory()
+{
+  if (m_pDir)
+    m_pDir->CancelDirectory();
 }
 
 /*!

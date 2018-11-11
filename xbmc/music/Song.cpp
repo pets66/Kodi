@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Song.h"
@@ -24,7 +12,9 @@
 #include "utils/StringUtils.h"
 #include "utils/log.h"
 #include "FileItem.h"
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 
 using namespace MUSIC_INFO;
 
@@ -40,7 +30,7 @@ CSong::CSong(CFileItem& item)
   //Set sort string before processing artist credits
   strArtistSort = tag.GetArtistSort();
   m_strComposerSort = tag.GetComposerSort();
-  
+
   // Determine artist credits from various tag arrays
   SetArtistCredits(tag.GetArtist(), tag.GetMusicBrainzArtistHints(), tag.GetMusicBrainzArtistID());
 
@@ -52,7 +42,7 @@ CSong::CSong(CFileItem& item)
     m_albumArtist = tag.GetMusicBrainzAlbumArtistHints();
   else
     // Split album artist names further using multiple possible delimiters, over single separator applied in Tag loader
-    m_albumArtist = StringUtils::SplitMulti(m_albumArtist, g_advancedSettings.m_musicArtistSeparators);
+    m_albumArtist = StringUtils::SplitMulti(m_albumArtist, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicArtistSeparators);
   for (auto artistname : m_albumArtist)
     StringUtils::Trim(artistname);
   m_strAlbumArtistSort = tag.GetAlbumArtistSort();
@@ -94,7 +84,7 @@ void CSong::SetArtistCredits(const std::vector<std::string>& names, const std::v
   artistCredits.clear();
   std::vector<std::string> artistHints = hints;
   //Split the artist sort string to try and get sort names for individual artists
-  std::vector<std::string> artistSort = StringUtils::Split(strArtistSort, g_advancedSettings.m_musicItemSeparator);
+  std::vector<std::string> artistSort = StringUtils::Split(strArtistSort, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
 
   if (!mbids.empty())
   { // Have musicbrainz artist info, so use it
@@ -149,7 +139,7 @@ void CSong::SetArtistCredits(const std::vector<std::string>& names, const std::v
         artistHints = names;
     }
 
-    // Try to get number of artist sort names and musicbrainz ids to match. Split sort names 
+    // Try to get number of artist sort names and musicbrainz ids to match. Split sort names
     // further using multiple possible delimiters, over single separator applied in Tag loader
     if (artistSort.size() != mbids.size())
       artistSort = StringUtils::SplitMulti(artistSort, { ";", ":", "|", "#" });
@@ -169,7 +159,7 @@ void CSong::SetArtistCredits(const std::vector<std::string>& names, const std::v
       else
         artistName = artistId;
 
-      // Use artist sort name providing we have as many as we have mbid, 
+      // Use artist sort name providing we have as many as we have mbid,
       // otherwise something is wrong with them so ignore and leave blank
       if (artistSort.size() == mbids.size())
         artistCredits.emplace_back(StringUtils::Trim(artistName), StringUtils::Trim(artistSort[i]), artistId);
@@ -186,7 +176,7 @@ void CSong::SetArtistCredits(const std::vector<std::string>& names, const std::v
       artists = artistHints;
     else
       // Split artist names further using multiple possible delimiters, over single separator applied in Tag loader
-      artists = StringUtils::SplitMulti(artists, g_advancedSettings.m_musicArtistSeparators);
+      artists = StringUtils::SplitMulti(artists, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicArtistSeparators);
 
     if (artistSort.size() != artists.size())
       // Split artist sort names further using multiple possible delimiters, over single separator applied in Tag loader
@@ -195,7 +185,7 @@ void CSong::SetArtistCredits(const std::vector<std::string>& names, const std::v
     for (size_t i = 0; i < artists.size(); i++)
     {
       artistCredits.emplace_back(StringUtils::Trim(artists[i]));
-      // Set artist sort name providing we have as many as we have artists, 
+      // Set artist sort name providing we have as many as we have artists,
       // otherwise something is wrong with them so ignore rather than guess.
       if (artistSort.size() == artists.size())
         artistCredits.back().SetSortName(StringUtils::Trim(artistSort[i]));
@@ -213,8 +203,8 @@ void CSong::MergeScrapedSong(const CSong& source, bool override)
     iTrack = source.iTrack;
   if (override)
   {
-    artistCredits = source.artistCredits; // Replace artists and store mbid returned by scraper   
-    strArtistDesc.clear();  // @todo: set artist display string e.g. "artist1 feat. artist2" when scraped 
+    artistCredits = source.artistCredits; // Replace artists and store mbid returned by scraper
+    strArtistDesc.clear();  // @todo: set artist display string e.g. "artist1 feat. artist2" when scraped
   }
 }
 
@@ -286,7 +276,7 @@ const std::vector<std::string> CSong::GetArtist() const
   //This is a temporary fix, in the longer term other areas should query the song_artist table and populate
   //artist credits. Note that splitting the string may not give the same artists as held in the song_artist table
   if (songartists.empty() && !strArtistDesc.empty())
-    songartists = StringUtils::Split(strArtistDesc, g_advancedSettings.m_musicItemSeparator);
+    songartists = StringUtils::Split(strArtistDesc, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
   return songartists;
 }
 
@@ -328,7 +318,7 @@ const std::string CSong::GetArtistString() const
     artistvector.push_back(i->GetArtist());
   std::string artistString;
   if (!artistvector.empty())
-    artistString = StringUtils::Join(artistvector, g_advancedSettings.m_musicItemSeparator);
+    artistString = StringUtils::Join(artistvector, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
   return artistString;
 }
 

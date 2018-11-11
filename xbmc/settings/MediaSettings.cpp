@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <string>
@@ -25,27 +13,25 @@
 #include "MediaSettings.h"
 #include "Application.h"
 #include "PlayListPlayer.h"
-#include "dialogs/GUIDialogContextMenu.h"
+#include "cores/RetroPlayer/RetroPlayerUtils.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "settings/dialogs/GUIDialogLibExportSettings.h"
 #include "guilib/LocalizeStrings.h"
 #include "interfaces/builtins/Builtins.h"
 #include "music/MusicDatabase.h"
 #include "music/MusicLibraryQueue.h"
-#include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogHelper.h"
-#include "profiles/ProfilesManager.h"
 #include "settings/lib/Setting.h"
 #include "settings/Settings.h"
 #include "storage/MediaManager.h"
 #include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
 #include "utils/Variant.h"
 #include "video/VideoDatabase.h"
 
+using namespace KODI;
 using namespace KODI::MESSAGING;
 
 using KODI::MESSAGING::HELPERS::DialogResponse;
@@ -124,7 +110,11 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
     XMLUtils::GetBoolean(pElement, "nonlinstretch", m_defaultVideoSettings.m_CustomNonLinStretch);
     if (!XMLUtils::GetInt(pElement, "stereomode", m_defaultVideoSettings.m_StereoMode))
       m_defaultVideoSettings.m_StereoMode = 0;
+    if (!XMLUtils::GetInt(pElement, "centermixlevel", m_defaultVideoSettings.m_CenterMixLevel))
+      m_defaultVideoSettings.m_CenterMixLevel = 0;
 
+    m_defaultVideoSettings.m_ToneMapMethod = 1;
+    m_defaultVideoSettings.m_ToneMapParam = 1.0f;
     m_defaultVideoSettings.m_SubtitleCached = false;
   }
 
@@ -132,13 +122,20 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
   pElement = settings->FirstChildElement("defaultgamesettings");
   if (pElement != nullptr)
   {
-    int scalingMethod;
-    if (XMLUtils::GetInt(pElement, "scalingmethod", scalingMethod, VS_SCALINGMETHOD_NEAREST, VS_SCALINGMETHOD_MAX))
-      m_defaultGameSettings.SetScalingMethod(static_cast<ESCALINGMETHOD>(scalingMethod));
+    std::string videoFilter;
+    if (XMLUtils::GetString(pElement, "videofilter", videoFilter))
+      m_defaultGameSettings.SetVideoFilter(videoFilter);
 
-    int viewMode;
-    if (XMLUtils::GetInt(pElement, "viewmode", viewMode, ViewModeNormal, ViewModeZoom110Width))
-      m_defaultGameSettings.SetViewMode(static_cast<ViewMode>(viewMode));
+    std::string stretchMode;
+    if (XMLUtils::GetString(pElement, "stretchmode", stretchMode))
+    {
+      RETRO::STRETCHMODE sm = RETRO::CRetroPlayerUtils::IdentifierToStretchMode(stretchMode);
+      m_defaultGameSettings.SetStretchMode(sm);
+    }
+
+    int rotation;
+    if (XMLUtils::GetInt(pElement, "rotation", rotation, 0, 270) && rotation >= 0)
+      m_defaultGameSettings.SetRotationDegCCW(static_cast<unsigned int>(rotation));
   }
 
   // mymusic settings
@@ -154,7 +151,7 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
     if (!XMLUtils::GetInt(pElement, "needsupdate", m_musicNeedsUpdate, 0, INT_MAX))
       m_musicNeedsUpdate = 0;
   }
-  
+
   // Read the watchmode settings for the various media views
   pElement = settings->FirstChildElement("myvideos");
   if (pElement != NULL)
@@ -220,6 +217,7 @@ bool CMediaSettings::Save(TiXmlNode *settings) const
   XMLUtils::SetFloat(pNode, "subtitledelay", m_defaultVideoSettings.m_SubtitleDelay);
   XMLUtils::SetBoolean(pNode, "nonlinstretch", m_defaultVideoSettings.m_CustomNonLinStretch);
   XMLUtils::SetInt(pNode, "stereomode", m_defaultVideoSettings.m_StereoMode);
+  XMLUtils::SetInt(pNode, "centermixlevel", m_defaultVideoSettings.m_CenterMixLevel);
 
   // default audio settings for dsp addons
   TiXmlElement audioSettingsNode("defaultaudiosettings");
@@ -233,8 +231,10 @@ bool CMediaSettings::Save(TiXmlNode *settings) const
   if (pNode == nullptr)
     return false;
 
-  XMLUtils::SetInt(pNode, "scalingmethod", m_defaultGameSettings.ScalingMethod());
-  XMLUtils::SetInt(pNode, "viewmode", m_defaultGameSettings.ViewMode());
+  XMLUtils::SetString(pNode, "videofilter", m_defaultGameSettings.VideoFilter());
+  std::string sm = RETRO::CRetroPlayerUtils::StretchModeToIdentifier(m_defaultGameSettings.StretchMode());
+  XMLUtils::SetString(pNode, "stretchmode", sm);
+  XMLUtils::SetInt(pNode, "rotation", m_defaultGameSettings.RotationDegCCW());
 
   // mymusic
   pNode = settings->FirstChild("mymusic");

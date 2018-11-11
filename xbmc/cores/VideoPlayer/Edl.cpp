@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Edl.h"
@@ -23,6 +11,7 @@
 #include "utils/URIUtils.h"
 #include "filesystem/File.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/XBMCTinyXML.h"
 #include "PlatformDefs.h"
@@ -50,7 +39,7 @@ void CEdl::Clear()
   m_lastCutTime = 0;
 }
 
-bool CEdl::ReadEditDecisionLists(const std::string& strMovie, const float fFrameRate, const int iHeight)
+bool CEdl::ReadEditDecisionLists(const CFileItem& fileItem, const float fFrameRate, const int iHeight)
 {
   /*
    * The frame rate hints returned from ffmpeg for the video stream do not appear to take into
@@ -98,8 +87,9 @@ bool CEdl::ReadEditDecisionLists(const std::string& strMovie, const float fFrame
    * Only check for edit decision lists if the movie is on the local hard drive, or accessed over a
    * network share.
    */
+  const std::string strMovie = fileItem.GetDynPath();
   if ((URIUtils::IsHD(strMovie) || URIUtils::IsOnLAN(strMovie)) &&
-      !URIUtils::IsPVRRecording(strMovie) &&
+      !fileItem.IsPVRRecording() &&
       !URIUtils::IsInternetStream(strMovie))
   {
     CLog::Log(LOGDEBUG, "%s - Checking for edit decision lists (EDL) on local drive or remote share for: %s",
@@ -124,12 +114,19 @@ bool CEdl::ReadEditDecisionLists(const std::string& strMovie, const float fFrame
   /*
    * PVR Recordings
    */
-  else if (URIUtils::IsPVRRecording(strMovie))
+  else if (fileItem.IsPVRRecording())
   {
     CLog::Log(LOGDEBUG, "%s - Checking for edit decision list (EDL) for PVR recording: %s",
       __FUNCTION__, strMovie.c_str());
 
-    bFound = ReadPvr(strMovie);
+    bFound = ReadPvr(fileItem);
+  }
+  else if (fileItem.IsEPG())
+  {
+    CLog::Log(LOGDEBUG, "%s - Checking for edit decision list (EDL) for EPG entry: %s",
+      __FUNCTION__, strMovie.c_str());
+
+    bFound = ReadPvr(fileItem);
   }
 
   if (bFound)
@@ -561,26 +558,33 @@ bool CEdl::ReadBeyondTV(const std::string& strMovie)
   }
 }
 
-bool CEdl::ReadPvr(const std::string &strMovie)
+bool CEdl::ReadPvr(const CFileItem &fileItem)
 {
+  const std::string strMovie = fileItem.GetDynPath();
   if (!CServiceBroker::GetPVRManager().IsStarted())
   {
     CLog::Log(LOGERROR, "%s - PVR Manager not started, cannot read Edl for %s", __FUNCTION__, strMovie.c_str());
     return false;
   }
 
-  CFileItemPtr tag =  CServiceBroker::GetPVRManager().Recordings()->GetByPath(strMovie);
-  if (tag && tag->HasPVRRecordingInfoTag())
+  std::vector<PVR_EDL_ENTRY> edl;
+
+  if (fileItem.HasPVRRecordingInfoTag())
   {
-    CLog::Log(LOGDEBUG, "%s - Reading Edl for recording: %s", __FUNCTION__, tag->GetPVRRecordingInfoTag()->m_strTitle.c_str());
+    CLog::Log(LOGDEBUG, "%s - Reading Edl for recording: %s", __FUNCTION__, fileItem.GetPVRRecordingInfoTag()->m_strTitle.c_str());
+    edl = fileItem.GetPVRRecordingInfoTag()->GetEdl();
+  }
+  else if (fileItem.HasEPGInfoTag())
+  {
+    CLog::Log(LOGDEBUG, "%s - Reading Edl for EPG: %s", __FUNCTION__, fileItem.GetEPGInfoTag()->Title(true).c_str());
+    edl = fileItem.GetEPGInfoTag()->GetEdl();
   }
   else
   {
-    CLog::Log(LOGERROR, "%s - Unable to find PVR recording: %s", __FUNCTION__, strMovie.c_str());
+    CLog::Log(LOGERROR, "%s - Unknown file item type : %s", __FUNCTION__, strMovie.c_str());
     return false;
   }
 
-  std::vector<PVR_EDL_ENTRY> edl = tag->GetPVRRecordingInfoTag()->GetEdl();
   std::vector<PVR_EDL_ENTRY>::const_iterator it;
   for (it = edl.begin(); it != edl.end(); ++it)
   {
@@ -679,8 +683,8 @@ bool CEdl::AddCut(Cut& cut)
      * the start (autowait) and automatically rewind by a bit (autowind) at the end of the commercial
      * break.
      */
-    int autowait = g_advancedSettings.m_iEdlCommBreakAutowait * 1000; // seconds -> ms
-    int autowind = g_advancedSettings.m_iEdlCommBreakAutowind * 1000; // seconds -> ms
+    int autowait = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iEdlCommBreakAutowait * 1000; // seconds -> ms
+    int autowind = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iEdlCommBreakAutowind * 1000; // seconds -> ms
 
     if (cut.start > 0) // Only autowait if not at the start.
      cut.start += autowait;
@@ -852,7 +856,7 @@ void CEdl::SetLastCutTime(const int iCutTime)
 
 bool CEdl::GetNearestCut(bool bPlus, const int iSeek, Cut *pCut) const
 {
-  if (bPlus) 
+  if (bPlus)
   {
     // Searching forwards
     for (auto &cut : m_vecCuts)
@@ -871,13 +875,13 @@ bool CEdl::GetNearestCut(bool bPlus, const int iSeek, Cut *pCut) const
       }
     }
     return false;
-  } 
+  }
   else
   {
     // Searching backwards
     for (int i = (int)m_vecCuts.size() - 1; i >= 0; i--)
     {
-      if (iSeek - 20000 >= m_vecCuts[i].start && iSeek <= m_vecCuts[i].end) 
+      if (iSeek - 20000 >= m_vecCuts[i].start && iSeek <= m_vecCuts[i].end)
         // Inside cut. We ignore if we're closer to 20 seconds inside
       {
         if (pCut)
@@ -965,13 +969,14 @@ void CEdl::MergeShortCommBreaks()
     m_vecCuts.erase(m_vecCuts.begin());
   }
 
-  if (g_advancedSettings.m_bEdlMergeShortCommBreaks)
+  const std::shared_ptr<CAdvancedSettings> advancedSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+  if (advancedSettings->m_bEdlMergeShortCommBreaks)
   {
-    for (int i = 0; i < (int)m_vecCuts.size() - 1; i++)
+    for (int i = 0; i < static_cast<int>(m_vecCuts.size()) - 1; i++)
     {
       if ((m_vecCuts[i].action == COMM_BREAK && m_vecCuts[i + 1].action == COMM_BREAK)
-      &&  (m_vecCuts[i + 1].end - m_vecCuts[i].start < g_advancedSettings.m_iEdlMaxCommBreakLength * 1000) // s to ms
-      &&  (m_vecCuts[i + 1].start - m_vecCuts[i].end < g_advancedSettings.m_iEdlMaxCommBreakGap * 1000)) // s to ms
+          &&  (m_vecCuts[i + 1].end - m_vecCuts[i].start < advancedSettings->m_iEdlMaxCommBreakLength * 1000) // s to ms
+          &&  (m_vecCuts[i + 1].start - m_vecCuts[i].end < advancedSettings->m_iEdlMaxCommBreakGap * 1000)) // s to ms
       {
         Cut commBreak;
         commBreak.action = COMM_BREAK;
@@ -1000,8 +1005,8 @@ void CEdl::MergeShortCommBreaks()
      * the maximum commercial break length being triggered.
      */
     if (!m_vecCuts.empty()
-    &&  m_vecCuts[0].action == COMM_BREAK
-    &&  m_vecCuts[0].start < g_advancedSettings.m_iEdlMaxStartGap * 1000)
+        &&  m_vecCuts[0].action == COMM_BREAK
+        &&  m_vecCuts[0].start < advancedSettings->m_iEdlMaxStartGap * 1000)
     {
       CLog::Log(LOGDEBUG, "%s - Expanding first commercial break back to start [%s - %s].", __FUNCTION__,
                 MillisecondsToTimeString(m_vecCuts[0].start).c_str(), MillisecondsToTimeString(m_vecCuts[0].end).c_str());
@@ -1011,15 +1016,15 @@ void CEdl::MergeShortCommBreaks()
     /*
      * Remove any commercial breaks shorter than the minimum (unless at the start)
      */
-    for (int i = 0; i < (int)m_vecCuts.size(); i++)
+    for (int i = 0; i < static_cast<int>(m_vecCuts.size()); i++)
     {
       if (m_vecCuts[i].action == COMM_BREAK
-      &&  m_vecCuts[i].start > 0
-      && (m_vecCuts[i].end - m_vecCuts[i].start) < g_advancedSettings.m_iEdlMinCommBreakLength * 1000)
+          &&  m_vecCuts[i].start > 0
+          && (m_vecCuts[i].end - m_vecCuts[i].start) < advancedSettings->m_iEdlMinCommBreakLength * 1000)
       {
         CLog::Log(LOGDEBUG, "%s - Removing short commercial break [%s - %s]. Minimum length: %i seconds", __FUNCTION__,
                   MillisecondsToTimeString(m_vecCuts[i].start).c_str(), MillisecondsToTimeString(m_vecCuts[i].end).c_str(),
-                  g_advancedSettings.m_iEdlMinCommBreakLength);
+                  advancedSettings->m_iEdlMinCommBreakLength);
         m_vecCuts.erase(m_vecCuts.begin() + i);
 
         i--;

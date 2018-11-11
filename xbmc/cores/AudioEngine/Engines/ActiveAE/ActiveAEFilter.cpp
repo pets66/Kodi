@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2016 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ActiveAEFilter.h"
@@ -218,9 +206,9 @@ int CActiveAEFilter::ProcessFilter(uint8_t **dst_buffer, int dst_samples, uint8_
 
     int channels = av_get_channel_layout_nb_channels(m_channelLayout);
 
-    av_frame_set_channel_layout(frame, m_channelLayout);
-    av_frame_set_channels(frame, channels);
-    av_frame_set_sample_rate(frame, m_sampleRate);
+    frame->channel_layout = m_channelLayout;
+    frame->channels = channels;
+    frame->sample_rate = m_sampleRate;
     frame->nb_samples = src_samples;
     frame->format = m_sampleFormat;
 
@@ -286,8 +274,8 @@ int CActiveAEFilter::ProcessFilter(uint8_t **dst_buffer, int dst_samples, uint8_
     {
       av_frame_unref(m_pOutFrame);
       m_pOutFrame->format = m_sampleFormat;
-      av_frame_set_channel_layout(m_pOutFrame, m_channelLayout);
-      av_frame_set_sample_rate(m_pOutFrame, m_sampleRate);
+      m_pOutFrame->channel_layout = m_channelLayout;
+      m_pOutFrame->sample_rate = m_sampleRate;
       result = swr_convert_frame(m_pConvertCtx, m_pOutFrame, m_pConvertFrame);
       av_frame_unref(m_pConvertFrame);
       if (result < 0)

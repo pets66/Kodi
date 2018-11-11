@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "guilib/IMsgTargetCallback.h"
 #include "messaging/IMessageTarget.h"
@@ -95,7 +84,7 @@ public:
   void SetCurrentSong(int index);
 
   int GetNextSong();
-  
+
   /*! \brief Get the index in the playlist that is offset away from the current index in the current playlist.
    Obeys any repeat settings (eg repeat one will return the current index regardless of offset)
    \return the index of the entry, or -1 if there is no current playlist. There is no guarantee that the returned index is valid.
@@ -144,7 +133,7 @@ public:
    \sa IsShuffled
    */
   void SetShuffle(int playlist, bool shuffle, bool notify = false);
-  
+
   /*! \brief Return whether a playlist is shuffled.
    If partymode is enabled, this always returns false.
    \param playlist the playlist to query for shuffle state, PLAYLIST_MUSIC or PLAYLIST_VIDEO.

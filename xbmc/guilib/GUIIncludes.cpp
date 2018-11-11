@@ -1,32 +1,23 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIIncludes.h"
 #include "addons/Skin.h"
 #include "GUIInfoManager.h"
-#include "GUIInfoTypes.h"
+#include "guilib/guiinfo/GUIInfoLabel.h"
+#include "guilib/GUIComponent.h"
 #include "utils/log.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
 #include "utils/StringUtils.h"
 #include "interfaces/info/SkinVariable.h"
+
+using namespace KODI::GUILIB;
 
 CGUIIncludes::CGUIIncludes()
 {
@@ -148,7 +139,7 @@ void CGUIIncludes::LoadDefaults(const TiXmlElement *node)
 {
   if (!node)
     return;
-  
+
   const TiXmlElement* child = node->FirstChildElement("default");
   while (child)
   {
@@ -240,7 +231,7 @@ void CGUIIncludes::LoadIncludes(const TiXmlElement *node)
 
       if (condition)
       { // load include file if condition evals to true
-        if (g_infoManager.Register(condition)->Get())
+        if (CServiceBroker::GetGUI()->GetInfoManager().Register(condition)->Get())
           Load_Internal(file);
       }
       else
@@ -263,7 +254,7 @@ void CGUIIncludes::FlattenExpressions()
 void CGUIIncludes::FlattenExpression(std::string &expression, const std::vector<std::string> &resolved)
 {
   std::string original(expression);
-  CGUIInfoLabel::ReplaceSpecialKeywordReferences(expression, "EXP", [&](const std::string &expressionName) -> std::string {
+  GUIINFO::CGUIInfoLabel::ReplaceSpecialKeywordReferences(expression, "EXP", [&](const std::string &expressionName) -> std::string {
     if (std::find(resolved.begin(), resolved.end(), expressionName) != resolved.end())
     {
       CLog::Log(LOGERROR, "Skin has a circular expression \"%s\": %s", resolved.back().c_str(), original.c_str());
@@ -420,7 +411,7 @@ void CGUIIncludes::ResolveIncludes(TiXmlElement *node, std::map<INFO::InfoPtr, b
     const char *condition = include->Attribute("condition");
     if (condition)
     {
-      INFO::InfoPtr conditionID = g_infoManager.Register(ResolveExpressions(condition));
+      INFO::InfoPtr conditionID = CServiceBroker::GetGUI()->GetInfoManager().Register(ResolveExpressions(condition));
       bool value = conditionID->Get();
 
       if (xmlIncludeConditions)
@@ -658,7 +649,7 @@ public:
 CGUIIncludes::ResolveParamsResult CGUIIncludes::ResolveParameters(const std::string& strInput, std::string& strOutput, const Params& params)
 {
   ParamReplacer paramReplacer(params);
-  if (CGUIInfoLabel::ReplaceSpecialKeywordReferences(strInput, "PARAM", std::ref(paramReplacer), strOutput))
+  if (GUIINFO::CGUIInfoLabel::ReplaceSpecialKeywordReferences(strInput, "PARAM", std::ref(paramReplacer), strOutput))
     // detect special input values of the form "$PARAM[undefinedParam]" (with no extra characters around)
     return paramReplacer.GetNumUndefinedParams() == 1 && paramReplacer.GetNumTotalParams() == 1 && strOutput.empty() ? SINGLE_UNDEFINED_PARAM_RESOLVED : PARAMS_RESOLVED;
   return NO_PARAMS_FOUND;
@@ -679,7 +670,7 @@ std::string CGUIIncludes::ResolveConstant(const std::string &constant) const
 std::string CGUIIncludes::ResolveExpressions(const std::string &expression) const
 {
   std::string work(expression);
-  CGUIInfoLabel::ReplaceSpecialKeywordReferences(work, "EXP", [&](const std::string &str) -> std::string {
+  GUIINFO::CGUIInfoLabel::ReplaceSpecialKeywordReferences(work, "EXP", [&](const std::string &str) -> std::string {
     std::map<std::string, std::string>::const_iterator it = m_expressions.find(str);
     if (it != m_expressions.end())
       return it->second;

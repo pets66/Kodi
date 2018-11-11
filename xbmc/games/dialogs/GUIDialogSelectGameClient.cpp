@@ -1,41 +1,28 @@
 /*
- *      Copyright (C) 2016-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogSelectGameClient.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonManager.h"
+#include "cores/RetroPlayer/savestates/ISavestate.h"
+#include "cores/RetroPlayer/savestates/SavestateDatabase.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "filesystem/AddonsDirectory.h"
-#include "games/addons/savestates/Savestate.h"
-#include "games/addons/savestates/SavestateDatabase.h"
-#include "games/addons/savestates/SavestateUtils.h"
 #include "games/addons/GameClient.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/WindowIDs.h"
-#include "messaging/helpers/DialogOKHelper.h" 
+#include "messaging/helpers/DialogOKHelper.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "ServiceBroker.h"
-#include "URL.h"
 
 using namespace KODI;
 using namespace KODI::MESSAGING;
@@ -48,19 +35,19 @@ std::string CGUIDialogSelectGameClient::ShowAndGetGameClient(const std::string &
   LogGameClients(candidates, installable);
 
   std::string extension = URIUtils::GetExtension(gamePath);
-  std::string xmlPath = CSavestateUtils::MakeMetadataPath(gamePath);
 
   // Load savestate
-  CSavestate save;
-  CSavestateDatabase db;
-  CLog::Log(LOGDEBUG, "Select game client dialog: Loading savestate metadata %s", CURL::GetRedacted(xmlPath).c_str());
-  const bool bLoaded = db.GetSavestate(xmlPath, save);
+  RETRO::CSavestateDatabase db;
+  std::unique_ptr<RETRO::ISavestate> save = db.CreateSavestate();
+
+  CLog::Log(LOGDEBUG, "Select game client dialog: Loading savestate metadata");
+  const bool bLoaded = db.GetSavestate(gamePath, *save);
 
   // Get savestate game client
   std::string saveGameClient;
   if (bLoaded)
   {
-    saveGameClient = save.GameClient();
+    saveGameClient = save->GameClientID();
     CLog::Log(LOGDEBUG, "Select game client dialog: Auto-selecting %s", saveGameClient.c_str());
   }
 
@@ -161,7 +148,7 @@ bool CGUIDialogSelectGameClient::Enable(const std::string &gameClient)
 
 CGUIDialogSelect *CGUIDialogSelectGameClient::GetDialog(const std::string &title)
 {
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+  CGUIDialogSelect *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog != nullptr)
   {
     dialog->Reset();

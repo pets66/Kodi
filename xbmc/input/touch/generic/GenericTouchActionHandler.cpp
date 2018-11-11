@@ -1,29 +1,18 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GenericTouchActionHandler.h"
 
 #include <cmath>
 
-#include "Application.h"
-#include "messaging/ApplicationMessenger.h"
+#include "AppInboundProtocol.h"
+#include "ServiceBroker.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
 
@@ -152,7 +141,7 @@ void CGenericTouchActionHandler::OnRotate(float centerX, float centerY, float an
 int CGenericTouchActionHandler::QuerySupportedGestures(float x, float y)
 {
   CGUIMessage msg(GUI_MSG_GESTURE_NOTIFY, 0, 0, static_cast<int> (std::round(x)), static_cast<int> (std::round(y)));
-  if (!g_windowManager.SendMessage(msg))
+  if (!CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg))
     return 0;
 
   int result = 0;
@@ -169,7 +158,7 @@ int CGenericTouchActionHandler::QuerySupportedGestures(float x, float y)
 void CGenericTouchActionHandler::sendEvent(int actionId, float x, float y, float x2 /* = 0.0f */, float y2 /* = 0.0f */, float x3, float y3, int pointers /* = 1 */)
 {
   XBMC_Event newEvent{XBMC_TOUCH};
-  
+
   newEvent.touch.action = actionId;
   newEvent.touch.x = x;
   newEvent.touch.y = y;
@@ -179,7 +168,9 @@ void CGenericTouchActionHandler::sendEvent(int actionId, float x, float y, float
   newEvent.touch.y3 = y3;
   newEvent.touch.pointers = pointers;
 
-  g_application.OnEvent(newEvent);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
+  if (appPort)
+    appPort->OnEvent(newEvent);
 }
 
 void CGenericTouchActionHandler::focusControl(float x, float y)
@@ -189,5 +180,7 @@ void CGenericTouchActionHandler::focusControl(float x, float y)
   newEvent.focus.x = static_cast<int> (std::round(x));
   newEvent.focus.y = static_cast<int> (std::round(y));
 
-  g_application.OnEvent(newEvent);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
+  if (appPort)
+    appPort->OnEvent(newEvent);
 }

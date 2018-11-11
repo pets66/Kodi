@@ -1,22 +1,10 @@
 /*
- *      Copyright (c) 2007 d4rk
- *      Copyright (C) 2007-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (c) 2007 d4rk
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <string>
@@ -70,7 +58,7 @@ ConvolutionFilterShader::ConvolutionFilterShader(ESCALINGMETHOD method, bool str
   std::string shadername;
   std::string defines;
 
-  m_floattex = CServiceBroker::GetRenderSystem().IsExtSupported("GL_ARB_texture_float");
+  m_floattex = CServiceBroker::GetRenderSystem()->IsExtSupported("GL_ARB_texture_float");
 
   if (m_method == VS_SCALINGMETHOD_CUBIC ||
       m_method == VS_SCALINGMETHOD_LANCZOS2 ||
@@ -84,7 +72,7 @@ ConvolutionFilterShader::ConvolutionFilterShader(ESCALINGMETHOD method, bool str
     else
       m_internalformat = GL_RGBA;
   }
-  else if (m_method == VS_SCALINGMETHOD_SPLINE36 || 
+  else if (m_method == VS_SCALINGMETHOD_SPLINE36 ||
            m_method == VS_SCALINGMETHOD_LANCZOS3)
   {
     shadername = "gl_convolution-6x6.glsl";

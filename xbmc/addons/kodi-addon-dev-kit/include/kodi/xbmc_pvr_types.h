@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #ifndef TARGET_WINDOWS
 #ifndef __cdecl
@@ -36,7 +24,7 @@
 #include "xbmc_epg_types.h"
 
 /*! @note Define "USE_DEMUX" at compile time if demuxing in the PVR add-on is used.
- *        Also XBMC's "DVDDemuxPacket.h" file must be in the include path of the add-on,
+ *        Also, "DVDDemuxPacket.h" file must be in the include path of the add-on,
  *        and the add-on should set bHandlesDemuxing to true.
  */
 #ifdef USE_DEMUX
@@ -79,7 +67,8 @@ struct DemuxPacket;
 #define PVR_STREAM_MAX_PROPERTIES     20
 #define PVR_STREAM_PROPERTY_STREAMURL "streamurl" /*!< @brief the URL of the stream that should be played. */
 #define PVR_STREAM_PROPERTY_INPUTSTREAMADDON  "inputstreamaddon" /*!< @brief the name of the inputstream add-on that should be used by Kodi to play the stream denoted by PVR_STREAM_PROPERTY_STREAMURL. Leave blank to use Kodi's built-in playing capabilities. */
-#define PVR_STREAM_PROPERTY_MIMETYPE "mimetype" /*!< @brief the Mime-Type of the stream that should be played. */
+#define PVR_STREAM_PROPERTY_MIMETYPE "mimetype" /*!< @brief the MIME type of the stream that should be played. */
+#define PVR_STREAM_PROPERTY_ISREALTIMESTREAM "isrealtimestream" /*!< @brief "true" to denote that the stream that should be played is a realtime stream. Any other value indicates that this is no realtime stream.*/
 
 /* using the default avformat's MAX_STREAMS value to be safe */
 #define PVR_STREAM_MAX_STREAMS 20
@@ -164,6 +153,7 @@ extern "C" {
   const unsigned int PVR_TIMER_TYPE_REQUIRES_EPG_SERIES_ON_CREATE     = 0x00800000; /*!< @brief this type should not appear on any create menus unless associated with an EPG tag with 'series' attributes (EPG_TAG.iFlags & EPG_TAG_FLAG_IS_SERIES || EPG_TAG.iSeriesNumber > 0 || EPG_TAG.iEpisodeNumber > 0 || EPG_TAG.iEpisodePartNumber > 0). Implies PVR_TIMER_TYPE_REQUIRES_EPG_TAG_ON_CREATE */
   const unsigned int PVR_TIMER_TYPE_SUPPORTS_ANY_CHANNEL              = 0x01000000; /*!< @brief this type supports 'any channel', for example when defining a timer rule that should match any channel instaed of a particular channel */
   const unsigned int PVR_TIMER_TYPE_REQUIRES_EPG_SERIESLINK_ON_CREATE = 0x02000000; /*!< @brief this type should not appear on any create menus which don't provide an associated EPG tag with a series link */
+  const unsigned int PVR_TIMER_TYPE_SUPPORTS_READONLY_DELETE          = 0x04000000; /*!< @brief this type allows deletion of an otherwise read-only timer */
 
   /*!
    * @brief PVR timer weekdays (PVR_TIMER.iWeekdays values)
@@ -202,7 +192,7 @@ extern "C" {
   {
     PVR_ERROR_NO_ERROR           = 0,  /*!< @brief no error occurred */
     PVR_ERROR_UNKNOWN            = -1, /*!< @brief an unknown error occurred */
-    PVR_ERROR_NOT_IMPLEMENTED    = -2, /*!< @brief the method that XBMC called is not implemented by the add-on */
+    PVR_ERROR_NOT_IMPLEMENTED    = -2, /*!< @brief the method that Kodi called is not implemented by the add-on */
     PVR_ERROR_SERVER_ERROR       = -3, /*!< @brief the backend reported an error, or the add-on isn't connected */
     PVR_ERROR_SERVER_TIMEOUT     = -4, /*!< @brief the command was sent to the backend, but the response timed out */
     PVR_ERROR_REJECTED           = -5, /*!< @brief the command was rejected by the backend */
@@ -303,6 +293,7 @@ extern "C" {
   typedef struct PVR_ADDON_CAPABILITIES
   {
     bool bSupportsEPG;                  /*!< @brief true if the add-on provides EPG information */
+    bool bSupportsEPGEdl;               /*!< @brief true if the backend supports retrieving an edit decision list for an EPG tag. */
     bool bSupportsTV;                   /*!< @brief true if this add-on provides TV channels */
     bool bSupportsRadio;                /*!< @brief true if this add-on supports radio channels */
     bool bSupportsRecordings;           /*!< @brief true if this add-on supports playback of recordings stored on the backend */
@@ -311,7 +302,7 @@ extern "C" {
     bool bSupportsChannelGroups;        /*!< @brief true if this add-on supports channel groups */
     bool bSupportsChannelScan;          /*!< @brief true if this add-on support scanning for new channels on the backend */
     bool bSupportsChannelSettings;      /*!< @brief true if this add-on supports the following functions: DeleteChannel, RenameChannel, DialogChannelSettings and DialogAddChannel */
-    bool bHandlesInputStream;           /*!< @brief true if this add-on provides an input stream. false if XBMC handles the stream. */
+    bool bHandlesInputStream;           /*!< @brief true if this add-on provides an input stream. false if Kodi handles the stream. */
     bool bHandlesDemuxing;              /*!< @brief true if this add-on demultiplexes packets. */
     bool bSupportsRecordingPlayCount;   /*!< @brief true if the backend supports play count for recordings. */
     bool bSupportsLastPlayedPosition;   /*!< @brief true if the backend supports store/retrieve of last played position for recordings. */
@@ -322,6 +313,9 @@ extern "C" {
 
     unsigned int iRecordingsLifetimesSize; /*!< @brief (required) Count of possible values for PVR_RECORDING.iLifetime. 0 means lifetime is not supported for recordings or no own value definition wanted, but to use Kodi defaults of 1..365. */
     PVR_ATTRIBUTE_INT_VALUE recordingsLifetimeValues[PVR_ADDON_ATTRIBUTE_VALUES_ARRAY_SIZE]; /*!< @brief (optional) Array containing the possible values for PVR_RECORDING.iLifetime. Must be filled if iLifetimesSize > 0 */
+
+    // TODO: cleanup: move this member up after the other bools with the next incompatible pvr addon api change.
+    bool bSupportsAsyncEPGTransfer;     /*!< @brief true if this addon-on supports asynchronous transfer of epg events to Kodi using the callback function EpgEventStateChange. */
   } ATTRIBUTE_PACKED PVR_ADDON_CAPABILITIES;
 
   /*!
@@ -511,7 +505,7 @@ extern "C" {
     int             iMaxRecordings;                            /*!< @brief (optional) maximum number of recordings this timer shall create. > 0 number of recordings, < 0 addon defined integer list reference, == 0 disabled */
     unsigned int    iRecordingGroup;                           /*!< @brief (optional) integer ref to addon/backend defined list of recording groups*/
     time_t          firstDay;                                  /*!< @brief (optional) the first day this timer is active, for repeating timers */
-    unsigned int    iWeekdays;                                 /*!< @brief (optional) week days, for repeating timers */
+    unsigned int    iWeekdays;                                 /*!< @brief (optional) week days, for repeating timers (see PVR_WEEKDAY_* constant values) */
     unsigned int    iPreventDuplicateEpisodes;                 /*!< @brief (optional) 1 if backend should only record new episodes in case of a repeating epg-based timer, 0 if all episodes shall be recorded (no duplicate detection). Actual algorithm for
                                                                     duplicate detection is defined by the backend. Addons may define own values for different duplicate detection algorithms, thus this is not just a bool.*/
     unsigned int    iEpgUid;                                   /*!< @brief (optional) EPG event id associated with this timer. Event ids must be unique for a channel. Valid ids must be greater than EPG_TAG_INVALID_UID. */
@@ -538,7 +532,7 @@ extern "C" {
     char   strPlot[PVR_ADDON_DESC_STRING_LENGTH];         /*!< @brief (optional) plot */
     char   strGenreDescription[PVR_ADDON_DESC_STRING_LENGTH]; /*!< @brief (optional) genre. Will be used only when iGenreType = EPG_GENRE_USE_STRING */
     char   strChannelName[PVR_ADDON_NAME_STRING_LENGTH];  /*!< @brief (optional) channel name */
-    char   strIconPath[PVR_ADDON_URL_STRING_LENGTH];      /*!< @brief (optional) icon path */
+    char   strIconPath[PVR_ADDON_URL_STRING_LENGTH];      /*!< @brief (optional) channel logo (icon) path */
     char   strThumbnailPath[PVR_ADDON_URL_STRING_LENGTH]; /*!< @brief (optional) thumbnail path */
     char   strFanartPath[PVR_ADDON_URL_STRING_LENGTH];    /*!< @brief (optional) fanart path */
     time_t recordingTime;                                 /*!< @brief (optional) start time of the recording */
@@ -594,8 +588,8 @@ extern "C" {
   {
     time_t startTime; /*!< @brief For recordings, this must be zero. For Live TV, this is a reference time in units of time_t (UTC) from which time elapsed starts. Ideally start of tv show, but can be any other value. */
     int64_t ptsStart; /*!< @brief the pts of startTime */
-    int64_t ptsBegin; /*!< @brief earliest pts player can seek back. Value is seconds, relative to ptsStart. For recordings, this must be zero. For Live TV, this must be zero if not timeshifting and must point to begin of the timeshift buffer, otherwise. */
-    int64_t ptsEnd;   /*!< @brief latest pts player can seek forward. Value is seconds, relative to ptsStart. For recordings, this must be the total length in seconds. For Live TV, this must be zero if not timeshifting and must point to end of the timeshift buffer, otherwise. */
+    int64_t ptsBegin; /*!< @brief earliest pts player can seek back. Value is in micro seconds, relative to ptsStart. For recordings, this must be zero. For Live TV, this must be zero if not timeshifting and must point to begin of the timeshift buffer, otherwise. */
+    int64_t ptsEnd;   /*!< @brief latest pts player can seek forward. Value is in micro seconds, relative to ptsStart. For recordings, this must be the total length. For Live TV, this must be zero if not timeshifting and must point to end of the timeshift buffer, otherwise. */
   } ATTRIBUTE_PACKED PVR_STREAM_TIMES;
 
   typedef struct AddonToKodiFuncTable_PVR
@@ -627,7 +621,7 @@ extern "C" {
   } AddonToKodiFuncTable_PVR;
 
   /*!
-   * @brief Structure to transfer the methods from xbmc_pvr_dll.h to XBMC
+   * @brief Structure to transfer the methods from xbmc_pvr_dll.h to Kodi
    */
   typedef struct KodiToAddonFuncTable_PVR
   {
@@ -643,6 +637,7 @@ extern "C" {
     PVR_ERROR (__cdecl* GetEPGForChannel)(ADDON_HANDLE, const PVR_CHANNEL&, time_t, time_t);
     PVR_ERROR (__cdecl* IsEPGTagRecordable)(const EPG_TAG*, bool*);
     PVR_ERROR (__cdecl* IsEPGTagPlayable)(const EPG_TAG*, bool*);
+    PVR_ERROR (__cdecl* GetEPGTagEdl)(const EPG_TAG*, PVR_EDL_ENTRY[], int*);
     PVR_ERROR (__cdecl* GetEPGTagStreamProperties)(const EPG_TAG*, PVR_NAMED_VALUE*, unsigned int*);
     int (__cdecl* GetChannelGroupsAmount)(void);
     PVR_ERROR (__cdecl* GetChannelGroups)(ADDON_HANDLE, bool);
@@ -704,6 +699,7 @@ extern "C" {
     void (__cdecl* OnPowerSavingActivated)(void);
     void (__cdecl* OnPowerSavingDeactivated)(void);
     PVR_ERROR (__cdecl* GetStreamTimes)(PVR_STREAM_TIMES*);
+    PVR_ERROR (__cdecl* GetStreamReadChunkSize)(int*);
   } KodiToAddonFuncTable_PVR;
 
   typedef struct AddonInstance_PVR

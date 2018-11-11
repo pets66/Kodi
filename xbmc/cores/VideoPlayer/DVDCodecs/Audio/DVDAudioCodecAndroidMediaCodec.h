@@ -1,24 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2016 Christian Browet
- *      http://kodi.tv
+ *  Copyright (C) 2016 Christian Browet
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
- *  http://www.gnu.org/copyleft/gpl.html
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <queue>
 #include <vector>
@@ -48,16 +36,16 @@ public:
 
   // required overrides
 public:
-  virtual bool Open(CDVDStreamInfo &hints, CDVDCodecOptions &options) override;
-  virtual void Dispose() override;
-  virtual bool AddData(const DemuxPacket &packet) override;
-  virtual void GetData(DVDAudioFrame &frame) override;
-  virtual int GetData(uint8_t** dst) override;
-  virtual void Reset() override;
-  virtual AEAudioFormat GetFormat() override { return m_format; }
-  virtual const char* GetName() override { return "mediacodec"; }
-  
+  bool Open(CDVDStreamInfo &hints, CDVDCodecOptions &options) override;
+  void Dispose() override;
+  bool AddData(const DemuxPacket &packet) override;
+  void GetData(DVDAudioFrame &frame) override;
+  void Reset() override;
+  AEAudioFormat GetFormat() override;
+  std::string GetName() override;
+
 protected:
+  int GetData(uint8_t** dst);
   int GetChannels() { return m_channels; }
   int GetEncodedChannels() { return m_channels; }
   CAEChannelInfo GetChannelMap();
@@ -72,7 +60,7 @@ protected:
   std::string m_mime;
   std::string m_codecname;
   std::string m_formatname;
-  bool m_opened;
+  bool m_opened, m_codecIsFed;
   int m_samplerate;
   int m_channels;
   uint8_t* m_buffer;
@@ -83,4 +71,5 @@ protected:
 
   std::shared_ptr<CJNIMediaCodec> m_codec;
   CJNIMediaCrypto *m_crypto;
+  std::shared_ptr<CDVDAudioCodec> m_decryptCodec;
 };

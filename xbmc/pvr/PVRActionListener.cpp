@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVRActionListener.h"
@@ -23,9 +11,11 @@
 #include "Application.h"
 #include "ServiceBroker.h"
 #include "dialogs/GUIDialogNumeric.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 
 #include "pvr/PVRGUIActions.h"
 #include "pvr/PVRManager.h"
@@ -39,7 +29,7 @@ namespace PVR
 CPVRActionListener::CPVRActionListener()
 {
   g_application.RegisterActionListener(this);
-  CServiceBroker::GetSettings().RegisterCallback(this, {
+  CServiceBroker::GetSettingsComponent()->GetSettings()->RegisterCallback(this, {
     CSettings::SETTING_PVRPARENTAL_ENABLED,
     CSettings::SETTING_PVRMANAGER_RESETDB,
     CSettings::SETTING_EPG_RESETEPG,
@@ -55,14 +45,14 @@ CPVRActionListener::CPVRActionListener()
 
 CPVRActionListener::~CPVRActionListener()
 {
-  CServiceBroker::GetSettings().UnregisterCallback(this);
+  CServiceBroker::GetSettingsComponent()->GetSettings()->UnregisterCallback(this);
   g_application.UnregisterActionListener(this);
 }
 
 ChannelSwitchMode CPVRActionListener::GetChannelSwitchMode(int iAction)
 {
   if ((iAction == ACTION_MOVE_UP || iAction == ACTION_MOVE_DOWN) &&
-      CServiceBroker::GetSettings().GetBool(CSettings::SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH))
+      CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH))
     return ChannelSwitchMode::NO_SWITCH;
 
   return ChannelSwitchMode::INSTANT_OR_DELAYED_SWITCH;
@@ -125,11 +115,11 @@ bool CPVRActionListener::OnAction(const CAction &action)
       if (!bIsPlayingPVR)
         return false;
 
-      if (g_windowManager.IsWindowActive(WINDOW_FULLSCREEN_VIDEO) || g_windowManager.IsWindowActive(WINDOW_VISUALISATION))
+      if (CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_FULLSCREEN_VIDEO) || CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_VISUALISATION))
       {
         // do not consume action if a python modal is the top most dialog
         // as a python modal can't return that it consumed the action.
-        if (g_windowManager.IsPythonWindow(g_windowManager.GetTopmostModalDialog()))
+        if (CServiceBroker::GetGUI()->GetWindowManager().IsPythonWindow(CServiceBroker::GetGUI()->GetWindowManager().GetTopmostModalDialog()))
           return false;
 
         char cCharacter;
@@ -163,7 +153,7 @@ bool CPVRActionListener::OnAction(const CAction &action)
         return false;
 
       // If the button that caused this action matches action "Select" ...
-      if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH) &&
+      if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH) &&
           CServiceBroker::GetPVRManager().GUIActions()->GetChannelNavigator().IsPreview())
       {
         // ... and if "confirm channel switch" setting is active and a channel
@@ -179,8 +169,25 @@ bool CPVRActionListener::OnAction(const CAction &action)
       return false;
     }
 
-    case ACTION_MOVE_UP:
     case ACTION_NEXT_ITEM:
+    {
+      if (!bIsPlayingPVR)
+        return false;
+
+      CServiceBroker::GetPVRManager().GUIActions()->SeekForward();
+      return true;
+    }
+
+    case ACTION_PREV_ITEM:
+    {
+      if (!bIsPlayingPVR)
+        return false;
+
+      CServiceBroker::GetPVRManager().GUIActions()->SeekBackward(CApplication::ACTION_PREV_ITEM_THRESHOLD);
+      return true;
+    }
+
+    case ACTION_MOVE_UP:
     case ACTION_CHANNEL_UP:
     {
       if (!bIsPlayingPVR)
@@ -191,7 +198,6 @@ bool CPVRActionListener::OnAction(const CAction &action)
     }
 
     case ACTION_MOVE_DOWN:
-    case ACTION_PREV_ITEM:
     case ACTION_CHANNEL_DOWN:
     {
       if (!bIsPlayingPVR)
@@ -237,12 +243,12 @@ void CPVRActionListener::OnSettingChanged(std::shared_ptr<const CSetting> settin
   const std::string &settingId = setting->GetId();
   if (settingId == CSettings::SETTING_PVRPARENTAL_ENABLED)
   {
-    if (std::static_pointer_cast<const CSettingBool>(setting)->GetValue() && CServiceBroker::GetSettings().GetString(CSettings::SETTING_PVRPARENTAL_PIN).empty())
+    if (std::static_pointer_cast<const CSettingBool>(setting)->GetValue() && CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_PVRPARENTAL_PIN).empty())
     {
       std::string newPassword = "";
       // password set... save it
       if (CGUIDialogNumeric::ShowAndVerifyNewPassword(newPassword))
-        CServiceBroker::GetSettings().SetString(CSettings::SETTING_PVRPARENTAL_PIN, newPassword);
+        CServiceBroker::GetSettingsComponent()->GetSettings()->SetString(CSettings::SETTING_PVRPARENTAL_PIN, newPassword);
       // password not set... disable parental
       else
         std::static_pointer_cast<CSettingBool>(std::const_pointer_cast<CSetting>(setting))->SetValue(false);
@@ -272,7 +278,7 @@ void CPVRActionListener::OnSettingAction(std::shared_ptr<const CSetting> setting
   {
     if (CServiceBroker::GetPVRManager().IsStarted())
     {
-      CGUIDialog *dialog = g_windowManager.GetDialog(WINDOW_DIALOG_PVR_CLIENT_PRIORITIES);
+      CGUIDialog *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PVR_CLIENT_PRIORITIES);
       if (dialog)
       {
         dialog->Open();
@@ -284,7 +290,7 @@ void CPVRActionListener::OnSettingAction(std::shared_ptr<const CSetting> setting
   {
     if (CServiceBroker::GetPVRManager().IsStarted())
     {
-      CGUIDialog *dialog = g_windowManager.GetDialog(WINDOW_DIALOG_PVR_CHANNEL_MANAGER);
+      CGUIDialog *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PVR_CHANNEL_MANAGER);
       if (dialog)
         dialog->Open();
     }
@@ -293,7 +299,7 @@ void CPVRActionListener::OnSettingAction(std::shared_ptr<const CSetting> setting
   {
     if (CServiceBroker::GetPVRManager().IsStarted())
     {
-      CGUIDialog *dialog = g_windowManager.GetDialog(WINDOW_DIALOG_PVR_GROUP_MANAGER);
+      CGUIDialog *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PVR_GROUP_MANAGER);
       if (dialog)
         dialog->Open();
     }
@@ -308,7 +314,7 @@ void CPVRActionListener::OnSettingAction(std::shared_ptr<const CSetting> setting
   }
   else if (settingId == CSettings::SETTING_PVRCLIENT_MENUHOOK)
   {
-    CServiceBroker::GetPVRManager().GUIActions()->ProcessMenuHooks(CFileItemPtr());
+    CServiceBroker::GetPVRManager().GUIActions()->ProcessSettingsMenuHooks();
   }
 }
 

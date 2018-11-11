@@ -1,39 +1,27 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DialogGameVideoSelect.h"
 #include "cores/RetroPlayer/guibridge/GUIGameVideoHandle.h"
 #include "cores/RetroPlayer/guibridge/GUIGameRenderManager.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/GUIBaseContainer.h"
 #include "guilib/GUIMessage.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "guilib/WindowIDs.h"
-#include "input/ActionIDs.h"
+#include "input/actions/ActionIDs.h"
 #include "settings/GameSettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "view/GUIViewControl.h"
 #include "view/ViewState.h"
 #include "Application.h"
-#include "ApplicationPlayer.h"
 #include "FileItem.h"
 #include "ServiceBroker.h"
 
@@ -171,7 +159,7 @@ void CDialogGameVideoSelect::Update()
 {
   //! @todo
   // Lock our display, as this window is rendered from the player thread
-  //g_graphicsContext.Lock();
+  //CServiceBroker::GetWinSystem()->GetGfxContext().Lock();
 
   m_viewControl->SetCurrentView(DEFAULT_VIEW_ICONS);
 
@@ -180,7 +168,7 @@ void CDialogGameVideoSelect::Update()
 
   OnRefreshList();
 
-  //g_graphicsContext.Unlock();
+  //CServiceBroker::GetWinSystem()->GetGfxContext().Unlock();
 }
 
 void CDialogGameVideoSelect::Clear()
@@ -210,7 +198,7 @@ void CDialogGameVideoSelect::SaveSettings()
   if (defaultSettings != currentSettings)
   {
     defaultSettings = currentSettings;
-    CServiceBroker::GetSettings().Save();
+    CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
   }
 }
 
@@ -218,7 +206,7 @@ void CDialogGameVideoSelect::OnDescriptionChange(const std::string &description)
 {
   CGUIMessage msg(GUI_MSG_LABEL_SET, GetID(), CONTROL_DESCRIPTION);
   msg.SetLabel(description);
-  g_windowManager.SendThreadMessage(msg, GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(msg, GetID());
 }
 
 void CDialogGameVideoSelect::RegisterDialog()

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2016 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #import <UIKit/UIKit.h>
@@ -94,7 +82,7 @@ void AnnounceBridge(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, con
   const std::string msg(message);
 
   // handle data which only has a database id and not the metadata inside
-  if (msg == "OnPlay")
+  if (msg == "OnPlay" || msg == "OnResume")
   {
     if (!nonConstData["item"].isNull())
     {
@@ -134,7 +122,7 @@ void AnnounceBridge(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, con
   //LOG(@"AnnounceBridge: [%s], [%s], [%s]", ANNOUNCEMENT::AnnouncementFlagToString(flag), sender, message);
   NSDictionary *dict = dictionaryFromVariantMap(nonConstData);
   //LOG(@"data: %@", dict.description);
-  if (msg == "OnPlay")
+  if (msg == "OnPlay" || msg == "OnResume")
   {
     NSDictionary *item = [dict valueForKey:@"item"];
     NSDictionary *player = [dict valueForKey:@"player"];
@@ -202,12 +190,12 @@ CAnnounceReceiver *CAnnounceReceiver::GetInstance()
 
 void CAnnounceReceiver::Initialize()
 {
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().AddAnnouncer(GetInstance());
+  CServiceBroker::GetAnnouncementManager()->AddAnnouncer(GetInstance());
 }
 
 void CAnnounceReceiver::DeInitialize()
 {
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().RemoveAnnouncer(GetInstance());
+  CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(GetInstance());
 }
 
 void CAnnounceReceiver::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)

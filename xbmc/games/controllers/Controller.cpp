@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2015-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2015-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Controller.h"
@@ -23,7 +11,6 @@
 #include "ControllerLayout.h"
 #include "ControllerTopology.h"
 #include "utils/log.h"
-#include "utils/URIUtils.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
 #include "URL.h"
@@ -98,7 +85,8 @@ const CControllerFeature& CController::GetFeature(const std::string &name) const
 unsigned int CController::FeatureCount(FEATURE_TYPE type /* = FEATURE_TYPE::UNKNOWN */,
                                        JOYSTICK::INPUT_TYPE inputType /* = JOYSTICK::INPUT_TYPE::UNKNOWN */) const
 {
-  return std::count_if(m_features.begin(), m_features.end(), FeatureTypeEqual(type, inputType));
+  auto featureCount = std::count_if(m_features.begin(), m_features.end(), FeatureTypeEqual(type, inputType));
+  return static_cast<unsigned int>(featureCount);
 }
 
 void CController::GetFeatures(std::vector<std::string>& features,

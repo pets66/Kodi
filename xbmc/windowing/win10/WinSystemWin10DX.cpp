@@ -1,34 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
-#include "commons/ilog.h"
-#include "guilib/GraphicContext.h"
 #include "input/touch/generic/GenericTouchActionHandler.h"
 #include "input/touch/generic/GenericTouchInputHandler.h"
 #include "rendering/dx/DirectXHelper.h"
-#include "rendering/dx/RenderContext.h"
-#include "utils/SystemInfo.h"
 #include "utils/log.h"
 #include "WinSystemWin10DX.h"
-
-#include <agile.h>
 
 std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
 {
@@ -60,27 +42,21 @@ void CWinSystemWin10DX::PresentRenderImpl(bool rendered)
 
 bool CWinSystemWin10DX::CreateNewWindow(const std::string& name, bool fullScreen, RESOLUTION_INFO& res)
 {
-  const MONITOR_DETAILS* monitor = GetMonitor(res.iScreen);
+  const MONITOR_DETAILS* monitor = GetDefaultMonitor();
   if (!monitor)
     return false;
 
   m_deviceResources = DX::DeviceResources::Get();
+  m_deviceResources->SetWindow(m_coreWindow);
 
-  bool created = CWinSystemWin10::CreateNewWindow(name, fullScreen, res);
-  m_deviceResources->SetWindow(m_coreWindow.Get());
-  created &= m_deviceResources->HasValidDevice();
-
-  if (created)
+  if (CWinSystemWin10::CreateNewWindow(name, fullScreen, res) && m_deviceResources->HasValidDevice())
   {
     CGenericTouchInputHandler::GetInstance().RegisterHandler(&CGenericTouchActionHandler::GetInstance());
     CGenericTouchInputHandler::GetInstance().SetScreenDPI(DX::DisplayMetrics::Dpi100);
     ChangeResolution(res, true);
+    return true;
   }
-  return created;
-}
-
-void CWinSystemWin10DX::SetWindow(HWND hWnd) const
-{
+  return false;
 }
 
 bool CWinSystemWin10DX::DestroyRenderSystem()
@@ -97,15 +73,8 @@ void CWinSystemWin10DX::ShowSplash(const std::string & message)
   CRenderSystemBase::ShowSplash(message);
 
   // this will prevent killing the app by watchdog timeout during loading
-  if (m_coreWindow.Get())
-    m_coreWindow->Dispatcher->ProcessEvents(Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
-}
-
-void CWinSystemWin10DX::UpdateMonitor() const
-{
-  //const MONITOR_DETAILS* monitor = GetMonitor(m_nScreen);
-  //if (monitor)
-  //  m_deviceResources->SetMonitor(monitor->hMonitor);
+  if (m_coreWindow != nullptr)
+    m_coreWindow.Dispatcher().ProcessEvents(winrt::Windows::UI::Core::CoreProcessEventsOption::ProcessAllIfPresent);
 }
 
 void CWinSystemWin10DX::SetDeviceFullScreen(bool fullScreen, RESOLUTION_INFO& res)
@@ -123,7 +92,7 @@ bool CWinSystemWin10DX::ResizeWindow(int newWidth, int newHeight, int newLeft, i
 
 void CWinSystemWin10DX::OnMove(int x, int y)
 {
-  m_deviceResources->SetWindowPos(m_coreWindow->Bounds);
+  m_deviceResources->SetWindowPos(m_coreWindow.Bounds());
 }
 
 bool CWinSystemWin10DX::DPIChanged(WORD dpi, RECT windowRect) const

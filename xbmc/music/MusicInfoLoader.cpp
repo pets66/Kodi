@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "MusicInfoLoader.h"
@@ -28,6 +16,7 @@
 #include "music/tags/MusicInfoTag.h"
 #include "filesystem/File.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "FileItem.h"
 #include "utils/log.h"
 #include "utils/Archive.h"
@@ -91,17 +80,17 @@ bool CMusicInfoLoader::LoadAdditionalTagInfo(CFileItem* pItem)
     return false; // already have the information
 
   std::string path(pItem->GetPath());
-  // For songs in library set the (primary) song artist and album properties 
+  // For songs in library set the (primary) song artist and album properties
   // Use song Id (not path) as called for items from either library or file view,
   // but could also be listitem with tag loaded by a script
-  if (pItem->HasMusicInfoTag() && 
-      pItem->GetMusicInfoTag()->GetType() == MediaTypeSong && 
+  if (pItem->HasMusicInfoTag() &&
+      pItem->GetMusicInfoTag()->GetType() == MediaTypeSong &&
       pItem->GetMusicInfoTag()->GetDatabaseId() > 0)
   {
     CMusicDatabase database;
     database.Open();
     // May already have song artist ids as item property set when data read from
-    // db, but check property is valid array (scripts could set item properties 
+    // db, but check property is valid array (scripts could set item properties
     // incorrectly), otherwise fetch artist using song id.
     CArtist artist;
     bool artistfound = false;
@@ -198,11 +187,11 @@ bool CMusicInfoLoader::LoadItemLookup(CFileItem* pItem)
         m_databaseHits++;
       }
 
-      /* Note for songs from embedded or separate cuesheets strFileName is not unique, so only the first song from such a file 
+      /* Note for songs from embedded or separate cuesheets strFileName is not unique, so only the first song from such a file
          gets added to the song map. Any such songs from a cuesheet can be identified by having a non-zero offset value.
-         When the item we are looking up has a cue document or is a music file with a cuesheet embedded in the tags, it needs 
-         to have the cuesheet fully processed replacing that item with items for every track etc. This is done elsewhere, as 
-         changes to the list of items is not possible from here. This method only loads the item with the song from the database 
+         When the item we are looking up has a cue document or is a music file with a cuesheet embedded in the tags, it needs
+         to have the cuesheet fully processed replacing that item with items for every track etc. This is done elsewhere, as
+         changes to the list of items is not possible from here. This method only loads the item with the song from the database
          when it maps to a single song.
       */
 
@@ -225,7 +214,7 @@ bool CMusicInfoLoader::LoadItemLookup(CFileItem* pItem)
             pItem->SetArt("thumb", song.strThumb);
         }
       }
-      else if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICFILES_USETAGS) || pItem->IsCDDA())
+      else if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_MUSICFILES_USETAGS) || pItem->IsCDDA())
       { // Nothing found, load tag from file,
         // always try to load cddb info
         // get correct tag parser
@@ -301,7 +290,7 @@ void CMusicInfoLoader::SaveCache(const std::string& strFileName, CFileItemList& 
   if (file.OpenForWrite(strFileName))
   {
     CArchive ar(&file, CArchive::store);
-    ar << (int)items.Size();
+    ar << items.Size();
     for (int i = 0; i < iSize; i++)
     {
       CFileItemPtr pItem = items[i];

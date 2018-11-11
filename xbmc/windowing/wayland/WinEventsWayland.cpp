@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WinEventsWayland.h"
@@ -29,12 +17,13 @@
 
 #include <wayland-client.hpp>
 
-#include "Application.h"
+#include "AppInboundProtocol.h"
+#include "ServiceBroker.h"
 #include "threads/CriticalSection.h"
 #include "threads/SingleLock.h"
 #include "threads/Thread.h"
 #include "utils/log.h"
-#include "utils/posix/FileHandle.h"
+#include "platform/posix/utils/FileHandle.h"
 
 using namespace KODI::UTILS::POSIX;
 using namespace KODI::WINDOWING::WAYLAND;
@@ -192,7 +181,7 @@ private:
           // Read away the char so we don't get another notification
           // Indepentent from m_roundtripQueue so there are no races
           char c;
-          read(m_pipeRead, &c, 1); 
+          read(m_pipeRead, &c, 1);
         }
       }
 
@@ -252,6 +241,7 @@ void CWinEventsWayland::RoundtripQueue(const wayland::event_queue_t& queue)
 
 bool CWinEventsWayland::MessagePump()
 {
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
   // Forward any events that may have been pushed to our queue
   while (true)
   {
@@ -271,7 +261,8 @@ bool CWinEventsWayland::MessagePump()
       m_queue.pop();
     }
 
-    g_application.OnEvent(event);
+    if (appPort)
+      appPort->OnEvent(event);
   }
 
   return true;

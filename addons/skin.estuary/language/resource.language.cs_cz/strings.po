@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: KODI Main\n"
-"Report-Msgid-Bugs-To: http://trac.kodi.tv/\n"
+"Report-Msgid-Bugs-To: https://github.com/xbmc/xbmc/issues/\n"
 "POT-Creation-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Kodi Translation Team\n"
@@ -266,7 +266,7 @@ msgstr "Možnosti napájení"
 
 msgctxt "#31075"
 msgid "Movie sets"
-msgstr "Kolekce filmů"
+msgstr "Sbírky filmů"
 
 msgctxt "#31079"
 msgid "Cast not available"
@@ -322,7 +322,7 @@ msgstr "Vyberte svůj uživatelský profil Kodi[CR]pro přihlášení a pokračo
 
 msgctxt "#31099"
 msgid "IconWall"
-msgstr "Zeď ikon"
+msgstr "Stěna ikon"
 
 msgctxt "#31100"
 msgid "Shift"
@@ -330,7 +330,7 @@ msgstr "Posun"
 
 msgctxt "#31101"
 msgid "InfoWall"
-msgstr "Zeď informací"
+msgstr "Infostěna"
 
 msgctxt "#31102"
 msgid "Wall"
@@ -422,7 +422,7 @@ msgstr "Stiskněte nahoru pro zobrazení informací o herci"
 
 msgctxt "#31126"
 msgid "Press OK to read plot"
-msgstr "Stiskněte OK pro přečtení děje"
+msgstr "Stisknutím OK si přečtete zápletku"
 
 msgctxt "#31127"
 msgid "Show icons"
@@ -448,13 +448,17 @@ msgctxt "#31132"
 msgid "Select Program"
 msgstr "Vybrat program"
 
+msgctxt "#31133"
+msgid "Select Resolution"
+msgstr "Vyberte rozlišení"
+
 msgctxt "#31134"
 msgid "Remaining"
 msgstr "Zbývá"
 
 msgctxt "#31136"
 msgid "Click here to see latest changes..."
-msgstr "Klikněte sem pro zobrazení posledních změn..."
+msgstr "Klikněte sem pro zobrazení posledních změn…"
 
 msgctxt "#31137"
 msgid "PVR info"
@@ -555,3 +559,15 @@ msgstr "Hrajte své vlastní hry nebo si stáhněte jeden z mnoha doplňků her 
 msgctxt "#31163"
 msgid "Show Fanart background"
 msgstr "Zobrazit fanart na pozadí"
+
+msgctxt "#31164"
+msgid "Choose kind of profile identification"
+msgstr "Zvolte typ identifikace profilu"
+
+msgctxt "#31165"
+msgid "Profile name"
+msgstr "Název profilu"
+
+msgctxt "#31166"
+msgid "Profile avatar"
+msgstr "Avatar profilu"

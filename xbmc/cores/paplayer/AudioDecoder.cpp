@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AudioDecoder.h"
 #include "CodecFactory.h"
 #include "Application.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "FileItem.h"
 #include "ServiceBroker.h"
 #include "music/tags/MusicInfoTag.h"
@@ -76,13 +65,14 @@ bool CAudioDecoder::Create(const CFileItem &file, int64_t seekOffset)
   m_eof = false;
 
   // get correct cache size
-  unsigned int filecache = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_CACHEAUDIO_INTERNET);
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  unsigned int filecache = settings->GetInt(CSettings::SETTING_CACHEAUDIO_INTERNET);
   if ( file.IsHD() )
-    filecache = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_CACHE_HARDDISK);
+    filecache = settings->GetInt(CSettings::SETTING_CACHE_HARDDISK);
   else if ( file.IsOnDVD() )
-    filecache = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_CACHEAUDIO_DVDROM);
+    filecache = settings->GetInt(CSettings::SETTING_CACHEAUDIO_DVDROM);
   else if ( file.IsOnLAN() )
-    filecache = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_CACHEAUDIO_LAN);
+    filecache = settings->GetInt(CSettings::SETTING_CACHEAUDIO_LAN);
 
   // create our codec
   m_codec=CodecFactory::CreateCodecDemux(file, filecache * 1024);
@@ -205,7 +195,7 @@ void *CAudioDecoder::GetData(unsigned int samples)
     CLog::Log(LOGERROR, "CAudioDecoder::GetData - More data was requested then we have space to buffer!");
     return NULL;
   }
-  
+
   if (size > m_pcmBuffer.getMaxReadSize())
   {
     CLog::Log(LOGWARNING, "CAudioDecoder::GetData() more bytes/samples (%i) requested than we have to give (%i)!", size, m_pcmBuffer.getMaxReadSize());
@@ -216,10 +206,10 @@ void *CAudioDecoder::GetData(unsigned int samples)
   {
     if (m_status == STATUS_ENDING && m_pcmBuffer.getMaxReadSize() == 0)
       m_status = STATUS_ENDED;
-    
+
     return m_outputBuffer;
   }
-  
+
   CLog::Log(LOGERROR, "CAudioDecoder::GetData() ReadBinary failed with %i samples", samples);
   return NULL;
 }

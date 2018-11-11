@@ -1,31 +1,21 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Album.h"
 #include "music/tags/MusicInfoTag.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/log.h"
 #include "utils/XMLUtils.h"
 #include "utils/MathUtils.h"
 #include "FileItem.h"
+#include "ServiceBroker.h"
 
 #include <algorithm>
 
@@ -40,8 +30,6 @@ ReleaseTypeInfo releaseTypes[] = {
   { CAlbum::Album,  "album" },
   { CAlbum::Single, "single" }
 };
-
-#define RELEASE_TYPES_SIZE sizeof(releaseTypes) / sizeof(ReleaseTypeInfo)
 
 CAlbum::CAlbum(const CFileItem& item)
 {
@@ -77,7 +65,7 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
 {
   std::vector<std::string> albumartistHints = hints;
   //Split the artist sort string to try and get sort names for individual artists
-  auto artistSort = StringUtils::Split(strArtistSort, g_advancedSettings.m_musicItemSeparator);
+  auto artistSort = StringUtils::Split(strArtistSort, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
   artistCredits.clear();
 
   if (!mbids.empty())
@@ -158,7 +146,7 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
         albumartistHints = names;
     }
 
-    // Try to get number of artist sort names and musicbrainz ids to match. Split sort names 
+    // Try to get number of artist sort names and musicbrainz ids to match. Split sort names
     // further using multiple possible delimiters, over single separator applied in Tag loader
     if (artistSort.size() != mbids.size())
       artistSort = StringUtils::SplitMulti(artistSort, { ";", ":", "|", "#" });
@@ -178,7 +166,7 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
       if (artistName.empty())
         artistName = artistId;
 
-      // Use artist sort name providing we have as many as we have mbid, 
+      // Use artist sort name providing we have as many as we have mbid,
       // otherwise something is wrong with them so ignore and leave blank
       if (artistSort.size() == mbids.size())
         artistCredits.emplace_back(StringUtils::Trim(artistName), StringUtils::Trim(artistSort[i]), artistId);
@@ -187,11 +175,11 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
     }
   }
   else
-  { 
-    /* 
+  {
+    /*
       No musicbrainz album artist ids so fill artist names directly.
-      This method only called during scanning when there is a musicbrainz album id, so 
-      means mbid tags are incomplete. But could also be called by JSON to SetAlbumDetails 
+      This method only called during scanning when there is a musicbrainz album id, so
+      means mbid tags are incomplete. But could also be called by JSON to SetAlbumDetails
       Try to separate album artist names further, and trim blank space.
     */
     std::vector<std::string> albumArtists = names;
@@ -200,7 +188,7 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
       albumArtists = albumartistHints;
     else
       // Split album artist names further using multiple possible delimiters, over single separator applied in Tag loader
-      albumArtists = StringUtils::SplitMulti(albumArtists, g_advancedSettings.m_musicArtistSeparators);
+      albumArtists = StringUtils::SplitMulti(albumArtists, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicArtistSeparators);
 
     if (artistSort.size() != albumArtists.size())
       // Split artist sort names further using multiple possible delimiters, over single separator applied in Tag loader
@@ -209,7 +197,7 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
     for (size_t i = 0; i < albumArtists.size(); i++)
     {
       artistCredits.emplace_back(StringUtils::Trim(albumArtists[i]));
-      // Set artist sort name providing we have as many as we have artists, 
+      // Set artist sort name providing we have as many as we have artists,
       // otherwise something is wrong with them so ignore rather than guess.
       if (artistSort.size() == albumArtists.size())
         artistCredits.back().SetSortName(StringUtils::Trim(artistSort[i]));
@@ -220,16 +208,16 @@ void CAlbum::SetArtistCredits(const std::vector<std::string>& names, const std::
 void CAlbum::MergeScrapedAlbum(const CAlbum& source, bool override /* = true */)
 {
   /*
-   Initial scraping of album information when there is a Musicbrainz album ID derived from 
+   Initial scraping of album information when there is a Musicbrainz album ID derived from
    tags is done directly using that ID, otherwise the lookup is based on album and artist names
    but this can sometimes mis-identify the album (i.e. classical music has many "Symphony No. 5").
-   It is useful to store the scraped mbid, but we need to be able to correct any mistakes. Hence 
-   a manual refresh of album information uses either the mbid as derived from tags or the album 
+   It is useful to store the scraped mbid, but we need to be able to correct any mistakes. Hence
+   a manual refresh of album information uses either the mbid as derived from tags or the album
    and artist names, not any previously scraped mbid.
 
    When overwritting the data derived from tags, AND the original and scraped album have the same
-   Musicbrainz album ID, then merging is used to keep Kodi up to date with changes in the Musicbrainz 
-   database including album artist credits, song artist credits and song titles. However it is ony 
+   Musicbrainz album ID, then merging is used to keep Kodi up to date with changes in the Musicbrainz
+   database including album artist credits, song artist credits and song titles. However it is ony
    appropriate when the music files are tagged with mbids, these are taken as definative, scraped
    mbids can not be depended on in this way.
 
@@ -238,13 +226,13 @@ void CAlbum::MergeScrapedAlbum(const CAlbum& source, bool override /* = true */)
   */
 
   bArtistSongMerge = override && !bScrapedMBID
-    && !source.strMusicBrainzAlbumID.empty() && !strMusicBrainzAlbumID.empty() 
+    && !source.strMusicBrainzAlbumID.empty() && !strMusicBrainzAlbumID.empty()
     && (strMusicBrainzAlbumID.compare(source.strMusicBrainzAlbumID) == 0);
 
   /*
    Musicbrainz album (release) ID and release group ID values derived from music file tags are
-   always taken as accurate and so can not be overwritten by a scraped value. When the album does 
-   not already have an mbid or has a previously scraped mbid, merge the new scraped value, 
+   always taken as accurate and so can not be overwritten by a scraped value. When the album does
+   not already have an mbid or has a previously scraped mbid, merge the new scraped value,
    flagging it as being from the scraper rather than derived from music file tags.
   */
   if (!source.strMusicBrainzAlbumID.empty() && (strMusicBrainzAlbumID.empty() || bScrapedMBID))
@@ -259,19 +247,19 @@ void CAlbum::MergeScrapedAlbum(const CAlbum& source, bool override /* = true */)
 
   /*
    Scraping can return different album artists from the originals derived from tags, even when doing
-   a lookup on name. 
+   a lookup on name.
 
    When overwritting the data derived from tags, AND the original and scraped album have the same
    Musicbrainz album ID, then merging an album replaces both the album artsts and the song artists
-   with those scraped. 
-   
+   with those scraped.
+
    When not doing that kind of merge, for any matching artist names the Musicbrainz artist id
    returned by the scraper can be used to populate any previously missing Musicbrainz artist id values.
   */
   if (bArtistSongMerge)
   {
-    artistCredits = source.artistCredits; // Replace artists and store mbid returned by scraper    
-    strArtistDesc.clear();  // @todo: set artist display string e.g. "artist1 & artist2" when scraped 
+    artistCredits = source.artistCredits; // Replace artists and store mbid returned by scraper
+    strArtistDesc.clear();  // @todo: set artist display string e.g. "artist1 & artist2" when scraped
   }
   else
   {
@@ -325,10 +313,10 @@ void CAlbum::MergeScrapedAlbum(const CAlbum& source, bool override /* = true */)
   fRating = source.fRating;
   iUserrating = source.iUserrating;
   iVotes = source.iVotes;
-  
+
   /*
    When overwritting the data derived from tags, AND the original and scraped album have the same
-   Musicbrainz album ID, update the local songs with scaped Musicbrainz information including the 
+   Musicbrainz album ID, update the local songs with scaped Musicbrainz information including the
    artist credits.
   */
   if (bArtistSongMerge)
@@ -345,7 +333,7 @@ void CAlbum::MergeScrapedAlbum(const CAlbum& source, bool override /* = true */)
 
 std::string CAlbum::GetGenreString() const
 {
-  return StringUtils::Join(genre, g_advancedSettings.m_musicItemSeparator);
+  return StringUtils::Join(genre, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
 }
 
 const std::vector<std::string> CAlbum::GetAlbumArtist() const
@@ -381,7 +369,7 @@ const std::string CAlbum::GetAlbumArtistString() const
     artistvector.emplace_back(i->GetArtist());
   std::string artistString;
   if (!artistvector.empty())
-    artistString = StringUtils::Join(artistvector, g_advancedSettings.m_musicItemSeparator);
+    artistString = StringUtils::Join(artistvector, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator);
   return artistString;
 }
 
@@ -433,9 +421,8 @@ void CAlbum::SetLastPlayed(const std::string& strLastPlayed)
 
 std::string CAlbum::ReleaseTypeToString(CAlbum::ReleaseType releaseType)
 {
-  for (size_t i = 0; i < RELEASE_TYPES_SIZE; i++)
+  for (const ReleaseTypeInfo& releaseTypeInfo : releaseTypes)
   {
-    const ReleaseTypeInfo& releaseTypeInfo = releaseTypes[i];
     if (releaseTypeInfo.type == releaseType)
       return releaseTypeInfo.name;
   }
@@ -445,9 +432,8 @@ std::string CAlbum::ReleaseTypeToString(CAlbum::ReleaseType releaseType)
 
 CAlbum::ReleaseType CAlbum::ReleaseTypeFromString(const std::string& strReleaseType)
 {
-  for (size_t i = 0; i < RELEASE_TYPES_SIZE; i++)
+  for (const ReleaseTypeInfo& releaseTypeInfo : releaseTypes)
   {
-    const ReleaseTypeInfo& releaseTypeInfo = releaseTypes[i];
     if (releaseTypeInfo.name == strReleaseType)
       return releaseTypeInfo.type;
   }
@@ -479,17 +465,19 @@ bool CAlbum::Load(const TiXmlElement *album, bool append, bool prioritise)
   if (!append)
     Reset();
 
+  const std::string itemSeparator = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator;
+
   XMLUtils::GetString(album,              "title", strAlbum);
   XMLUtils::GetString(album, "musicbrainzalbumid", strMusicBrainzAlbumID);
   XMLUtils::GetString(album, "musicbrainzreleasegroupid", strReleaseGroupMBID);
   XMLUtils::GetBoolean(album, "scrapedmbid", bScrapedMBID);
   XMLUtils::GetString(album, "artistdesc", strArtistDesc);
   std::vector<std::string> artist; // Support old style <artist></artist> for backwards compatibility
-  XMLUtils::GetStringArray(album, "artist", artist, prioritise, g_advancedSettings.m_musicItemSeparator);
-  XMLUtils::GetStringArray(album, "genre", genre, prioritise, g_advancedSettings.m_musicItemSeparator);
-  XMLUtils::GetStringArray(album, "style", styles, prioritise, g_advancedSettings.m_musicItemSeparator);
-  XMLUtils::GetStringArray(album, "mood", moods, prioritise, g_advancedSettings.m_musicItemSeparator);
-  XMLUtils::GetStringArray(album, "theme", themes, prioritise, g_advancedSettings.m_musicItemSeparator);
+  XMLUtils::GetStringArray(album, "artist", artist, prioritise, itemSeparator);
+  XMLUtils::GetStringArray(album, "genre", genre, prioritise, itemSeparator);
+  XMLUtils::GetStringArray(album, "style", styles, prioritise, itemSeparator);
+  XMLUtils::GetStringArray(album, "mood", moods, prioritise, itemSeparator);
+  XMLUtils::GetStringArray(album, "theme", themes, prioritise, itemSeparator);
   XMLUtils::GetBoolean(album, "compilation", bCompilation);
 
   XMLUtils::GetString(album,"review",strReview);
@@ -505,7 +493,7 @@ bool CAlbum::Load(const TiXmlElement *album, bool append, bool prioritise)
     float max_rating = 10;
     XMLUtils::GetFloat(album, "rating", rating);
     if (rElement->QueryFloatAttribute("max", &max_rating) == TIXML_SUCCESS && max_rating>=1)
-      rating *= (10.f / max_rating); // Normalise the Rating to between 0 and 10 
+      rating *= (10.f / max_rating); // Normalise the Rating to between 0 and 10
     if (rating > 10.f)
       rating = 10.f;
     fRating = rating;
@@ -542,7 +530,7 @@ bool CAlbum::Load(const TiXmlElement *album, bool append, bool prioritise)
   if (prioritise && iThumbCount && iThumbCount != thumbURL.m_url.size())
   {
     rotate(thumbURL.m_url.begin(),
-           thumbURL.m_url.begin()+iThumbCount, 
+           thumbURL.m_url.begin()+iThumbCount,
            thumbURL.m_url.end());
     thumbURL.m_xml = xmlAdd;
   }
@@ -642,7 +630,7 @@ bool CAlbum::Save(TiXmlNode *node, const std::string &tag, const std::string& st
     XMLUtils::SetString(albumArtistCreditsNode,               "artist", artistCredit->m_strArtist);
     XMLUtils::SetString(albumArtistCreditsNode,  "musicBrainzArtistID", artistCredit->m_strMusicBrainzArtistID);
   }
-  
+
   XMLUtils::SetString(album, "releasetype", GetReleaseType());
 
   return true;

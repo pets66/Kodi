@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <memory>
 #include <string>
@@ -26,7 +14,7 @@
 
 #include "threads/CriticalSection.h"
 #include "threads/SystemClock.h"
-#include "guilib/Resolution.h"
+#include "windowing/Resolution.h"
 #include "cores/IPlayer.h"
 #include "SeekHandler.h"
 
@@ -47,6 +35,7 @@ public:
 
   // player management
   void ClosePlayer();
+  void ResetPlayer();
   std::string GetCurrentPlayer();
   float GetPlaySpeed();
   float GetPlayTempo();
@@ -77,6 +66,7 @@ public:
   void RenderCaptureRelease(unsigned int captureId);
   bool RenderCaptureGetPixels(unsigned int captureId, unsigned int millis, uint8_t *buffer, unsigned int size);
   bool IsExternalPlaying();
+  bool IsRemotePlaying();
 
   // proxy calls
   void AddSubtitle(const std::string& strSubPath);
@@ -101,7 +91,7 @@ public:
   int GetSubtitleCount();
   void GetSubtitleStreamInfo(int index, SubtitleStreamInfo &info);
   bool GetSubtitleVisible();
-  TextCacheStruct_t* GetTeletextCache();
+  std::shared_ptr<TextCacheStruct_t> GetTeletextCache();
   std::string GetRadioText(unsigned int line);
   int64_t GetTime() const;
   int64_t GetMinTime() const;
@@ -160,13 +150,20 @@ public:
 
   CSeekHandler& GetSeekHandler();
 
+  void SetUpdateStreamDetails();
+
+  /*!
+   * \copydoc IPlayer::HasGameAgent
+   */
+  bool HasGameAgent();
+
 private:
   std::shared_ptr<IPlayer> GetInternal() const;
   void CreatePlayer(const CPlayerCoreFactory &factory, const std::string &player, IPlayerCallback& callback);
   void CloseFile(bool reopen = false);
 
   std::shared_ptr<IPlayer> m_pPlayer;
-  CCriticalSection m_playerLock;
+  mutable CCriticalSection m_playerLock;
   CSeekHandler m_seekHandler;
 
   // cache player state

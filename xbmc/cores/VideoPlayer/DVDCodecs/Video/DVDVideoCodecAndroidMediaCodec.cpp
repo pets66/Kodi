@@ -1,22 +1,9 @@
 /*
- *      Copyright (C) 2013-2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
- *  http://www.gnu.org/copyleft/gpl.html
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 // http://developer.android.com/reference/android/media/MediaCodec.html
@@ -45,7 +32,6 @@
 #include "utils/log.h"
 
 #include "DVDCodecs/DVDFactoryCodec.h"
-#include "settings/AdvancedSettings.h"
 #include "platform/android/activity/XBMCApp.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
@@ -53,7 +39,9 @@
 #include "cores/VideoPlayer/Process/VideoBuffer.h"
 #include "platform/android/activity/AndroidFeatures.h"
 #include "platform/android/activity/JNIXBMCSurfaceTextureOnFrameAvailableListener.h"
+#include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "system.h"
 
 #include "utils/TimeUtils.h"
@@ -203,7 +191,7 @@ void CMediaCodecVideoBuffer::ReleaseOutputBuffer(bool render, int64_t displayTim
     if (m_frameready)
       m_frameready->Reset();
 
-  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     int64_t diff = displayTime ? displayTime - CurrentHostCounter() : 0;
     CLog::Log(LOGDEBUG, "CMediaCodecVideoBuffer::ReleaseOutputBuffer index(%d), render(%d), time:%lld, offset:%lld", m_bufferId, render, displayTime, diff);
@@ -392,6 +380,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
 {
   int num_codecs;
   bool needSecureDecoder(false);
+  int profile(0);
 
   m_opened = false;
   // allow only 1 instance here
@@ -407,7 +396,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
     CLog::Log(LOGERROR, "CDVDVideoCodecAndroidMediaCodec::Open - %s\n", "null size, cannot handle");
     goto FAIL;
   }
-  else if (hints.stills || hints.dvd)
+  else if (hints.stills)
   {
     // Won't work reliably
     goto FAIL;
@@ -417,11 +406,11 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
     CLog::Log(LOGERROR, "CDVDVideoCodecAndroidMediaCodec::Open - %s\n", "Surface does not support orientation before API 23");
     goto FAIL;
   }
-  else if (!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODEC) &&
-           !CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODECSURFACE))
+  else if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODEC) &&
+           !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODECSURFACE))
     goto FAIL;
 
-  m_render_surface = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODECSURFACE);
+  m_render_surface = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEMEDIACODECSURFACE);
   m_state = MEDIACODEC_STATE_UNINITIALIZED;
   m_noPictureLoop = 0;
   m_codecControlFlags = 0;
@@ -469,6 +458,22 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
       m_formatname = "amc-vp8";
       break;
     case AV_CODEC_ID_VP9:
+      switch(hints.profile)
+      {
+        case FF_PROFILE_VP9_0:
+          profile = CJNIMediaCodecInfoCodecProfileLevel::VP9Profile0;
+          break;
+        case FF_PROFILE_VP9_1:
+          profile = CJNIMediaCodecInfoCodecProfileLevel::VP9Profile1;
+          break;
+        case FF_PROFILE_VP9_2:
+          profile = CJNIMediaCodecInfoCodecProfileLevel::VP9Profile2;
+          break;
+        case FF_PROFILE_VP9_3:
+          profile = CJNIMediaCodecInfoCodecProfileLevel::VP9Profile3;
+          break;
+        default:;
+      }
       m_mime = "video/x-vnd.on2.vp9";
       m_formatname = "amc-vp9";
       break;
@@ -478,6 +483,8 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
       switch(hints.profile)
       {
         case FF_PROFILE_H264_HIGH_10:
+          profile = CJNIMediaCodecInfoCodecProfileLevel::AVCProfileHigh10;
+          break;
         case FF_PROFILE_H264_HIGH_10_INTRA:
           // No known h/w decoder supporting Hi10P
           goto FAIL;
@@ -606,7 +613,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
   if (m_render_surface)
   {
     m_jnivideoview.reset(CJNIXBMCVideoView::createVideoView(this));
-    if (!m_jnivideoview || !m_jnivideoview->waitForSurface(500))
+    if (!m_jnivideoview || !m_jnivideoview->waitForSurface(2000))
     {
       CLog::Log(LOGERROR, "CDVDVideoCodecAndroidMediaCodec: VideoView creation failed!!");
       goto FAIL;
@@ -647,6 +654,17 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
     }
 
     std::vector<int> color_formats = codec_caps.colorFormats();
+
+    if (profile)
+    {
+      std::vector<CJNIMediaCodecInfoCodecProfileLevel> profileLevels = codec_caps.profileLevels();
+      if (std::find_if(profileLevels.cbegin(), profileLevels.cend(),
+        [&](const CJNIMediaCodecInfoCodecProfileLevel profileLevel){ return profileLevel.profile() == profile; }) == profileLevels.cend())
+      {
+        CLog::Log(LOGERROR, "CDVDVideoCodecAndroidMediaCodec::Open: profile not supported: %d", profile);
+        continue;
+      }
+    }
 
     std::vector<std::string> types = codec_info.getSupportedTypes();
     // return the 1st one we find, that one is typically 'the best'
@@ -778,7 +796,7 @@ bool CDVDVideoCodecAndroidMediaCodec::AddData(const DemuxPacket &packet)
 
   double pts(packet.pts), dts(packet.dts);
 
-  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "CDVDVideoCodecAndroidMediaCodec::AddData dts:%0.2lf pts:%0.2lf sz:%d indexBuffer:%d current state (%d)", dts, pts, packet.iSize, m_indexInputBuffer, m_state);
   else if (m_state != MEDIACODEC_STATE_RUNNING)
     CLog::Log(LOGDEBUG, "CDVDVideoCodecAndroidMediaCodec::AddData current state (%d)", m_state);
@@ -897,9 +915,12 @@ bool CDVDVideoCodecAndroidMediaCodec::AddData(const DemuxPacket &packet)
         mstat = AMediaCodec_queueSecureInputBuffer(m_codec->codec(), m_indexInputBuffer, offset, cryptoInfo, presentationTimeUs, flags);
         AMediaCodecCryptoInfo_delete(cryptoInfo);
       }
-      m_indexInputBuffer = -1;
       if (mstat != AMEDIA_OK)
+      {
         CLog::Log(LOGERROR, "CDVDVideoCodecAndroidMediaCodec::AddData error(%d)", mstat);
+        return false;
+      }
+      m_indexInputBuffer = -1;
     }
     else
       return false;

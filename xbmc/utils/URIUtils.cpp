@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "network/Network.h"
@@ -42,6 +30,18 @@
 #include <arpa/inet.h>
 
 using namespace XFILE;
+
+const CAdvancedSettings* URIUtils::m_advancedSettings = nullptr;
+
+void URIUtils::RegisterAdvancedSettings(const CAdvancedSettings& advancedSettings)
+{
+  m_advancedSettings = &advancedSettings;
+}
+
+void URIUtils::UnregisterAdvancedSettings()
+{
+  m_advancedSettings = nullptr;
+}
 
 /* returns filename extension including period of filename */
 std::string URIUtils::GetExtension(const CURL& url)
@@ -175,14 +175,14 @@ std::string URIUtils::ReplaceExtension(const std::string& strFile,
   return strChangedFile;
 }
 
-const std::string URIUtils::GetFileName(const CURL& url)
+std::string URIUtils::GetFileName(const CURL& url)
 {
   return GetFileName(url.GetFileName());
 }
 
 /* returns a filename given an url */
 /* handles both / and \, and options in urls*/
-const std::string URIUtils::GetFileName(const std::string& strFileNameAndPath)
+std::string URIUtils::GetFileName(const std::string& strFileNameAndPath)
 {
   if(IsURL(strFileNameAndPath))
   {
@@ -226,7 +226,7 @@ void URIUtils::Split(const std::string& strFileNameAndPath,
     while (i > 0)
     {
       char ch = strFileName[i];
-      if (ch == '?') break;
+      if (ch == '?' || ch == '|') break;
       else i--;
     }
     if (i > 0)
@@ -243,10 +243,10 @@ std::vector<std::string> URIUtils::SplitPath(const std::string& strPath)
 
   // split the filename portion of the URL up into separate dirs
   std::vector<std::string> dirs = StringUtils::Split(url.GetFileName(), sep);
-  
+
   // we start with the root path
   std::string dir = url.GetWithoutFilename();
-  
+
   if (!dir.empty())
     dirs.insert(dirs.begin(), dir);
 
@@ -275,12 +275,12 @@ void URIUtils::GetCommonPath(std::string& strParent, const std::string& strPath)
 bool URIUtils::HasParentInHostname(const CURL& url)
 {
   return url.IsProtocol("zip")
-      || url.IsProtocol("rar")
-      || url.IsProtocol("archive")
       || url.IsProtocol("apk")
       || url.IsProtocol("bluray")
       || url.IsProtocol("udf")
-      || url.IsProtocol("xbt");
+      || url.IsProtocol("xbt")
+      || (CServiceBroker::IsBinaryAddonCacheUp() &&
+          CServiceBroker::GetFileExtensionProvider().EncodedHostName(url.GetProtocol()));
 }
 
 bool URIUtils::HasEncodedHostname(const CURL& url)
@@ -349,6 +349,11 @@ bool URIUtils::GetParentPath(const std::string& strPath, std::string& strParent)
   {
     if (!url.GetOptions().empty())
     {
+      //! @todo Make a new python call to get the plugin content type and remove this temporary hack
+      // When a plugin provides multiple types, it has "plugin://addon.id/?content_type=xxx" root URL
+      if (url.GetFileName().empty() && url.HasOption("content_type") && url.GetOptions().find('&') == std::string::npos)
+        url.SetHostName("");
+      //
       url.SetOptions("");
       strParent = url.Get();
       return true;
@@ -493,22 +498,16 @@ CURL URIUtils::SubstitutePath(const CURL& url, bool reverse /* = false */)
 
 std::string URIUtils::SubstitutePath(const std::string& strPath, bool reverse /* = false */)
 {
-  for (CAdvancedSettings::StringMapping::iterator i = g_advancedSettings.m_pathSubstitutions.begin();
-      i != g_advancedSettings.m_pathSubstitutions.end(); ++i)
+  if (!m_advancedSettings)
   {
-    std::string fromPath;
-    std::string toPath;
+    // path substitution not needed / not working during Kodi bootstrap.
+    return strPath;
+  }
 
-    if (!reverse)
-    {
-      fromPath = i->first;  // Fake path
-      toPath = i->second;   // Real path
-    }
-    else
-    {
-      fromPath = i->second; // Real path
-      toPath = i->first;    // Fake path
-    }
+  for (const auto& pathPair : m_advancedSettings->m_pathSubstitutions)
+  {
+    const std::string fromPath = reverse ? pathPair.second : pathPair.first;
+    const std::string toPath = reverse ? pathPair.first : pathPair.second;
 
     if (strncmp(strPath.c_str(), fromPath.c_str(), HasSlashAtEnd(fromPath) ? fromPath.size() - 1 : fromPath.size()) == 0)
     {
@@ -593,6 +592,12 @@ bool URIUtils::IsRemote(const std::string& strFile)
   CURL url(strFile);
   if(HasParentInHostname(url))
     return IsRemote(url.GetHostName());
+
+  if (IsAddonsPath(strFile))
+    return false;
+
+  if (IsSourcesPath(strFile))
+    return false;
 
   if (!url.IsLocal())
     return true;
@@ -961,7 +966,7 @@ bool URIUtils::IsDAV(const std::string& strFile)
   CURL url(strFile);
   if (HasParentInHostname(url))
     return IsDAV(url.GetHostName());
-  
+
   return IsProtocol(strFile, "dav") ||
          IsProtocol(strFile, "davs");
 }
@@ -982,6 +987,7 @@ bool URIUtils::IsInternetStream(const CURL& url, bool bStrictCheck /* = false */
     return IsInternetStream(CStackDirectory::GetFirstStackedFile(url.Get()));
 
   // Special case these
+  //! @todo sftp special case has to be handled by vfs addon
   if (url.IsProtocol("ftp") || url.IsProtocol("ftps")  ||
       url.IsProtocol("dav") || url.IsProtocol("davs")  ||
       url.IsProtocol("sftp"))
@@ -1231,7 +1237,7 @@ std::string URIUtils::CanonicalizePath(const std::string& path, const char slash
   return result;
 }
 
-std::string URIUtils::AddFileToFolder(const std::string& strFolder, 
+std::string URIUtils::AddFileToFolder(const std::string& strFolder,
                                 const std::string& strFile)
 {
   if (IsURL(strFolder))
@@ -1310,7 +1316,7 @@ std::string URIUtils::GetRealPath(const std::string &path)
   CURL url(path);
   url.SetHostName(GetRealPath(url.GetHostName()));
   url.SetFileName(resolvePath(url.GetFileName()));
-  
+
   return url.Get();
 }
 
@@ -1363,7 +1369,7 @@ bool URIUtils::UpdateUrlEncoding(std::string &strFilename)
 {
   if (strFilename.empty())
     return false;
-  
+
   CURL url(strFilename);
   // if this is a stack:// URL we need to work with its filename
   if (URIUtils::IsStack(strFilename))
@@ -1394,7 +1400,7 @@ bool URIUtils::UpdateUrlEncoding(std::string &strFilename)
   std::string newFilename = url.Get();
   if (newFilename == strFilename)
     return false;
-  
+
   strFilename = newFilename;
   return true;
 }

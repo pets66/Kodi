@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2016 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -25,27 +13,19 @@
 
 class CAppParamParser;
 
-namespace ADDON {
-class CAddonMgr;
-class CBinaryAddonManager;
-class CBinaryAddonCache;
-class CVFSAddonCache;
-class CServiceAddonManager;
-class CRepositoryUpdater;
-}
-
-namespace ActiveAE {
-class CActiveAE;
-}
-
-namespace ANNOUNCEMENT
+namespace ADDON
 {
-class CAnnouncementManager;
+  class CAddonMgr;
+  class CBinaryAddonManager;
+  class CBinaryAddonCache;
+  class CVFSAddonCache;
+  class CServiceAddonManager;
+  class CRepositoryUpdater;
 }
 
 namespace PVR
 {
-class CPVRManager;
+  class CPVRManager;
 }
 
 namespace PLAYLIST
@@ -58,10 +38,8 @@ class CContextMenuManager;
 class XBPython;
 #endif
 class CDataCacheCore;
-class CSettings;
-class IAE;
 class CFavouritesService;
-class CNetwork;
+class CNetworkBase;
 class CWinSystemBase;
 class CPowerManager;
 class CWeatherManager;
@@ -89,7 +67,7 @@ class CInputManager;
 class CFileExtensionProvider;
 class CPlayerCoreFactory;
 class CDatabaseManager;
-class CProfilesManager;
+class CProfileManager;
 class CEventLog;
 
 class CServiceManager
@@ -100,30 +78,24 @@ public:
 
   bool InitForTesting();
   bool InitStageOne();
-  bool InitStageOnePointFive(); // Services that need our DllLoaders emu env
-  bool InitStageTwo(const CAppParamParser &params);
-  bool CreateAudioEngine();
-  bool DestroyAudioEngine();
-  bool StartAudioEngine();
-  bool InitStageThree();
+  bool InitStageTwo(const CAppParamParser &params, const std::string& profilesUserDataFolder);
+  bool InitStageThree(const std::shared_ptr<CProfileManager>& profileManager);
   void DeinitTesting();
   void DeinitStageThree();
   void DeinitStageTwo();
-  void DeinitStageOnePointFive();
   void DeinitStageOne();
+
   ADDON::CAddonMgr& GetAddonMgr();
   ADDON::CBinaryAddonManager& GetBinaryAddonManager();
   ADDON::CBinaryAddonCache& GetBinaryAddonCache();
   ADDON::CVFSAddonCache& GetVFSAddonCache();
   ADDON::CServiceAddonManager& GetServiceAddons();
   ADDON::CRepositoryUpdater& GetRepositoryUpdater();
-  ANNOUNCEMENT::CAnnouncementManager& GetAnnouncementManager();
-  CNetwork& GetNetwork();
+  CNetworkBase& GetNetwork();
 #ifdef HAS_PYTHON
   XBPython& GetXBPython();
 #endif
   PVR::CPVRManager& GetPVRManager();
-  IAE& GetActiveAE();
   CContextMenuManager& GetContextMenuManager();
   CDataCacheCore& GetDataCacheCore();
   /**\brief Get the platform object. This is save to be called after Init1() was called
@@ -137,13 +109,9 @@ public:
   PLAYLIST::CPlayListPlayer& GetPlaylistPlayer();
   int init_level = 0;
 
-  CSettings& GetSettings();
   CFavouritesService& GetFavouritesService();
   CInputManager &GetInputManager();
   CFileExtensionProvider &GetFileExtensionProvider();
-
-  CWinSystemBase &GetWinSystem();
-  void SetWinSystem(std::unique_ptr<CWinSystemBase> winSystem);
 
   CPowerManager &GetPowerManager();
 
@@ -152,10 +120,6 @@ public:
   CPlayerCoreFactory &GetPlayerCoreFactory();
 
   CDatabaseManager &GetDatabaseManager();
-
-  CProfilesManager &GetProfileManager();
-
-  CEventLog &GetEventLog();
 
 protected:
   struct delete_dataCacheCore
@@ -168,18 +132,10 @@ protected:
     void operator()(CContextMenuManager *p) const;
   };
 
-  struct delete_activeAE
-  {
-    void operator()(ActiveAE::CActiveAE *p) const;
-  };
-
   struct delete_favouritesService
   {
     void operator()(CFavouritesService *p) const;
   };
-
-  //! \brief Initialize appropriate networking instance.
-  CNetwork* SetupNetwork() const;
 
   std::unique_ptr<ADDON::CAddonMgr> m_addonMgr;
   std::unique_ptr<ADDON::CBinaryAddonManager> m_binaryAddonManager;
@@ -187,17 +143,14 @@ protected:
   std::unique_ptr<ADDON::CVFSAddonCache> m_vfsAddonCache;
   std::unique_ptr<ADDON::CServiceAddonManager> m_serviceAddons;
   std::unique_ptr<ADDON::CRepositoryUpdater> m_repositoryUpdater;
-  std::unique_ptr<ANNOUNCEMENT::CAnnouncementManager> m_announcementManager;
 #ifdef HAS_PYTHON
   std::unique_ptr<XBPython> m_XBPython;
 #endif
   std::unique_ptr<PVR::CPVRManager> m_PVRManager;
-  std::unique_ptr<ActiveAE::CActiveAE, delete_activeAE> m_ActiveAE;
   std::unique_ptr<CContextMenuManager, delete_contextMenuManager> m_contextMenuManager;
   std::unique_ptr<CDataCacheCore, delete_dataCacheCore> m_dataCacheCore;
   std::unique_ptr<CPlatform> m_Platform;
   std::unique_ptr<PLAYLIST::CPlayListPlayer> m_playlistPlayer;
-  std::unique_ptr<CSettings> m_settings;
   std::unique_ptr<KODI::GAME::CControllerManager> m_gameControllerManager;
   std::unique_ptr<KODI::GAME::CGameServices> m_gameServices;
   std::unique_ptr<KODI::RETRO::CGUIGameRenderManager> m_gameRenderManager;
@@ -205,11 +158,9 @@ protected:
   std::unique_ptr<CFavouritesService, delete_favouritesService> m_favouritesService;
   std::unique_ptr<CInputManager> m_inputManager;
   std::unique_ptr<CFileExtensionProvider> m_fileExtensionProvider;
-  std::unique_ptr<CNetwork> m_network;
-  std::unique_ptr<CWinSystemBase> m_winSystem;
+  std::unique_ptr<CNetworkBase> m_network;
   std::unique_ptr<CPowerManager> m_powerManager;
   std::unique_ptr<CWeatherManager> m_weatherManager;
   std::unique_ptr<CPlayerCoreFactory> m_playerCoreFactory;
   std::unique_ptr<CDatabaseManager> m_databaseManager;
-  std::unique_ptr<CProfilesManager> m_profileManager;
 };

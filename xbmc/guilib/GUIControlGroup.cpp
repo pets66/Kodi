@@ -1,29 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIControlGroup.h"
+#include "GUIMessage.h"
 
 #include <cassert>
 #include <utility>
-
-#include "guiinfo/GUIInfoLabels.h"
 
 CGUIControlGroup::CGUIControlGroup()
 {
@@ -95,7 +82,7 @@ void CGUIControlGroup::DynamicResourceAlloc(bool bOnOff)
 void CGUIControlGroup::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
   CPoint pos(GetPosition());
-  g_graphicsContext.SetOrigin(pos.x, pos.y);
+  CServiceBroker::GetWinSystem()->GetGfxContext().SetOrigin(pos.x, pos.y);
 
   CRect rect;
   for (auto *control : m_children)
@@ -107,7 +94,7 @@ void CGUIControlGroup::Process(unsigned int currentTime, CDirtyRegionList &dirty
       rect.Union(control->GetRenderRegion());
   }
 
-  g_graphicsContext.RestoreOrigin();
+  CServiceBroker::GetWinSystem()->GetGfxContext().RestoreOrigin();
   CGUIControl::Process(currentTime, dirtyregions);
   m_renderRegion = rect;
 }
@@ -115,7 +102,7 @@ void CGUIControlGroup::Process(unsigned int currentTime, CDirtyRegionList &dirty
 void CGUIControlGroup::Render()
 {
   CPoint pos(GetPosition());
-  g_graphicsContext.SetOrigin(pos.x, pos.y);
+  CServiceBroker::GetWinSystem()->GetGfxContext().SetOrigin(pos.x, pos.y);
   CGUIControl *focusedControl = NULL;
   for (auto *control : m_children)
   {
@@ -127,7 +114,7 @@ void CGUIControlGroup::Render()
   if (focusedControl)
     focusedControl->DoRender();
   CGUIControl::Render();
-  g_graphicsContext.RestoreOrigin();
+  CServiceBroker::GetWinSystem()->GetGfxContext().RestoreOrigin();
 }
 
 void CGUIControlGroup::RenderEx()
@@ -450,7 +437,7 @@ CGUIControl *CGUIControlGroup::GetFocusedControl() const
 CGUIControl *CGUIControlGroup::GetFirstFocusableControl(int id)
 {
   if (!CanFocus()) return NULL;
-  if (id && id == (int) GetID()) return this; // we're focusable and they want us
+  if (id && id == GetID()) return this; // we're focusable and they want us
   for (auto *pControl : m_children)
   {
     CGUIControlGroup *group(dynamic_cast<CGUIControlGroup*>(pControl));
@@ -459,7 +446,7 @@ CGUIControl *CGUIControlGroup::GetFirstFocusableControl(int id)
       CGUIControl *control = group->GetFirstFocusableControl(id);
       if (control) return control;
     }
-    if ((!id || (int) pControl->GetID() == id) && pControl->CanFocus())
+    if ((!id || pControl->GetID() == id) && pControl->CanFocus())
       return pControl;
   }
   return NULL;

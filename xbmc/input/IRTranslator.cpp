@@ -1,27 +1,17 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "IRTranslator.h"
+#include "ServiceBroker.h"
 #include "filesystem/File.h"
 #include "input/remote/IRRemote.h"
-#include "profiles/ProfilesManager.h"
+#include "profiles/ProfileManager.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
@@ -30,8 +20,7 @@
 #include <stdlib.h>
 #include <vector>
 
-CIRTranslator::CIRTranslator(const CProfilesManager &profileManager) :
-  m_profileManager(profileManager)
+CIRTranslator::CIRTranslator()
 {
 }
 
@@ -50,7 +39,7 @@ void CIRTranslator::Load(const std::string &irMapName)
   else
     CLog::Log(LOGDEBUG, "CIRTranslator::Load - no system %s found, skipping", irMapName.c_str());
 
-  irMapPath = m_profileManager.GetUserDataItem(irMapName);
+  irMapPath = CServiceBroker::GetSettingsComponent()->GetProfileManager()->GetUserDataItem(irMapName);
   if (XFILE::CFile::Exists(irMapPath))
     success |= LoadIRMap(irMapPath);
   else
@@ -63,7 +52,9 @@ void CIRTranslator::Load(const std::string &irMapName)
 bool CIRTranslator::LoadIRMap(const std::string &irMapPath)
 {
   std::string remoteMapTag = URIUtils::GetFileName(irMapPath);
-  URIUtils::RemoveExtension(remoteMapTag);
+  size_t lastindex = remoteMapTag.find_last_of(".");
+  if (lastindex != std::string::npos)
+    remoteMapTag = remoteMapTag.substr(0, lastindex);
   StringUtils::ToLower(remoteMapTag);
 
   // Load our xml file, and fill up our mapping tables
@@ -163,7 +154,7 @@ unsigned int CIRTranslator::TranslateButton(const std::string &szDevice, const s
 
 uint32_t CIRTranslator::TranslateString(std::string strButton)
 {
-  if (strButton.empty()) 
+  if (strButton.empty())
     return 0;
 
   uint32_t buttonCode = 0;
@@ -242,14 +233,14 @@ uint32_t CIRTranslator::TranslateString(std::string strButton)
 
 uint32_t CIRTranslator::TranslateUniversalRemoteString(const std::string &szButton)
 {
-  if (szButton.empty() || szButton.length() < 4 || strnicmp(szButton.c_str(), "obc", 3)) 
+  if (szButton.empty() || szButton.length() < 4 || strnicmp(szButton.c_str(), "obc", 3))
     return 0;
 
   const char *szCode = szButton.c_str() + 3;
 
   // Button Code is 255 - OBC (Original Button Code) of the button
   uint32_t buttonCode = 255 - atol(szCode);
-  if (buttonCode > 255) 
+  if (buttonCode > 255)
     buttonCode = 0;
 
   return buttonCode;

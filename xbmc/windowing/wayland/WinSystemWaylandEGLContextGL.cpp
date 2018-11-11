@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WinSystemWaylandEGLContextGL.h"
 #include "OptionalsReg.h"
 
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 #include "cores/RetroPlayer/process/RPProcessInfo.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererOpenGL.h"
@@ -64,19 +53,16 @@ bool CWinSystemWaylandEGLContextGL::CreateContext()
   const EGLint glMajor = 3;
   const EGLint glMinor = 2;
 
-  const EGLint contextAttribs[] = {
-    EGL_CONTEXT_MAJOR_VERSION_KHR, glMajor,
-    EGL_CONTEXT_MINOR_VERSION_KHR, glMinor,
-    EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR,
-    EGL_NONE
-  };
+  CEGLAttributesVec contextAttribs;
+  contextAttribs.Add({{EGL_CONTEXT_MAJOR_VERSION_KHR, glMajor},
+                      {EGL_CONTEXT_MINOR_VERSION_KHR, glMinor},
+                      {EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR}});
 
   if (!m_eglContext.CreateContext(contextAttribs))
   {
-    const EGLint fallbackContextAttribs[] = {
-      EGL_CONTEXT_CLIENT_VERSION, 2,
-      EGL_NONE
-    };
+    CEGLAttributesVec fallbackContextAttribs;
+    fallbackContextAttribs.Add({{EGL_CONTEXT_CLIENT_VERSION, 2}});
+
     if (!m_eglContext.CreateContext(fallbackContextAttribs))
     {
       CLog::Log(LOGERROR, "EGL context creation failed");

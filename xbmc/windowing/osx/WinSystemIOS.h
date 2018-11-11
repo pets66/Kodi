@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -37,6 +25,7 @@ public:
   CWinSystemIOS();
   virtual ~CWinSystemIOS();
 
+  int GetDisplayIndexFromSettings();
   // Implementation of CWinSystemBase
   CRenderSystemBase *GetRenderSystem() override { return this; }
   bool InitWindowSystem() override;
@@ -66,9 +55,6 @@ public:
   void Register(IDispResource *resource) override;
   void Unregister(IDispResource *resource) override;
 
-  int GetNumScreens() override;
-  int GetCurrentScreen() override;
-
   virtual std::unique_ptr<CVideoSync> GetVideoSync(void *clock) override;
 
   bool InitDisplayLink(CVideoSyncIos *syncImpl);
@@ -76,6 +62,11 @@ public:
   void OnAppFocusChange(bool focus);
   bool IsBackgrounded() const { return m_bIsBackgrounded; }
   void* GetEAGLContextObj();
+  void GetConnectedOutputs(std::vector<std::string> *outputs);
+  void MoveToTouchscreen();
+
+  // winevents override
+  bool MessagePump() override;
 
 protected:
   void PresentRenderImpl(bool rendered) override;
@@ -92,8 +83,8 @@ protected:
 
 private:
   bool GetScreenResolution(int* w, int* h, double* fps, int screenIdx);
-  void FillInVideoModes();
-  bool SwitchToVideoMode(int width, int height, double refreshrate, int screenIdx);
+  void FillInVideoModes(int screenIdx);
+  bool SwitchToVideoMode(int width, int height, double refreshrate);
   CADisplayLinkWrapper *m_pDisplayLink;
 };
 

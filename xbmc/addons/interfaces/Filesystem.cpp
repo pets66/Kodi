@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <vector>
@@ -102,7 +90,7 @@ bool Interface_Filesystem::can_open_directory(void* kodiBase, const char* url)
   }
 
   CFileItemList items;
-  return CDirectory::GetDirectory(url, items);
+  return CDirectory::GetDirectory(url, items, "", DIR_FLAG_DEFAULTS);
 }
 
 bool Interface_Filesystem::create_directory(void* kodiBase, const char *path)
@@ -140,7 +128,7 @@ bool Interface_Filesystem::remove_directory(void* kodiBase, const char *path)
 
   // Empty directory
   CFileItemList fileItems;
-  CDirectory::GetDirectory(path, fileItems);
+  CDirectory::GetDirectory(path, fileItems, "", DIR_FLAG_DEFAULTS);
   for (int i = 0; i < fileItems.Size(); ++i)
     CFile::Delete(fileItems.Get(i)->GetPath());
 
@@ -281,7 +269,7 @@ char* Interface_Filesystem::get_file_md5(void* kodiBase, const char* filename)
     return nullptr;
   }
 
-  std::string string = CUtil::GetFileMD5(filename);
+  std::string string = CUtil::GetFileDigest(filename, KODI::UTILITY::CDigest::Type::MD5);
   char* buffer = strdup(string.c_str());
   return buffer;
 }
@@ -470,7 +458,7 @@ int64_t Interface_Filesystem::get_file_length(void* kodiBase, void* file)
     CLog::Log(LOGERROR, "Interface_Filesystem::%s - invalid data (addon='%p', file='%p')", __FUNCTION__, kodiBase, file);
     return -1;
   }
-  
+
   return static_cast<CFile*>(file)->GetLength();
 }
 

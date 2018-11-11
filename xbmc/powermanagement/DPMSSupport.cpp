@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2009-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2009-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DPMSSupport.h"
@@ -23,7 +11,7 @@
 #include <assert.h>
 #include <string>
 #ifdef TARGET_WINDOWS
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "rendering/dx/RenderContext.h"
 #endif
 
@@ -34,7 +22,7 @@ static const char* const MODE_NAMES[DPMSSupport::NUM_MODES] =
 
 bool DPMSSupport::CheckValidMode(PowerSavingMode mode)
 {
-  if (mode < 0 || mode > NUM_MODES)
+  if (mode > NUM_MODES)
   {
     CLog::Log(LOGERROR, "Invalid power-saving mode %d", mode);
     return false;
@@ -116,8 +104,8 @@ static const CARD16 X_DPMS_MODES[] =
 
 void DPMSSupport::PlatformSpecificInit()
 {
-  CWinSystemX11 &winSystem = dynamic_cast<CWinSystemX11&>(CServiceBroker::GetWinSystem());
-  Display* dpy = winSystem.GetDisplay();
+  CWinSystemX11 *winSystem = dynamic_cast<CWinSystemX11*>(CServiceBroker::GetWinSystem());
+  Display* dpy = winSystem->GetDisplay();
   if (dpy == NULL)
     return;
 
@@ -141,8 +129,8 @@ void DPMSSupport::PlatformSpecificInit()
 
 bool DPMSSupport::PlatformSpecificEnablePowerSaving(PowerSavingMode mode)
 {
-  CWinSystemX11 &winSystem = dynamic_cast<CWinSystemX11&>(CServiceBroker::GetWinSystem());
-  Display* dpy = winSystem.GetDisplay();
+  CWinSystemX11 *winSystem = dynamic_cast<CWinSystemX11*>(CServiceBroker::GetWinSystem());
+  Display* dpy = winSystem->GetDisplay();
   if (dpy == NULL)
     return false;
 
@@ -158,8 +146,8 @@ bool DPMSSupport::PlatformSpecificEnablePowerSaving(PowerSavingMode mode)
 
 bool DPMSSupport::PlatformSpecificDisablePowerSaving()
 {
-  CWinSystemX11 &winSystem = dynamic_cast<CWinSystemX11&>(CServiceBroker::GetWinSystem());
-  Display* dpy = winSystem.GetDisplay();
+  CWinSystemX11 *winSystem = dynamic_cast<CWinSystemX11*>(CServiceBroker::GetWinSystem());
+  Display* dpy = winSystem->GetDisplay();
   if (dpy == NULL)
     return false;
 
@@ -167,7 +155,7 @@ bool DPMSSupport::PlatformSpecificDisablePowerSaving()
   DPMSDisable(dpy);
   XFlush(dpy);
 
-  winSystem.RecreateWindow();
+  winSystem->RecreateWindow();
 
   return true;
 }
@@ -187,7 +175,7 @@ void DPMSSupport::PlatformSpecificInit()
 
 bool DPMSSupport::PlatformSpecificEnablePowerSaving(PowerSavingMode mode)
 {
-  if(!g_graphicsContext.IsFullScreenRoot())
+  if(!CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenRoot())
   {
     CLog::Log(LOGDEBUG, "DPMS: not in fullscreen, power saving disabled");
     return false;
@@ -197,10 +185,10 @@ bool DPMSSupport::PlatformSpecificEnablePowerSaving(PowerSavingMode mode)
 #ifdef TARGET_WINDOWS_DESKTOP
   case OFF:
     // Turn off display
-    return SendMessage(DX::Windowing().GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 2) == 0;
+    return SendMessage(DX::Windowing()->GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 2) == 0;
   case STANDBY:
     // Set display to low power
-    return SendMessage(DX::Windowing().GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 1) == 0;
+    return SendMessage(DX::Windowing()->GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 1) == 0;
 #endif
   default:
     return true;
@@ -213,7 +201,7 @@ bool DPMSSupport::PlatformSpecificDisablePowerSaving()
   return false;
 #else
   // Turn display on
-  return SendMessage(DX::Windowing().GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) -1) == 0;
+  return SendMessage(DX::Windowing()->GetHwnd(), WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) -1) == 0;
 #endif
 }
 
@@ -265,6 +253,35 @@ bool DPMSSupport::PlatformSpecificDisablePowerSaving()
 
   // Turn display on
   return (IORegistryEntrySetCFProperty(r, CFSTR("IORequestIdle"), kCFBooleanFalse) == 0);
+}
+
+#elif defined(HAVE_GBM)
+#include "ServiceBroker.h"
+#include "windowing/gbm/WinSystemGbm.h"
+
+using namespace KODI::WINDOWING::GBM;
+
+void DPMSSupport::PlatformSpecificInit()
+{
+  m_supportedModes.push_back(OFF);
+}
+bool DPMSSupport::PlatformSpecificEnablePowerSaving(PowerSavingMode mode)
+{
+  CWinSystemGbm *winSystem = dynamic_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
+  switch(mode)
+  {
+  case OFF:
+    return winSystem->Hide();
+  default:
+    return false;
+  }
+}
+
+bool DPMSSupport::PlatformSpecificDisablePowerSaving()
+{
+  CWinSystemGbm *winSystem = dynamic_cast<CWinSystemGbm*>(CServiceBroker::GetWinSystem());
+  winSystem->Show();
+  return true;
 }
 
 #else

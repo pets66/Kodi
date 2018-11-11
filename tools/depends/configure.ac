@@ -3,7 +3,7 @@ AC_INIT([xbmc-depends], [2.00], [http://trac.xbmc.org])
 :${CFLAGS=""}
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_FILES([target/config.site native/config.site.native Makefile.include target/Toolchain.cmake
-                 target/config-binaddons.site target/Toolchain_binaddons.cmake])
+                 target/config-binaddons.site target/Toolchain_binaddons.cmake target/cross-file.meson])
 AC_CANONICAL_HOST
 
 m4_include([m4/xbmc_arch.m4])
@@ -184,6 +184,7 @@ case $build in
   ;;
   *darwin*)
     build_os="osx"
+    native_platform_min_version=-mmacosx-version-min=`sw_vers | grep ProductVersion | sed -E "s/.*:.*(10\..*)\.?.*/\1/"`
   ;;
   *)
     AC_MSG_ERROR(unsupported native build platform: $build)
@@ -195,7 +196,7 @@ case $host in
     platform_cc=clang
     platform_cxx=clang++
     deps_dir="$use_host-$use_ndk_api-$build_type"
-    platform_cflags="-DANDROID -D__ANDROID_API__=$use_ndk_api -fexceptions -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fPIC -DPIC -D_GLIBCXX_USE_C99_MATH_TR1"
+    platform_cflags="-DANDROID -D__ANDROID_API__=$use_ndk_api -fexceptions -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fPIC -DPIC"
     optimize_flags="-Os"
     platform_ldflags="-Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libatomic.a -L$prefix/$deps_dir/lib/android-$use_ndk_api"
 
@@ -257,33 +258,21 @@ case $host in
       prefix=/Users/Shared/xbmc-depends
     fi
 
-    native_platform_min_version=-mmacosx-version-min=`sw_vers | grep ProductVersion | sed -E "s/.*:.*(10\..*)\.?.*/\1/"`
     use_xcodepath=`xcode-select -print-path`
     use_xcodebuild=$use_xcodepath/usr/bin/xcodebuild
-    use_xcode=[`$use_xcodebuild -version | grep Xcode | awk '{ print $2}'`]
     AC_MSG_RESULT(found xcodebuild at $use_xcodebuild)
     use_build_toolchain=$use_xcodepath
+    use_toolchain="${use_xcodepath}/Toolchains/XcodeDefault.xctoolchain"
 
     # darwin builds are always cross
     cross_compiling="yes"
 
-    platform_cflags="-std=gnu99 -no_compact_linkedit -no-cpp-precomp"
-    platform_ldflags="-Wl,-search_paths_first -no_compact_linkedit"
-    platform_cxxflags="-no_compact_linkedit -no-cpp-precomp"
+    platform_cc=clang
+    platform_cxx=clang++
+    platform_cflags="-fheinous-gnu-extensions -no-cpp-precomp"
+    platform_ldflags="-Wl,-search_paths_first"
+    platform_cxxflags="-no-cpp-precomp"
 
-    case $use_xcode in
-      4.* | 4.*.*)
-        platform_cc=llvm-gcc-4.2
-        platform_cxx=llvm-g++-4.2
-        ;;
-      *)
-        platform_cc=clang
-        platform_cxx=clang++
-        platform_cflags="-fheinous-gnu-extensions -no-cpp-precomp"
-        platform_ldflags="-Wl,-search_paths_first"
-        platform_cxxflags="-no-cpp-precomp"
-        ;;
-    esac
     case $host in
       *86*-apple-darwin)
         MC_CHECK_NOT_CPU([$use_cpu], "arm")
@@ -311,30 +300,20 @@ case $host in
 
         # now that we know which sdk, error check sdk_name
         case $use_sdk in
-          10.8);;
           10.9);;
           10.10);;
           10.11);;
           10.12);;
           10.13);;
+          10.14);;
           *)
             AC_MSG_ERROR(error in configure of --with-sdk=$use_sdk)
         esac
         sdk_name=macosx$use_sdk
-        platform_min_version="macosx-version-min=10.8"
+        platform_min_version="macosx-version-min=10.9"
 
         use_sdk_path=[`$use_xcodebuild -version -sdk $sdk_name Path`]
         platform_os="osx"
-
-        # find the matching toolchain
-        case $use_xcode in
-          5.* | 5.*.* )
-            use_toolchain="${use_xcodepath}/Toolchains/XcodeDefault.xctoolchain"
-            ;;
-          *)
-            use_toolchain="${use_toolchain:-$use_xcodepath}"
-            ;;
-        esac
       ;;
 
       arm-apple-darwin*)
@@ -372,12 +351,11 @@ case $host in
           9.*);;
           10.*);;
           11.*);;
+          12.*);;
             *)
               AC_MSG_ERROR(error in configure of --with-sdk=$use_sdk)
             ;;
         esac
-
-        use_toolchain="${use_xcodepath}/Toolchains/XcodeDefault.xctoolchain"
 
         platform_os="ios"
 
@@ -389,14 +367,14 @@ case $host in
         platform_cflags+=" -Wreturn-type -Wunused-variable -fmessage-length=0 -gdwarf-2"
         platform_cflags+=" -Wno-error=implicit-function-declaration"
         optimize_flags="-O3"
+        use_sdk_path=[`$use_xcodebuild -version -sdk $sdk_name | grep ^Path | awk '{ print $2}'`]
         platform_ldflags+=" -L$use_sdk_path/usr/lib/system"
         platform_cxxflags+=" $cpu_flags"
-        use_sdk_path=[`$use_xcodebuild -version -sdk $sdk_name | grep ^Path | awk '{ print $2}'`]
       ;;
     esac
     platform_cflags+=" -arch $use_cpu -m$platform_min_version"
     platform_ldflags+=" -arch $use_cpu -m$platform_min_version -isysroot $use_sdk_path -stdlib=libc++"
-    platform_cxxflags+=" -arch $use_cpu -m$platform_min_version -std=c++11 -stdlib=libc++"
+    platform_cxxflags+=" -arch $use_cpu -m$platform_min_version -stdlib=libc++"
     platform_includes="-isysroot $use_sdk_path"
     deps_dir="${sdk_name}_${use_cpu}-target-${build_type}"
     AC_CHECK_LIB([z], [main], has_zlib=1, AC_MSG_WARN("No zlib support in toolchain. Will build libz."); has_zlib=0)
@@ -406,7 +384,7 @@ case $host in
 esac
 
 case $use_platform in
-  aml|gbm|mir|wayland)
+  aml|gbm|wayland)
     if test "$platform_os" != "linux"; then
       AC_MSG_ERROR([$use_platform is only supported on the Linux platform])
     fi
@@ -642,8 +620,8 @@ else
 fi
 
 # add user supplied flags to the end, so they override our defaults
-platform_cflags_release="$tmp_cflags $relase_cflags $optimize_flags $target_cflags"
-platform_cxxflags_release="$tmp_cxxflags $relase_cflags $optimize_flags $target_cxxflags"
+platform_cflags_release="$tmp_cflags $release_cflags $optimize_flags $target_cflags"
+platform_cxxflags_release="$tmp_cxxflags $release_cflags $optimize_flags $target_cxxflags"
 platform_cflags_debug="$tmp_cflags $debug_cflags $target_cflags"
 platform_cxxflags_debug="$tmp_cxxflags $debug_cflags $target_cxxflags"
 platform_ldflags+=" $target_ldflags $LIBS"
@@ -693,7 +671,6 @@ AC_SUBST(has_zlib)
 AC_SUBST(link_iconv)
 AC_SUBST(need_libiconv)
 AC_SUBST(use_gplv3)
-AC_SUBST(use_xcode)
 AC_SUBST(use_ccache)
 AC_SUBST(native_platform_min_version)
 AC_SUBST(app_rendersystem)
@@ -719,6 +696,7 @@ cp -vf target/config.site $prefix/$deps_dir/share
 cp -vf target/config-binaddons.site $prefix/$tool_dir/share
 cp -vf target/Toolchain.cmake $prefix/$deps_dir/share
 cp -vf target/Toolchain_binaddons.cmake $prefix/$deps_dir/share
+cp -vf target/cross-file.meson $prefix/$deps_dir/share
 cp -vf native/config.site.native $prefix/$tool_dir/share/config.site
 
 

@@ -1,29 +1,19 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVRTimerInfoTag.h"
 
 #include "ServiceBroker.h"
+#include "addons/PVRClient.h"
 #include "guilib/LocalizeStrings.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
@@ -33,37 +23,30 @@
 #include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/epg/Epg.h"
-#include "pvr/epg/EpgContainer.h"
 #include "pvr/timers/PVRTimers.h"
 
 using namespace PVR;
 
 CPVRTimerInfoTag::CPVRTimerInfoTag(bool bRadio /* = false */) :
   m_strTitle(g_localizeStrings.Get(19056)), // New Timer
-  m_bFullTextEpgSearch(false),
-  m_state(PVR_TIMER_STATE_SCHEDULED),
   m_iClientId(CServiceBroker::GetPVRManager().Clients()->GetFirstCreatedClientID()),
   m_iClientIndex(PVR_TIMER_NO_CLIENT_INDEX),
   m_iParentClientIndex(PVR_TIMER_NO_PARENT),
   m_iClientChannelUid(PVR_CHANNEL_INVALID_UID),
-  m_bStartAnyTime(false),
-  m_bEndAnyTime(false),
   m_iPriority(DEFAULT_RECORDING_PRIORITY),
   m_iLifetime(DEFAULT_RECORDING_LIFETIME),
-  m_iMaxRecordings(0),
   m_iPreventDupEpisodes(DEFAULT_RECORDING_DUPLICATEHANDLING),
-  m_iRecordingGroup(0),
   m_bIsRadio(bRadio),
-  m_iTimerId(0),
-  m_iMarginStart(CServiceBroker::GetSettings().GetInt(CSettings::SETTING_PVRRECORD_MARGINSTART)),
-  m_iMarginEnd(CServiceBroker::GetSettings().GetInt(CSettings::SETTING_PVRRECORD_MARGINEND)),
+  m_iMarginStart(CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_PVRRECORD_MARGINSTART)),
+  m_iMarginEnd(CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_PVRRECORD_MARGINEND)),
   m_StartTime(CDateTime::GetUTCDateTime()),
   m_StopTime(m_StartTime),
   m_iEpgUid(EPG_TAG_INVALID_UID)
 {
   m_FirstDay.SetValid(false);
 
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsTimers())
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsTimers())
   {
     // default to manual one-shot timer for given client
     CPVRTimerTypePtr type(CPVRTimerType::CreateFromAttributes(
@@ -78,7 +61,7 @@ CPVRTimerInfoTag::CPVRTimerInfoTag(bool bRadio /* = false */) :
     if (type)
       SetTimerType(type);
     else
-      CLog::Log(LOGERROR, "%s: no timer type, although timers are supported by client %d!", __FUNCTION__, m_iClientId);
+      CLog::LogF(LOGERROR, "No timer type, although timers are supported by client %d!", m_iClientId);
   }
 
   m_iWeekdays = (m_timerType && m_timerType->IsTimerRule()) ? PVR_WEEKDAY_ALLDAYS : PVR_WEEKDAY_NONE;
@@ -107,20 +90,20 @@ CPVRTimerInfoTag::CPVRTimerInfoTag(const PVR_TIMER &timer, const CPVRChannelPtr 
   m_iRecordingGroup(timer.iRecordingGroup),
   m_strFileNameAndPath(StringUtils::Format("pvr://client%i/timers/%i", m_iClientId, m_iClientIndex)),
   m_bIsRadio(channel && channel->IsRadio()),
-  m_iTimerId(0),
   m_iMarginStart(timer.iMarginStart),
   m_iMarginEnd(timer.iMarginEnd),
-  m_StartTime(timer.startTime + g_advancedSettings.m_iPVRTimeCorrection),
-  m_StopTime(timer.endTime + g_advancedSettings.m_iPVRTimeCorrection),
-  m_FirstDay(timer.firstDay + g_advancedSettings.m_iPVRTimeCorrection),
+  m_StartTime(timer.startTime + CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iPVRTimeCorrection),
+  m_StopTime(timer.endTime + CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iPVRTimeCorrection),
+  m_FirstDay(timer.firstDay + CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iPVRTimeCorrection),
   m_strSeriesLink(timer.strSeriesLink),
   m_iEpgUid(timer.iEpgUid),
   m_channel(channel)
 {
   if (m_iClientIndex == PVR_TIMER_NO_CLIENT_INDEX)
-    CLog::Log(LOGERROR, "%s: invalid client index supplied by client %d (must be > 0)!", __FUNCTION__, m_iClientId);
+    CLog::LogF(LOGERROR, "Invalid client index supplied by client %d (must be > 0)!", m_iClientId);
 
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsTimers())
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsTimers())
   {
     // begin compat section
 
@@ -158,9 +141,9 @@ CPVRTimerInfoTag::CPVRTimerInfoTag(const PVR_TIMER &timer, const CPVRChannelPtr 
     }
 
     if (!m_timerType)
-      CLog::Log(LOGERROR, "%s: no timer type, although timers are supported by client %d!", __FUNCTION__, m_iClientId);
+      CLog::LogF(LOGERROR, "No timer type, although timers are supported by client %d!", m_iClientId);
     else if (m_iEpgUid == EPG_TAG_INVALID_UID && m_timerType->IsEpgBasedOnetime())
-      CLog::Log(LOGERROR, "%s: no epg tag given for epg based timer type (%d)!", __FUNCTION__, m_timerType->GetTypeId());
+      CLog::LogF(LOGERROR, "No epg tag given for epg based timer type (%d)!", m_timerType->GetTypeId());
   }
 
   ResetChildState();
@@ -211,8 +194,6 @@ bool CPVRTimerInfoTag::operator ==(const CPVRTimerInfoTag& right) const
           m_bHasChildRecording  == right.m_bHasChildRecording &&
           m_bHasChildErrors     == right.m_bHasChildErrors);
 }
-
-CPVRTimerInfoTag::~CPVRTimerInfoTag(void) = default;
 
 /**
  * Compare not equal for two CPVRTimerInfoTag
@@ -515,12 +496,19 @@ std::string CPVRTimerInfoTag::GetWeekdaysString() const
 
 bool CPVRTimerInfoTag::AddToClient(void) const
 {
-  return CServiceBroker::GetPVRManager().Clients()->AddTimer(*this) == PVR_ERROR_NO_ERROR;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client)
+    return client->AddTimer(*this) == PVR_ERROR_NO_ERROR;
+  return false;
 }
 
 TimerOperationResult CPVRTimerInfoTag::DeleteFromClient(bool bForce /* = false */) const
 {
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->DeleteTimer(*this, bForce);
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  PVR_ERROR error = PVR_ERROR_UNKNOWN;
+
+  if (client)
+    error = client->DeleteTimer(*this, bForce);
 
   if (error == PVR_ERROR_RECORDING_RUNNING)
     return TimerOperationResult::RECORDING;
@@ -625,7 +613,8 @@ void CPVRTimerInfoTag::ResetChildState()
 
 bool CPVRTimerInfoTag::UpdateOnClient()
 {
-  return CServiceBroker::GetPVRManager().Clients()->UpdateTimer(*this) == PVR_ERROR_NO_ERROR;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  return client && (client->UpdateTimer(*this) == PVR_ERROR_NO_ERROR);
 }
 
 std::string CPVRTimerInfoTag::ChannelName() const
@@ -655,7 +644,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateInstantTimerTag(const CPVRChannelPtr
 {
   if (!channel)
   {
-    CLog::Log(LOGERROR, "%s - no channel set", __FUNCTION__);
+    CLog::LogF(LOGERROR, "No channel");
     return CPVRTimerInfoTagPtr();
   }
 
@@ -669,7 +658,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateInstantTimerTag(const CPVRChannelPtr
     }
     else
     {
-      CLog::Log(LOGERROR, "%s - epg tag is not recordable", __FUNCTION__);
+      CLog::LogF(LOGERROR, "EPG tag is not recordable");
       return CPVRTimerInfoTagPtr();
     }
   }
@@ -691,7 +680,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateInstantTimerTag(const CPVRChannelPtr
       PVR_TIMER_TYPE_IS_MANUAL, PVR_TIMER_TYPE_IS_REPEATING | PVR_TIMER_TYPE_FORBIDS_NEW_INSTANCES, channel->ClientID()));
     if (!timerType)
     {
-      CLog::Log(LOGERROR, "%s - unable to create one shot manual timer type", __FUNCTION__);
+      CLog::LogF(LOGERROR, "Unable to create one shot manual timer type");
       return CPVRTimerInfoTagPtr();
     }
 
@@ -708,7 +697,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateInstantTimerTag(const CPVRChannelPtr
   newTimer->SetStartFromUTC(now);
 
   if (iDuration == DEFAULT_PVRRECORD_INSTANTRECORDTIME)
-    iDuration = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_PVRRECORD_INSTANTRECORDTIME);
+    iDuration = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_PVRRECORD_INSTANTRECORDTIME);
 
   CDateTime endTime = now + CDateTimeSpan(0, 0, iDuration ? iDuration : 120, 0);
   newTimer->SetEndFromUTC(endTime);
@@ -737,7 +726,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateFromEpg(const CPVREpgInfoTagPtr &tag
   CPVRChannelPtr channel = tag->Channel();
   if (!channel)
   {
-    CLog::Log(LOGERROR, "%s - no channel set", __FUNCTION__);
+    CLog::LogF(LOGERROR, "EPG tag has no channel");
     return CPVRTimerInfoTagPtr();
   }
 
@@ -799,7 +788,7 @@ CPVRTimerInfoTagPtr CPVRTimerInfoTag::CreateFromEpg(const CPVREpgInfoTagPtr &tag
 
   if (!timerType)
   {
-    CLog::Log(LOGERROR, "%s - unable to create any epg-based timer type", __FUNCTION__);
+    CLog::LogF(LOGERROR, "Unable to create any epg-based timer type");
     return CPVRTimerInfoTagPtr();
   }
 
@@ -940,37 +929,40 @@ CPVREpgInfoTagPtr CPVRTimerInfoTag::GetEpgInfoTag(bool bCreate /* = true */) con
           {
             m_epgTag = epg->GetTagByBroadcastId(m_iEpgUid);
           }
-          else
+        }
+
+        if (!m_epgTag && m_epTagRefetchTimeout.IsTimePast())
+        {
+          m_epTagRefetchTimeout.Set(30000); // try to fetch missing epg tag from backend at most every 30 secs
+
+          time_t startTime = 0;
+          time_t endTime = 0;
+
+          StartAsUTC().GetAsTime(startTime);
+          if (startTime > 0)
+            EndAsUTC().GetAsTime(endTime);
+
+          if (startTime > 0 && endTime > 0)
           {
-            time_t startTime = 0;
-            time_t endTime = 0;
-
-            StartAsUTC().GetAsTime(startTime);
-            if (startTime > 0)
-              EndAsUTC().GetAsTime(endTime);
-
-            if (startTime > 0 && endTime > 0)
+            // try to fetch missing epg tag from backend
+            const CPVREpgInfoTagPtr epgTag = epg->GetTagBetween(StartAsUTC() - CDateTimeSpan(0, 0, 2, 0), EndAsUTC() + CDateTimeSpan(0, 0, 2, 0), true);
+            if (epgTag)
             {
-              // if no epg uid present, try to find a tag according to timer's start/end time
-              CPVREpgInfoTagPtr epgTag = epg->GetTagBetween(StartAsUTC() - CDateTimeSpan(0, 0, 2, 0), EndAsUTC() + CDateTimeSpan(0, 0, 2, 0));
-              if (epgTag)
+              bool bTagMatches = !IsTimerRule();
+              if (!bTagMatches)
               {
-                bool bTagMatches = !IsTimerRule();
-                if (!bTagMatches)
+                // Check whether the tag actually is an event that belongs to a child of this timer rule
+                const CPVRTimerInfoTagPtr timer = epgTag->Timer();
+                if (timer && (timer->GetTimerRuleId() == m_iClientIndex))
                 {
-                  // Check whether the tag actually is an event that belongs to a child of this timer rule
-                  const CPVRTimerInfoTagPtr timer = epgTag->Timer();
-                  if (timer && (timer->GetTimerRuleId() == m_iClientIndex))
-                  {
-                    bTagMatches = true;
-                  }
+                  bTagMatches = true;
                 }
+              }
 
-                if (bTagMatches)
-                {
-                  m_epgTag = epgTag;
-                  m_iEpgUid = m_epgTag->UniqueBroadcastID();
-                }
+              if (bTagMatches)
+              {
+                m_epgTag = epgTag;
+                m_iEpgUid = m_epgTag->UniqueBroadcastID();
               }
             }
           }

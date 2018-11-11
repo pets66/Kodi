@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <algorithm>
@@ -24,16 +12,15 @@
 #include "AddonSettings.h"
 #include "FileItem.h"
 #include "GUIInfoManager.h"
+#include "LangInfo.h"
 #include "ServiceBroker.h"
-#include "addons/Addon.h"
 #include "addons/settings/GUIDialogAddonSettings.h"
 #include "addons/settings/SettingUrlEncodedString.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/ApplicationMessenger.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/MediaSourceSettings.h"
 #include "settings/SettingAddon.h"
 #include "settings/SettingControl.h"
 #include "settings/SettingDateTime.h"
@@ -41,7 +28,6 @@
 #include "settings/lib/Setting.h"
 #include "settings/lib/SettingSection.h"
 #include "settings/lib/SettingsManager.h"
-#include "storage/MediaManager.h"
 #include "threads/SingleLock.h"
 #include "utils/FileExtensionProvider.h"
 #include "utils/log.h"
@@ -56,7 +42,7 @@ static const int UnknownSettingLabelIdStart = 100000;
 
 bool InfoBool(const std::string &condition, const std::string &value, SettingConstPtr setting, void *data)
 {
-  return g_infoManager.EvaluateBool(value);
+  return CServiceBroker::GetGUI()->GetInfoManager().EvaluateBool(value);
 }
 
 template<class TSetting>
@@ -405,7 +391,7 @@ void CAddonSettings::InitializeControls()
 
 void CAddonSettings::InitializeConditions()
 {
-  GetSettingsManager()->AddCondition("InfoBool", InfoBool);
+  GetSettingsManager()->AddDynamicCondition("InfoBool", InfoBool);
 }
 
 bool CAddonSettings::InitializeDefinitions(const CXBMCTinyXML& doc)
@@ -712,7 +698,7 @@ bool CAddonSettings::InitializeFromOldSettingDefinitions(const CXBMCTinyXML& doc
 
   // register the callback for action settings
   GetSettingsManager()->RegisterCallback(this, actionSettings);
-  
+
   return true;
 }
 
@@ -818,7 +804,7 @@ SettingPtr CAddonSettings::InitializeFromOldSettingTextIpAddress(const std::stri
       control->SetHidden(StringUtils::EqualsNoCase(option, "hidden"));
     }
   }
-  
+
   setting->SetDefault(defaultValue);
   setting->SetAllowEmpty(true);
   setting->SetControl(control);
@@ -1518,7 +1504,7 @@ void CAddonSettings::FileEnumSettingOptionsFiller(std::shared_ptr<const CSetting
   // fetch the matching files/directories
   CFileItemList items;
   XFILE::CDirectory::GetDirectory(settingPath->GetSources().front(), items, masking, XFILE::DIR_FLAG_NO_FILE_DIRS);
-  
+
   // process the matching files/directories
   for (auto item : items)
   {

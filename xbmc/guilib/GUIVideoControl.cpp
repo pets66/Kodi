@@ -1,27 +1,18 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
+#include "GUIComponent.h"
 #include "GUIVideoControl.h"
 #include "GUIWindowManager.h"
 #include "Application.h"
+#include "ServiceBroker.h"
 #include "input/Key.h"
+#include "utils/Color.h"
 #include "WindowIDs.h"
 
 CGUIVideoControl::CGUIVideoControl(int parentID, int controlID, float posX, float posY, float width, float height)
@@ -48,24 +39,24 @@ void CGUIVideoControl::Render()
     if (!g_application.GetAppPlayer().IsPausedPlayback())
       g_application.ResetScreenSaver();
 
-    g_graphicsContext.SetViewWindow(m_posX, m_posY, m_posX + m_width, m_posY + m_height);
+    CServiceBroker::GetWinSystem()->GetGfxContext().SetViewWindow(m_posX, m_posY, m_posX + m_width, m_posY + m_height);
     TransformMatrix mat;
-    g_graphicsContext.SetTransform(mat, 1.0, 1.0);
+    CServiceBroker::GetWinSystem()->GetGfxContext().SetTransform(mat, 1.0, 1.0);
 
-    color_t alpha = g_graphicsContext.MergeAlpha(0xFF000000) >> 24;
+    UTILS::Color alpha = CServiceBroker::GetWinSystem()->GetGfxContext().MergeAlpha(0xFF000000) >> 24;
     if (g_application.GetAppPlayer().IsRenderingVideoLayer())
     {
-      CRect old = g_graphicsContext.GetScissors();
+      CRect old = CServiceBroker::GetWinSystem()->GetGfxContext().GetScissors();
       CRect region = GetRenderRegion();
       region.Intersect(old);
-      g_graphicsContext.SetScissors(region);
-      g_graphicsContext.Clear(0);
-      g_graphicsContext.SetScissors(old);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetScissors(region);
+      CServiceBroker::GetWinSystem()->GetGfxContext().Clear(0);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetScissors(old);
     }
     else
       g_application.GetAppPlayer().Render(false, alpha);
 
-    g_graphicsContext.RemoveTransform();
+    CServiceBroker::GetWinSystem()->GetGfxContext().RemoveTransform();
   }
   CGUIControl::Render();
 }
@@ -84,7 +75,7 @@ EVENT_RESULT CGUIVideoControl::OnMouseEvent(const CPoint &point, const CMouseEve
   if (event.m_id == ACTION_MOUSE_LEFT_CLICK)
   { // switch to fullscreen
     CGUIMessage message(GUI_MSG_FULLSCREEN, GetID(), GetParentID());
-    g_windowManager.SendMessage(message);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(message);
     return EVENT_RESULT_HANDLED;
   }
   return EVENT_RESULT_UNHANDLED;

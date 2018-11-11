@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <string>
 #include <vector>
@@ -91,11 +79,9 @@ public:
     pPrivate = NULL;
     ExtraData = NULL;
     ExtraSize = 0;
-    memset(language, 0, sizeof(language));
     disabled = false;
     changes = 0;
     flags = StreamFlags::FLAG_NONE;
-    realtime = false;
   }
 
   virtual ~CDemuxStream()
@@ -114,7 +100,6 @@ public:
   int level;   // encoder level of the stream reported by the decoder. used to qualify hw decoders.
   StreamType type;
   int source;
-  bool realtime;
 
   int iDuration; // in mseconds
   void* pPrivate; // private pointer for the demuxer
@@ -122,7 +107,7 @@ public:
   unsigned int ExtraSize; // size of extra data
 
   StreamFlags flags;
-  char language[4]; // ISO 639 3-letter language code (empty string if undefined)
+  std::string language; // RFC 5646 language code (empty string if undefined)
   bool disabled; // set when stream is disabled. (when no decoder exists)
 
   std::string name;
@@ -192,6 +177,7 @@ public:
   int iBitRate;
   int iBitsPerSample;
   uint64_t iChannelLayout;
+  std::string m_channelLayoutName;
 };
 
 class CDemuxStreamSubtitle : public CDemuxStream
@@ -348,7 +334,7 @@ public:
    * adaptive demuxers like DASH can use this to choose best fitting video stream
    */
   virtual void SetVideoResolution(int width, int height) {};
-  
+
   /*
   * return the id of the demuxer
   */

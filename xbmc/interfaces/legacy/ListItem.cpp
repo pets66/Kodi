@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <cstdlib>
@@ -33,13 +21,15 @@
 #include "utils/Variant.h"
 #include "utils/StringUtils.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "Util.h"
+#include "ServiceBroker.h"
 
 namespace XBMCAddon
 {
   namespace xbmcgui
   {
-    ListItem::ListItem(const String& label, 
+    ListItem::ListItem(const String& label,
                        const String& label2,
                        const String& iconImage,
                        const String& thumbnailImage,
@@ -250,6 +240,12 @@ namespace XBMCAddon
         item->SetProperty(lowerKey, value);
     }
 
+    void ListItem::setProperties(const Properties& dictionary)
+    {
+      for (const auto& it: dictionary)
+        setProperty(it.first.c_str(), it.second);
+    }
+
     String ListItem::getProperty(const char* key)
     {
       XBMCAddonUtils::GuiLock lock(languageHook, m_offscreen);
@@ -412,7 +408,7 @@ namespace XBMCAddon
             videotag.m_cast.clear();
             for (const auto& castEntry: alt.later())
             {
-              // castEntry can be a string meaning it's the actor or it can be a tuple meaning it's the 
+              // castEntry can be a string meaning it's the actor or it can be a tuple meaning it's the
               //  actor and the role.
               const String& actor = castEntry.which() == first ? castEntry.former() : castEntry.later().first();
               SActorInfo info;
@@ -426,7 +422,7 @@ namespace XBMCAddon
           {
             if (alt.which() != second)
               throw WrongTypeException("When using \"artist\" you need to supply a list of strings for the value in the dictionary");
-            
+
             videotag.m_artist.clear();
 
             for (const auto& castEntry: alt.later())
@@ -588,11 +584,11 @@ namespace XBMCAddon
           else if (key == "musicbrainztrackid")
             musictag.SetMusicBrainzTrackID(value);
           else if (key == "musicbrainzartistid")
-            musictag.SetMusicBrainzArtistID(StringUtils::Split(value, g_advancedSettings.m_musicItemSeparator));
+            musictag.SetMusicBrainzArtistID(StringUtils::Split(value, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator));
           else if (key == "musicbrainzalbumid")
             musictag.SetMusicBrainzAlbumID(value);
           else if (key == "musicbrainzalbumartistid")
-            musictag.SetMusicBrainzAlbumArtistID(StringUtils::Split(value, g_advancedSettings.m_musicItemSeparator));
+            musictag.SetMusicBrainzAlbumArtistID(StringUtils::Split(value, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_musicItemSeparator));
           else if (key == "comment")
             musictag.SetComment(value);
           else if (key == "date")
@@ -644,9 +640,10 @@ namespace XBMCAddon
           else
           {
             const String& exifkey = key;
-            if (!StringUtils::StartsWithNoCase(exifkey, "exif:") || exifkey.length() < 6) continue;
-            int info = CPictureInfoTag::TranslateString(StringUtils::Mid(exifkey,5));
-            item->GetPictureInfoTag()->SetInfo(info, value);
+            if (!StringUtils::StartsWithNoCase(exifkey, "exif:") || exifkey.length() < 6)
+              continue;
+
+            item->GetPictureInfoTag()->SetInfo(StringUtils::Mid(exifkey, 5), value);
           }
         }
       }
@@ -861,9 +858,9 @@ namespace XBMCAddon
       {
         if (value.empty())
           value = alt.former();
-        return StringUtils::Split(value, g_advancedSettings.m_videoItemSeparator);
+        return StringUtils::Split(value, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoItemSeparator);
       }
-      
+
       std::vector<std::string> els;
       for (const auto& el : alt.later())
       {

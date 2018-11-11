@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <sys/resource.h>
@@ -23,7 +11,10 @@
 #include <stdio.h>
 
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "Application.h"
+#include "AppInboundProtocol.h"
+#include "ServiceBroker.h"
 #include "messaging/ApplicationMessenger.h"
 #include "utils/log.h"
 #include "utils/TimeUtils.h"
@@ -69,7 +60,7 @@ using namespace KODI::MESSAGING;
 //--------------------------------------------------------------
 - (void) resizeFrameBuffer
 {
-  CGRect frame = [IOSScreenManager getLandscapeResolution: currentScreen];
+  CGRect frame = [currentScreen bounds];
   CAEAGLLayer *eaglLayer = (CAEAGLLayer *)[self layer];
   //allow a maximum framebuffer size of 1080p
   //needed for tvout on iPad3/4 and iphone4/5 and maybe AppleTV3
@@ -314,14 +305,18 @@ using namespace KODI::MESSAGING;
 {
   PRINT_SIGNATURE();
   pause = TRUE;
-  g_application.SetRenderGUI(false);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
+  if (appPort)
+    appPort->SetRenderGUI(false);
 }
 //--------------------------------------------------------------
 - (void) resumeAnimation
 {
   PRINT_SIGNATURE();
   pause = FALSE;
-  g_application.SetRenderGUI(true);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
+  if (appPort)
+    appPort->SetRenderGUI(true);
 }
 //--------------------------------------------------------------
 - (void) startAnimation
@@ -373,12 +368,11 @@ using namespace KODI::MESSAGING;
   NSConditionLock* myLock = arg;
   [myLock lock];
 
+  CAppParamParser appParamParser;
   #ifdef _DEBUG
-    g_advancedSettings.m_logLevel     = LOG_LEVEL_DEBUG;
-    g_advancedSettings.m_logLevelHint = LOG_LEVEL_DEBUG;
+    appParamParser.m_logLevel = LOG_LEVEL_DEBUG;
   #else
-    g_advancedSettings.m_logLevel     = LOG_LEVEL_NORMAL;
-    g_advancedSettings.m_logLevelHint = LOG_LEVEL_NORMAL;
+    appParamParser.m_logLevel = LOG_LEVEL_NORMAL;
   #endif
 
   // Prevent child processes from becoming zombies on exit if not waited upon. See also Util::Command
@@ -391,7 +385,7 @@ using namespace KODI::MESSAGING;
   setlocale(LC_NUMERIC, "C");
 
   g_application.Preflight();
-  if (!g_application.Create(CAppParamParser()))
+  if (!g_application.Create(appParamParser))
   {
     readyToRun = false;
     ELOG(@"%sUnable to create application", __PRETTY_FUNCTION__);
@@ -413,8 +407,8 @@ using namespace KODI::MESSAGING;
 
   if (readyToRun)
   {
-    g_advancedSettings.m_startFullScreen = true;
-    g_advancedSettings.m_canWindowed = false;
+    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_startFullScreen = true;
+    CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_canWindowed = false;
     xbmcAlive = TRUE;
     try
     {

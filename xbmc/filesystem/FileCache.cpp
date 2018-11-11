@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "threads/SystemClock.h"
@@ -23,11 +11,13 @@
 #include "threads/Thread.h"
 #include "File.h"
 #include "URL.h"
+#include "ServiceBroker.h"
 
 #include "CircularCache.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 
 #if !defined(TARGET_WINDOWS)
 #include "platform/linux/ConvUtils.h"
@@ -179,7 +169,7 @@ bool CFileCache::Open(const CURL& url)
 
   if (!m_pCache)
   {
-    if (g_advancedSettings.m_cacheMemSize == 0)
+    if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheMemSize == 0)
     {
       // Use cache on disk
       m_pCache = new CSimpleFileCache();
@@ -188,19 +178,19 @@ bool CFileCache::Open(const CURL& url)
     else
     {
       size_t cacheSize;
-      if (m_fileSize > 0 && m_fileSize < g_advancedSettings.m_cacheMemSize && !(m_flags & READ_AUDIO_VIDEO))
+      if (m_fileSize > 0 && m_fileSize < CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheMemSize && !(m_flags & READ_AUDIO_VIDEO))
       {
         // NOTE: We don't need to take into account READ_MULTI_STREAM here as it's only used for audio/video
         cacheSize = m_fileSize;
       }
       else
       {
-        cacheSize = g_advancedSettings.m_cacheMemSize;
+        cacheSize = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheMemSize;
       }
 
       size_t back = cacheSize / 4;
       size_t front = cacheSize - back;
-      
+
       if (m_flags & READ_MULTI_STREAM)
       {
         // READ_MULTI_STREAM requires double buffering, so use half the amount of memory for each buffer
@@ -225,7 +215,7 @@ bool CFileCache::Open(const CURL& url)
     Close();
     return false;
   }
-  
+
   m_readPos = 0;
   m_writePos = 0;
   m_writeRate = 1024 * 1024;
@@ -296,13 +286,13 @@ void CFileCache::Process()
 
     while (m_writeRate)
     {
-      if (m_writePos - m_readPos < m_writeRate * g_advancedSettings.m_cacheReadFactor)
+      if (m_writePos - m_readPos < m_writeRate * CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheReadFactor)
       {
         limiter.Reset(m_writePos);
         break;
       }
 
-      if (limiter.Rate(m_writePos) < m_writeRate * g_advancedSettings.m_cacheReadFactor)
+      if (limiter.Rate(m_writePos) < m_writeRate * CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheReadFactor)
         break;
 
       if (m_seekEvent.WaitMSec(100))
@@ -451,7 +441,7 @@ ssize_t CFileCache::Read(void* lpBuf, size_t uiBufSize)
 
 retry:
   // attempt to read
-  iRc = m_pCache->ReadFromCache((char *)lpBuf, (size_t)uiBufSize);
+  iRc = m_pCache->ReadFromCache((char *)lpBuf, uiBufSize);
   if (iRc > 0)
   {
     m_readPos += iRc;

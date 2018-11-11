@@ -1,65 +1,37 @@
 /*
- *      Copyright (C) 2016-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
-
-#include "cores/AudioEngine/Utils/AEChannelData.h"
-
-#include "libavcodec/avcodec.h"
-#include "libavutil/pixfmt.h"
-
-#include <stdint.h>
-
-class CAEChannelInfo;
 
 namespace KODI
 {
 namespace GAME
 {
-  class IGameAudioCallback
-  {
-  public:
-    virtual ~IGameAudioCallback() = default;
-
-    virtual unsigned int NormalizeSamplerate(unsigned int samplerate) const = 0;
-    virtual bool OpenPCMStream(AEDataFormat format, unsigned int samplerate, const CAEChannelInfo& channelLayout) = 0;
-    virtual bool OpenEncodedStream(AVCodecID codec, unsigned int samplerate, const CAEChannelInfo& channelLayout) = 0;
-    virtual void AddData(const uint8_t* data, unsigned int size) = 0;
-    virtual void CloseStream() = 0;
-  };
-
-  class IGameVideoCallback
-  {
-  public:
-    virtual ~IGameVideoCallback() = default;
-
-    virtual bool OpenPixelStream(AVPixelFormat pixfmt, unsigned int width, unsigned int height, unsigned int orientationDeg) = 0;
-    virtual bool OpenEncodedStream(AVCodecID codec) = 0;
-    virtual void AddData(const uint8_t* data, unsigned int size) = 0;
-    virtual void CloseStream() = 0;
-  };
-
+  /*!
+   * \brief Input callbacks
+   *
+   * @todo Remove this file when Game API is updated for input polling
+   */
   class IGameInputCallback
   {
   public:
     virtual ~IGameInputCallback() = default;
 
+    /*!
+     * \brief Return true if the input source accepts input
+     *
+     * \return True if input should be processed, false otherwise
+     */
+    virtual bool AcceptsInput() const = 0;
+
+    /*!
+     * \brief Poll the input source for input
+     */
     virtual void PollInput() = 0;
   };
 }

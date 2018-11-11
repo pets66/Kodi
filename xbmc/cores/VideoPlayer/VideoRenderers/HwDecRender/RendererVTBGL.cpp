@@ -1,28 +1,14 @@
 /*
- *      Copyright (C) 2007-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RendererVTBGL.h"
 #include "../RenderFactory.h"
 #include "ServiceBroker.h"
-#include "settings/Settings.h"
-#include "settings/AdvancedSettings.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/VTB.h"
 #include "utils/log.h"
@@ -55,6 +41,7 @@ CRendererVTB::~CRendererVTB()
 {
   for (int i = 0; i < NUM_BUFFERS; ++i)
   {
+    ReleaseBuffer(i);
     DeleteTexture(i);
   }
 }
@@ -94,12 +81,13 @@ bool CRendererVTB::CreateTexture(int index)
 {
   CPictureBuffer &buf = m_buffers[index];
   YuvImage &im = buf.image;
-  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
+  CYuvPlane (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
 
+  ReleaseBuffer(index);
   DeleteTexture(index);
 
   memset(&im    , 0, sizeof(im));
-  memset(&planes, 0, sizeof(YUVPLANE[YuvImage::MAX_PLANES]));
+  memset(&planes, 0, sizeof(CYuvPlane[YuvImage::MAX_PLANES]));
 
   im.bpp    = 1;
   im.width  = m_sourceWidth;
@@ -130,9 +118,9 @@ bool CRendererVTB::CreateTexture(int index)
 
 void CRendererVTB::DeleteTexture(int index)
 {
-  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[0];
-
-  ReleaseBuffer(index);
+  CPictureBuffer& buf = m_buffers[index];
+  CYuvPlane (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
+  buf.loaded = false;
 
   if (planes[0].id && glIsTexture(planes[0].id))
   {
@@ -150,7 +138,7 @@ void CRendererVTB::DeleteTexture(int index)
 bool CRendererVTB::UploadTexture(int index)
 {
   CPictureBuffer &buf = m_buffers[index];
-  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[0];
+  CYuvPlane (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[0];
 
   VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buf.videoBuffer);
   if (!vb)
@@ -162,8 +150,8 @@ bool CRendererVTB::UploadTexture(int index)
 
   // It is the fastest way to render a CVPixelBuffer backed
   // with an IOSurface as there is no CPU -> GPU upload.
-  CWinSystemOSX& winSystem = dynamic_cast<CWinSystemOSX&>(CServiceBroker::GetWinSystem());
-  CGLContextObj cgl_ctx  = (CGLContextObj)winSystem.GetCGLContextObj();
+  CWinSystemOSX* winSystem = dynamic_cast<CWinSystemOSX*>(CServiceBroker::GetWinSystem());
+  CGLContextObj cgl_ctx  = (CGLContextObj)winSystem->GetCGLContextObj();
   IOSurfaceRef surface  = CVPixelBufferGetIOSurface(cvBufferRef);
   OSType format_type = IOSurfaceGetPixelFormat(surface);
 

@@ -1,32 +1,20 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonManager.h"
 
+#include "LangInfo.h"
 #include "ServiceBroker.h"
 #include "events/AddonManagementEvent.h"
 #include "events/EventLog.h"
 #include "events/NotificationEvent.h"
 #include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
-#include "settings/AdvancedSettings.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
@@ -41,6 +29,11 @@ namespace ADDON
 
 void cp_fatalErrorHandler(const char *msg);
 void cp_logger(cp_log_severity_t level, const char *msg, const char *apid, void *user_data);
+
+namespace {
+// Note that all of these characters are url-safe
+const std::string VALID_ADDON_IDENTIFIER_CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_@!$";
+}
 
 /**********************************************************
  * CAddonMgr
@@ -74,10 +67,19 @@ AddonPtr CAddonMgr::Factory(const cp_plugin_info_t* plugin, TYPE type)
   return nullptr;
 }
 
-bool CAddonMgr::Factory(const cp_plugin_info_t* plugin, TYPE type, CAddonBuilder& builder, bool ignoreExtensions/* = false*/)
+bool CAddonMgr::Factory(const cp_plugin_info_t* plugin, TYPE type, CAddonBuilder& builder, bool ignoreExtensions/* = false*/, const CRepository::DirInfo& repo)
 {
   if (!plugin || !plugin->identifier)
     return false;
+
+  // Check addon identifier for forbidden characters
+  // The identifier is used e.g. in URLs so we shouldn't allow just
+  // any character to go through.
+  if (std::string{plugin->identifier}.find_first_not_of(VALID_ADDON_IDENTIFIER_CHARACTERS) != std::string::npos)
+  {
+    CLog::Log(LOGERROR, "Plugin identifier {} is invalid", plugin->identifier);
+    return false;
+  }
 
   if (!PlatformSupportsAddon(plugin))
     return false;
@@ -101,11 +103,11 @@ bool CAddonMgr::Factory(const cp_plugin_info_t* plugin, TYPE type, CAddonBuilder
     }
   }
 
-  FillCpluffMetadata(plugin, builder);
+  FillCpluffMetadata(plugin, builder, repo);
   return true;
 }
 
-void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder& builder)
+void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder& builder, const CRepository::DirInfo& repo)
 {
   builder.SetId(plugin->identifier);
 
@@ -120,9 +122,6 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
 
   if (plugin->provider_name)
     builder.SetAuthor(plugin->provider_name);
-
-  if (plugin->plugin_path && strcmp(plugin->plugin_path, "") != 0)
-    builder.SetPath(plugin->plugin_path);
 
   {
     std::vector<DependencyInfo> dependencies;
@@ -142,15 +141,44 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
   if (!metadata)
     metadata = CServiceBroker::GetAddonMgr().GetExtension(plugin, "kodi.addon.metadata");
 
-  if (plugin->plugin_path && strcmp(plugin->plugin_path, "") != 0)
+  std::string path;
+  if (metadata)
+    path = CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "path");
+
+  if (plugin->plugin_path && strcmp(plugin->plugin_path, "") != 0 && strcmp(plugin->plugin_path, "memory") != 0)
+    builder.SetPath(plugin->plugin_path);
+  else
+  {
+    if (path.empty())
+      builder.SetPath(URIUtils::AddFileToFolder(repo.datadir, plugin->identifier,
+        StringUtils::Format("{}-{}.zip", plugin->identifier, builder.GetVersion().asString())));
+    else
+      builder.SetPath(URIUtils::AddFileToFolder(repo.datadir, path));
+  }
+
+  std::string assetBasePath = repo.artdir;
+  if (repo.artdir.empty() && plugin->plugin_path)
+  {
+    // Default for add-on information not loaded from repository
+    assetBasePath = plugin->plugin_path;
+  }
+  else
+  {
+    if (path.empty())
+      assetBasePath = URIUtils::AddFileToFolder(assetBasePath, plugin->identifier);
+    else
+      assetBasePath = URIUtils::AddFileToFolder(assetBasePath, StringUtils::Split(path, '/')[0]);
+  }
+
+  if (!assetBasePath.empty())
   {
     //backwards compatibility
     std::string icon = metadata && CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "noicon") == "true" ? "" : "icon.png";
     std::string fanart = metadata && CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "nofanart") == "true" ? "" : "fanart.jpg";
     if (!icon.empty())
-      builder.SetIcon(URIUtils::AddFileToFolder(plugin->plugin_path, icon));
+      builder.SetIcon(URIUtils::AddFileToFolder(assetBasePath, icon));
     if (!fanart.empty())
-      builder.SetArt("fanart", URIUtils::AddFileToFolder(plugin->plugin_path, fanart));
+      builder.SetArt("fanart", URIUtils::AddFileToFolder(assetBasePath, fanart));
   }
 
   if (metadata)
@@ -162,17 +190,24 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
     builder.SetLicense(CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "license"));
     builder.SetPackageSize(StringUtils::ToUint64(CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "size"), 0));
 
-    std::string language = CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "language");
-    if (!language.empty())
     {
       InfoMap extrainfo;
-      extrainfo.insert(std::make_pair("language",language));
-      builder.SetExtrainfo(std::move(extrainfo));
+
+      std::string metaString = CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "language");
+      if (!metaString.empty())
+        extrainfo.insert(std::make_pair("language", metaString));
+
+      metaString = CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "reuselanguageinvoker");
+      if (!metaString.empty())
+        extrainfo.insert(std::make_pair("reuselanguageinvoker", metaString));
+
+      if (!extrainfo.empty())
+        builder.SetExtrainfo(std::move(extrainfo));
     }
 
     builder.SetBroken(CServiceBroker::GetAddonMgr().GetExtValue(metadata->configuration, "broken"));
 
-    if (plugin->plugin_path && strcmp(plugin->plugin_path, "") != 0)
+    if (!assetBasePath.empty())
     {
       auto assets = CServiceBroker::GetAddonMgr().GetExtElement(metadata->configuration, "assets");
       if (assets)
@@ -181,7 +216,7 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
         builder.SetArt("fanart", "");
         std::string icon = CServiceBroker::GetAddonMgr().GetExtValue(assets, "icon");
         if (!icon.empty())
-          icon = URIUtils::AddFileToFolder(plugin->plugin_path, icon);
+          icon = URIUtils::AddFileToFolder(assetBasePath, icon);
         builder.SetIcon(icon);
 
         std::map<std::string, std::string> art;
@@ -191,7 +226,7 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
           auto value = CServiceBroker::GetAddonMgr().GetExtValue(assets, type.c_str());
           if (!value.empty())
           {
-            value = URIUtils::AddFileToFolder(plugin->plugin_path, value);
+            value = URIUtils::AddFileToFolder(assetBasePath, value);
             builder.SetArt(type, value);
           }
         }
@@ -203,7 +238,7 @@ void CAddonMgr::FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder
           for (const auto& elem : elements)
           {
             if (elem->value && strcmp(elem->value, "") != 0)
-              screenshots.emplace_back(URIUtils::AddFileToFolder(plugin->plugin_path, elem->value));
+              screenshots.emplace_back(URIUtils::AddFileToFolder(assetBasePath, elem->value));
           }
         }
         builder.SetScreenshots(std::move(screenshots));
@@ -242,10 +277,6 @@ static bool LoadManifest(std::set<std::string>& system, std::set<std::string>& o
   }
   return true;
 }
-
-CAddonMgr::CAddonMgr()
-  : m_cp_context(nullptr)
-{ }
 
 CAddonMgr::~CAddonMgr()
 {
@@ -720,13 +751,13 @@ bool CAddonMgr::LoadAddon(const std::string& addonId)
 
   if (!FindAddons())
   {
-    CLog::Log(LOGERROR, "CAddonMgr: could not reload add-on %s. FindAddons failed.", addon->ID().c_str());
+    CLog::Log(LOGERROR, "CAddonMgr: could not reload add-on %s. FindAddons failed.", addonId.c_str());
     return false;
   }
 
   if (!GetAddon(addonId, addon, ADDON_UNKNOWN, false))
   {
-    CLog::Log(LOGERROR, "CAddonMgr: could not load add-on %s. No add-on with that ID is installed.", addon->ID().c_str());
+    CLog::Log(LOGERROR, "CAddonMgr: could not load add-on %s. No add-on with that ID is installed.", addonId.c_str());
     return false;
   }
 
@@ -914,7 +945,7 @@ bool CAddonMgr::IsAddonInstalled(const std::string& ID)
 
 bool CAddonMgr::CanAddonBeInstalled(const AddonPtr& addon)
 {
-  return addon != nullptr &&!IsAddonInstalled(addon->ID());
+  return addon != nullptr && !addon->IsBroken() && !IsAddonInstalled(addon->ID());
 }
 
 bool CAddonMgr::CanUninstall(const AddonPtr& addon)
@@ -941,7 +972,8 @@ std::string CAddonMgr::GetTranslatedString(const cp_cfg_element_t *root, const c
     if (strcmp(tag, child.name) == 0)
     {
       // see if we have a "lang" attribute
-      const char *lang = cp_lookup_cfg_value((cp_cfg_element_t*)&child, "@lang");
+      //! @bug libcpluff isn't const correct
+      const char *lang = cp_lookup_cfg_value(const_cast<cp_cfg_element_t*>(&child), "@lang");
       if (lang != NULL && g_langInfo.GetLocale().Matches(lang))
         translatedValues.insert(std::make_pair(lang, child.value != NULL ? child.value : ""));
       else if (lang == NULL || strcmp(lang, "en") == 0 || strcmp(lang, "en_GB") == 0)
@@ -993,6 +1025,15 @@ bool CAddonMgr::PlatformSupportsAddon(const cp_plugin_info_t *plugin)
     "all",
 #if defined(TARGET_ANDROID)
     "android",
+#if defined(__ARM_ARCH_7A__)
+    "android-armv7",
+#elif defined(__aarch64__)
+    "android-aarch64",
+#elif defined(__i686__)
+    "android-i686",
+#else
+    #warning no architecture dependant platform tag
+#endif
 #elif defined(TARGET_FREEBSD)
     "freebsd",
     "linux",
@@ -1001,16 +1042,34 @@ bool CAddonMgr::PlatformSupportsAddon(const cp_plugin_info_t *plugin)
 #elif defined(TARGET_WINDOWS_DESKTOP)
     "windx",
     "windows",
+#if defined(_M_IX86)
+    "windows-i686",
+#elif defined(_M_AMD64)
+    "windows-x86_64",
+#else
+#error no architecture dependant platform tag
+#endif
 #elif defined(TARGET_WINDOWS_STORE)
     "windowsstore",
 #elif defined(TARGET_DARWIN_IOS)
     "ios",
+#if defined(__ARM_ARCH_7A__)
+    "ios-armv7",
+#elif defined(__aarch64__)
+    "ios-aarch64",
+#else
+#warning no architecture dependant platform tag
+#endif
 #elif defined(TARGET_DARWIN_OSX)
     "osx",
 #if defined(__x86_64__)
     "osx64",
-#else
+    "osx-x86_64",
+#elif defined(__i686__)
+    "osx-i686",
     "osx32",
+#else
+#warning no architecture dependant platform tag
 #endif
 #endif
   };
@@ -1175,15 +1234,8 @@ bool CAddonMgr::AddonsFromRepoXML(const CRepository::DirInfo& repo, const std::s
     if (info)
     {
       CAddonBuilder builder;
-      auto basePath = URIUtils::AddFileToFolder(repo.datadir, std::string(info->identifier));
-      info->plugin_path = static_cast<char*>(malloc(basePath.length() + 1));
-      strncpy(info->plugin_path, basePath.c_str(), basePath.length());
-      info->plugin_path[basePath.length()] = '\0';
-
-      if (Factory(info, ADDON_UNKNOWN, builder))
+      if (Factory(info, ADDON_UNKNOWN, builder, false, repo))
       {
-        builder.SetPath(URIUtils::AddFileToFolder(repo.datadir, StringUtils::Format("%s/%s-%s.zip",
-            info->identifier, info->identifier, builder.GetVersion().asString().c_str())));
         auto addon = builder.Build();
         if (addon)
           addons.push_back(std::move(addon));

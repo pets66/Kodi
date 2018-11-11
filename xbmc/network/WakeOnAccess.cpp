@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <limits.h>
@@ -30,11 +18,14 @@
 #include "dialogs/GUIDialogProgress.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "filesystem/SpecialProtocol.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/MediaSourceSettings.h"
+#include "settings/lib/Setting.h"
 #include "utils/JobManager.h"
 #include "utils/log.h"
 #include "utils/XMLUtils.h"
@@ -188,7 +179,6 @@ CWakeOnAccess::WakeUpEntry::WakeUpEntry (bool isAwake)
   , wait_online1_sec(DEFAULT_WAIT_FOR_ONLINE_SEC_1)
   , wait_online2_sec(DEFAULT_WAIT_FOR_ONLINE_SEC_2)
   , wait_services_sec(DEFAULT_WAIT_FOR_SERVICES_SEC)
-  , ping_port(0), ping_mode(0)
 {
   nextWake = CDateTime::GetCurrentDateTime();
 
@@ -280,11 +270,11 @@ public:
   explicit ProgressDialogHelper (const std::string& heading) : m_dialog(0)
   {
     if (g_application.IsCurrentThread())
-      m_dialog = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
+      m_dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
 
     if (m_dialog)
     {
-      m_dialog->SetHeading(CVariant{heading}); 
+      m_dialog->SetHeading(CVariant{heading});
       m_dialog->SetLine(0, CVariant{""});
       m_dialog->SetLine(1, CVariant{""});
       m_dialog->SetLine(2, CVariant{""});
@@ -317,7 +307,7 @@ public:
     {
       if (waitObj.SuccessWaiting())
         return Success;
-            
+
       if (m_dialog)
       {
         if (!m_dialog->IsActive())
@@ -369,7 +359,7 @@ private:
 class PingResponseWaiter : public WaitCondition, private IJobCallback
 {
 public:
-  PingResponseWaiter (bool async, const CWakeOnAccess::WakeUpEntry& server) 
+  PingResponseWaiter (bool async, const CWakeOnAccess::WakeUpEntry& server)
     : m_server(server), m_jobId(0), m_hostOnline(false)
   {
     if (async)
@@ -445,7 +435,6 @@ private:
 CWakeOnAccess::CWakeOnAccess()
   : m_netinit_sec(DEFAULT_NETWORK_INIT_SEC)    // wait for network to connect
   , m_netsettle_ms(DEFAULT_NETWORK_SETTLE_MS)  // wait for network to settle
-  , m_enabled(false)
 {
 }
 
@@ -517,7 +506,7 @@ bool CWakeOnAccess::WakeUpHost(const WakeUpEntry& server)
       else
       {
         CLog::Log(LOGNOTICE, "WakeOnAccess timeout/cancel while waiting for network");
-        return false; // timedout or canceled ; give up 
+        return false; // timedout or canceled ; give up
       }
     }
   }
@@ -540,7 +529,7 @@ bool CWakeOnAccess::WakeUpHost(const WakeUpEntry& server)
   {
     PingResponseWaiter waitObj (dlg.HasDialog(), server); // wait for ping response ..
 
-    ProgressDialogHelper::wait_result 
+    ProgressDialogHelper::wait_result
       result = dlg.ShowAndWait (waitObj, server.wait_online1_sec, LOCALIZED(13030));
 
     if (result == ProgressDialogHelper::TimedOut)
@@ -696,22 +685,23 @@ void CWakeOnAccess::QueueMACDiscoveryForAllRemotes()
   AddHostsFromVecSource(ms.GetSources("pictures"), hosts);
   AddHostsFromVecSource(ms.GetSources("programs"), hosts);
 
+  const std::shared_ptr<CAdvancedSettings> advancedSettings = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings();
+
   // add mysql servers
-  AddHostFromDatabase(g_advancedSettings.m_databaseVideo, hosts);
-  AddHostFromDatabase(g_advancedSettings.m_databaseMusic, hosts);
-  AddHostFromDatabase(g_advancedSettings.m_databaseEpg, hosts);
-  AddHostFromDatabase(g_advancedSettings.m_databaseTV, hosts);
+  AddHostFromDatabase(advancedSettings->m_databaseVideo, hosts);
+  AddHostFromDatabase(advancedSettings->m_databaseMusic, hosts);
+  AddHostFromDatabase(advancedSettings->m_databaseEpg, hosts);
+  AddHostFromDatabase(advancedSettings->m_databaseTV, hosts);
 
   // add from path substitutions ..
-  for (CAdvancedSettings::StringMapping::iterator i = g_advancedSettings.m_pathSubstitutions.begin(); i != g_advancedSettings.m_pathSubstitutions.end(); ++i)
+  for (const auto& pathPair : advancedSettings->m_pathSubstitutions)
   {
-    CURL url(i->second);
-
+    CURL url(pathPair.second);
     AddHost (url.GetHostName(), hosts);
   }
 
-  for (std::vector<std::string>::const_iterator it = hosts.begin(); it != hosts.end(); ++it)
-    QueueMACDiscoveryForHost(*it);
+  for (const std::string& host : hosts)
+    QueueMACDiscoveryForHost(host);
 }
 
 void CWakeOnAccess::SaveMACDiscoveryResult(const std::string& host, const std::string& mac)
@@ -797,7 +787,7 @@ void CWakeOnAccess::OnSettingsLoaded()
   LoadFromXML();
 }
 
-void CWakeOnAccess::SetEnabled(bool enabled) 
+void CWakeOnAccess::SetEnabled(bool enabled)
 {
   m_enabled = enabled;
 
@@ -806,7 +796,7 @@ void CWakeOnAccess::SetEnabled(bool enabled)
 
 void CWakeOnAccess::LoadFromXML()
 {
-  bool enabled = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_POWERMANAGEMENT_WAKEONACCESS);
+  bool enabled = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_POWERMANAGEMENT_WAKEONACCESS);
 
   CXBMCTinyXML xmlDoc;
   if (!xmlDoc.LoadFile(GetSettingFile()))
@@ -833,7 +823,7 @@ void CWakeOnAccess::LoadFromXML()
   if (XMLUtils::GetInt(pRootElement, "netinittimeout", tmp, 0, 5 * 60))
     m_netinit_sec = tmp;
   CLog::Log(LOGNOTICE,"  -Network init timeout : [%d] sec", m_netinit_sec);
-  
+
   if (XMLUtils::GetInt(pRootElement, "netsettletime", tmp, 0, 5 * 1000))
     m_netsettle_ms = tmp;
   CLog::Log(LOGNOTICE,"  -Network settle time  : [%d] ms", m_netsettle_ms);

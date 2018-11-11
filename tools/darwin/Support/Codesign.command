@@ -8,6 +8,7 @@ LIST_BINARY_EXTENSIONS="dylib so"
 export CODESIGN_ALLOCATE=`xcodebuild -find codesign_allocate`
 
 GEN_ENTITLEMENTS="$NATIVEPREFIX/bin/gen_entitlements.py"
+IOS11_ENTITLEMENTS="$XBMC_DEPENDS/share/ios11_entitlements.xml"
 LDID="$NATIVEPREFIX/bin/ldid"
 
 if [ ! -f ${GEN_ENTITLEMENTS} ]; then
@@ -23,7 +24,21 @@ if [ "${PLATFORM_NAME}" == "iphoneos" ] || [ "${PLATFORM_NAME}" == "appletvos" ]
 
   #do fake sign - needed for jailbroken ios5.1 devices for some reason
   if [ -f ${LDID} ]; then
-    ${LDID} -S ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${APP_NAME}
+    find ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/ -name "*.dylib" | xargs ${LDID} -S${IOS11_ENTITLEMENTS}
+    find ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/ -name "*.so" | xargs ${LDID} -S${IOS11_ENTITLEMENTS}
+    ${LDID} -S${IOS11_ENTITLEMENTS} ${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${APP_NAME}
+    
+    #repackage python eggs
+    EGGS=`find ${CODESIGNING_FOLDER_PATH} -name "*.egg" -type f`
+        for i in $EGGS; do
+          echo $i
+          mkdir del
+          unzip $i -d del
+          find ./del/ -name "*.so" -type f |  xargs ${LDID} -S${IOS11_ENTITLEMENTS}
+          rm $i
+          cd del && zip -r $i ./* &&  cd ..
+          rm -r ./del/
+        done
   fi
 
   # pull the CFBundleIdentifier out of the built xxx.app
@@ -45,7 +60,7 @@ if [ "${PLATFORM_NAME}" == "iphoneos" ] || [ "${PLATFORM_NAME}" == "appletvos" ]
 
   ${GEN_ENTITLEMENTS} "${BUNDLEID}" "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${PROJECT_NAME}.xcent";
   codesign -v -f -s "${CODE_SIGN_IDENTITY_FOR_ITEMS}" --entitlements "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/${PROJECT_NAME}.xcent" "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/"
-  
+
   #if user has set a code_sign_identity different from iPhone Developer we do a real codesign (for deployment on non-jailbroken devices)
   if ! [ -z "${CODE_SIGN_IDENTITY}" ] && [ "${CODE_SIGN_IDENTITY}" == "iPhone Developer" ] && [ "${CODE_SIGN_IDENTITY}" != "Don't Code Sign"  ]; then
     echo "Doing a full bundle sign using genuine identity ${CODE_SIGN_IDENTITY}"

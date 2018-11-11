@@ -1,26 +1,13 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ControllerGrid.h"
 #include "games/controllers/Controller.h"
-#include "games/controllers/ControllerTranslator.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -112,7 +99,7 @@ unsigned int CControllerGrid::AddPorts(const ControllerPortVec &ports, Controlle
       if (port.PortType() == PORT_TYPE::CONTROLLER)
       {
         // Add controller
-        height = std::max(height, AddController(port, column.vertices.size(), column.vertices, grid));
+        height = std::max(height, AddController(port, static_cast<unsigned int>(column.vertices.size()), column.vertices, grid));
 
         if (bFirstPlayer == true)
         {
@@ -120,9 +107,9 @@ unsigned int CControllerGrid::AddPorts(const ControllerPortVec &ports, Controlle
 
           // Keyboard and mouse are added below the first controller
           if (itKeyboard != ports.end())
-            height = std::max(height, AddController(*itKeyboard, column.vertices.size(), column.vertices, grid));
+            height = std::max(height, AddController(*itKeyboard, static_cast<unsigned int>(column.vertices.size()), column.vertices, grid));
           if (itMouse != ports.end())
-            height = std::max(height, AddController(*itMouse, column.vertices.size(), column.vertices, grid));
+            height = std::max(height, AddController(*itMouse, static_cast<unsigned int>(column.vertices.size()), column.vertices, grid));
         }
       }
 
@@ -136,9 +123,9 @@ unsigned int CControllerGrid::AddPorts(const ControllerPortVec &ports, Controlle
     ControllerColumn column;
 
     if (itKeyboard != ports.end())
-      height = std::max(height, AddController(*itKeyboard, column.vertices.size(), column.vertices, grid));
+      height = std::max(height, AddController(*itKeyboard, static_cast<unsigned int>(column.vertices.size()), column.vertices, grid));
     if (itMouse != ports.end())
-      height = std::max(height, AddController(*itMouse, column.vertices.size(), column.vertices, grid));
+      height = std::max(height, AddController(*itMouse, static_cast<unsigned int>(column.vertices.size()), column.vertices, grid));
 
     if (!column.vertices.empty())
       grid.emplace_back(std::move(column));
@@ -234,7 +221,7 @@ void CControllerGrid::SetHeight(unsigned int height, ControllerGrid &grid)
 {
   for (auto &column : grid)
   {
-    while (column.vertices.size() < height)
+    while (static_cast<unsigned int>(column.vertices.size()) < height)
       AddInvisible(column.vertices);
   }
 }
@@ -244,7 +231,7 @@ CControllerGrid::GRID_DIRECTION CControllerGrid::GetDirection(const CControllerN
   // Hub controllers are added horizontally, one per row.
   //
   // If the current controller offers a player spot, the row starts to the
-  // right at the same hight as the controller.
+  // right at the same height as the controller.
   //
   // Otherwise, to row starts below the current controller in the same
   // column.

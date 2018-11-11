@@ -1,31 +1,17 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
+
 /*!
 \file GUIFontCache.h
 \brief
 */
-
-#ifndef CGUILIB_GUIFONTCACHE_H
-#define CGUILIB_GUIFONTCACHE_H
-#pragma once
-
-/*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
- *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
- */
 
 #include <cstddef>
 #include <cstring>
@@ -36,7 +22,8 @@
 #include <memory>
 #include <cassert>
 
-#include "TransformMatrix.h"
+#include "utils/Color.h"
+#include "utils/TransformMatrix.h"
 
 #define FONT_CACHE_TIME_LIMIT (1000)
 #define FONT_CACHE_DIST_LIMIT (0.01f)
@@ -51,7 +38,7 @@ template<class Position>
 struct CGUIFontCacheKey
 {
   Position m_pos;
-  vecColors &m_colors;
+  std::vector<UTILS::Color> &m_colors;
   vecText &m_text;
   uint32_t m_alignment;
   float m_maxPixelWidth;
@@ -61,7 +48,7 @@ struct CGUIFontCacheKey
   float m_scaleY;
 
   CGUIFontCacheKey(Position pos,
-                   vecColors &colors, vecText &text,
+                   std::vector<UTILS::Color> &colors, vecText &text,
                    uint32_t alignment, float maxPixelWidth,
                    bool scrolling, const TransformMatrix &matrix,
                    float scaleX, float scaleY) :
@@ -85,7 +72,7 @@ struct CGUIFontCacheEntry
   CGUIFontCacheEntry(const CGUIFontCache<Position, Value> &cache, const CGUIFontCacheKey<Position> &key, unsigned int nowMillis) :
     m_cache(cache),
     m_key(key.m_pos,
-          *new vecColors, *new vecText,
+          *new std::vector<UTILS::Color>, *new vecText,
           key.m_alignment, key.m_maxPixelWidth,
           key.m_scrolling, m_matrix,
           key.m_scaleX, key.m_scaleY),
@@ -148,9 +135,9 @@ public:
   explicit CGUIFontCache(CGUIFontTTFBase &font);
 
   ~CGUIFontCache();
- 
+
   Value &Lookup(Position &pos,
-                const vecColors &colors, const vecText &text,
+                const std::vector<UTILS::Color> &colors, const vecText &text,
                 uint32_t alignment, float maxPixelWidth,
                 bool scrolling,
                 unsigned int nowMillis, bool &dirtyCache);
@@ -214,9 +201,9 @@ struct CVertexBuffer
   typedef void* BufferHandleType;
 #define BUFFER_HANDLE_INIT nullptr
 #endif
-  BufferHandleType bufferHandle; // this is really a GLuint
-  size_t size;
-  CVertexBuffer() : bufferHandle(BUFFER_HANDLE_INIT), size(0), m_font(NULL) {}
+  BufferHandleType bufferHandle = BUFFER_HANDLE_INIT; // this is really a GLuint
+  size_t size = 0;
+  CVertexBuffer() : m_font(NULL) {}
   CVertexBuffer(BufferHandleType bufferHandle, size_t size, const CGUIFontTTFBase *font) : bufferHandle(bufferHandle), size(size), m_font(font) {}
   CVertexBuffer(const CVertexBuffer &other) : bufferHandle(other.bufferHandle), size(other.size), m_font(other.m_font)
   {
@@ -263,4 +250,3 @@ inline float MatrixHashContribution(const CGUIFontCacheKey<CGUIFontCacheDynamicP
   return 0;
 }
 
-#endif

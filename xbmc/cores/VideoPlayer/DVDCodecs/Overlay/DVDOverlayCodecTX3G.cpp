@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2011-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2011-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDOverlayCodecTX3G.h"
@@ -25,6 +13,7 @@
 #include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/auto_buffer.h"
@@ -50,7 +39,7 @@
                       (((uint32_t) str[1]) << 16) | \
                       (((uint32_t) str[2]) << 8) | \
                       (((uint32_t) str[3]) << 0))
-                      
+
 typedef enum {
  BOLD       = 0x1,
  ITALIC     = 0x2,
@@ -72,7 +61,7 @@ CDVDOverlayCodecTX3G::CDVDOverlayCodecTX3G() : CDVDOverlayCodec("TX3G Subtitle D
   m_pOverlay = NULL;
   // stupid, this comes from a static global in GUIWindowFullScreen.cpp
   uint32_t colormap[8] = { 0xFFFFFF00, 0xFFFFFFFF, 0xFF0099FF, 0xFF00FF00, 0xFFCCFF00, 0xFF00FFFF, 0xFFE5E5E5, 0xFFC0C0C0 };
-  m_textColor = colormap[CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SUBTITLES_COLOR)];
+  m_textColor = colormap[CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_SUBTITLES_COLOR)];
 }
 
 CDVDOverlayCodecTX3G::~CDVDOverlayCodecTX3G()
@@ -107,7 +96,7 @@ int CDVDOverlayCodecTX3G::Decode(DemuxPacket *pPacket)
   uint8_t  *end = pPacket->pData + pPacket->iSize;
 
   // Parse the packet as a TX3G TextSample.
-  // Look for a single StyleBox ('styl') and 
+  // Look for a single StyleBox ('styl') and
   // read all contained StyleRecords.
   // Ignore all other box types.
   // NOTE: Buffer overflows on read are not checked.
@@ -244,7 +233,7 @@ int CDVDOverlayCodecTX3G::Decode(DemuxPacket *pPacket)
     // this is a char index, not a byte index.
     charIndex++;
   }
-  
+
   if (strUTF8.empty())
     return OC_BUFFER;
 

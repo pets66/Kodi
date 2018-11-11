@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <X11/Xlib.h>
@@ -25,12 +13,12 @@
 #include "GLContextEGL.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/DispResource.h"
 #include "threads/SingleLock.h"
 #include <vector>
 #include "Application.h"
-#include "VideoSyncDRM.h"
+#include "VideoSyncOML.h"
 
 #include "cores/RetroPlayer/process/X11/RPProcessInfoX11.h"
 #include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererOpenGL.h"
@@ -40,6 +28,7 @@
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 
 #include "OptionalsReg.h"
+#include "platform/linux/OptionalsReg.h"
 
 using namespace KODI;
 
@@ -52,30 +41,39 @@ std::unique_ptr<CWinSystemBase> CWinSystemBase::CreateWinSystem()
 CWinSystemX11GLContext::CWinSystemX11GLContext()
 {
   std::string envSink;
-  if (getenv("AE_SINK"))
-    envSink = getenv("AE_SINK");
+  if (getenv("KODI_AE_SINK"))
+    envSink = getenv("KODI_AE_SINK");
   if (StringUtils::EqualsNoCase(envSink, "ALSA"))
   {
-    X11::ALSARegister();
+    OPTIONALS::ALSARegister();
   }
   else if (StringUtils::EqualsNoCase(envSink, "PULSE"))
   {
-    X11::PulseAudioRegister();
+    OPTIONALS::PulseAudioRegister();
+  }
+  else if (StringUtils::EqualsNoCase(envSink, "OSS"))
+  {
+    OPTIONALS::OSSRegister();
   }
   else if (StringUtils::EqualsNoCase(envSink, "SNDIO"))
   {
-    X11::SndioRegister();
+    OPTIONALS::SndioRegister();
   }
   else
   {
-    if (!X11::PulseAudioRegister())
+    if (!OPTIONALS::PulseAudioRegister())
     {
-      if (!X11::ALSARegister())
+      if (!OPTIONALS::ALSARegister())
       {
-        X11::SndioRegister();
+        if (!OPTIONALS::SndioRegister())
+        {
+          OPTIONALS::OSSRegister();
+        }
       }
     }
   }
+
+  m_lirc.reset(OPTIONALS::LircRegister());
 }
 
 CWinSystemX11GLContext::~CWinSystemX11GLContext()
@@ -144,13 +142,14 @@ EGLConfig CWinSystemX11GLContext::GetEGLConfig() const
 bool CWinSystemX11GLContext::SetWindow(int width, int height, bool fullscreen, const std::string &output, int *winstate)
 {
   int newwin = 0;
+
   CWinSystemX11::SetWindow(width, height, fullscreen, output, &newwin);
   if (newwin)
   {
     RefreshGLContext(m_currentOutput.compare(output) != 0);
     XSync(m_dpy, False);
-    g_graphicsContext.Clear(0);
-    g_graphicsContext.Flip(true, false);
+    CServiceBroker::GetWinSystem()->GetGfxContext().Clear(0);
+    CServiceBroker::GetWinSystem()->GetGfxContext().Flip(true, false);
     ResetVSync();
 
     m_windowDirty = false;
@@ -230,7 +229,7 @@ XVisualInfo* CWinSystemX11GLContext::GetVisual()
 
   int vMask = VisualScreenMask | VisualDepthMask | VisualClassMask;
 
-  vTemplate.screen = m_nScreen;
+  vTemplate.screen = m_screen;
   vTemplate.depth = 24;
   vTemplate.c_class = TrueColor;
 
@@ -250,7 +249,12 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
   bool success = false;
   if (m_pGLContext)
   {
-    success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+    success = m_pGLContext->Refresh(force, m_screen, m_glWindow, m_newGlContext);
+    if (!success)
+    {
+      success = m_pGLContext->CreatePB();
+      m_newGlContext = true;
+    }
     return success;
   }
 
@@ -268,12 +272,12 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
   std::transform(gpuvendor.begin(), gpuvendor.end(), gpuvendor.begin(), ::tolower);
   bool isNvidia = (gpuvendor.compare(0, 6, "nvidia") == 0);
   bool isIntel = (gpuvendor.compare(0, 5, "intel") == 0);
-  std::string gli = (getenv("GL_INTERFACE") != nullptr) ? getenv("GL_INTERFACE") : "";
+  std::string gli = (getenv("KODI_GL_INTERFACE") != nullptr) ? getenv("KODI_GL_INTERFACE") : "";
 
   if (gli != "GLX")
   {
     m_pGLContext = new CGLContextEGL(m_dpy);
-    success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+    success = m_pGLContext->Refresh(force, m_screen, m_glWindow, m_newGlContext);
     if (success)
     {
       if (!isNvidia)
@@ -292,13 +296,19 @@ bool CWinSystemX11GLContext::RefreshGLContext(bool force)
           return true;
       }
     }
+    else if (gli != "EGL")
+    {
+      success = m_pGLContext->CreatePB();
+      if (success)
+        return true;
+    }
   }
 
   delete m_pGLContext;
 
   // fallback for vdpau
   m_pGLContext = X11::GLXContextCreate(m_dpy);
-  success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+  success = m_pGLContext->Refresh(force, m_screen, m_glWindow, m_newGlContext);
   if (success)
   {
     X11::VDPAURegister();
@@ -313,7 +323,7 @@ std::unique_ptr<CVideoSync> CWinSystemX11GLContext::GetVideoSync(void *clock)
 
   if (dynamic_cast<CGLContextEGL*>(m_pGLContext))
   {
-    pVSync.reset(new CVideoSyncDRM(clock, *this));
+    pVSync.reset(new CVideoSyncOML(clock, *this));
   }
   else
   {
@@ -321,6 +331,29 @@ std::unique_ptr<CVideoSync> CWinSystemX11GLContext::GetVideoSync(void *clock)
   }
 
   return pVSync;
+}
+
+float CWinSystemX11GLContext::GetFrameLatencyAdjustment()
+{
+  if (m_pGLContext)
+  {
+    uint64_t msc, interval;
+    float micros = m_pGLContext->GetVblankTiming(msc, interval);
+    return micros / 1000;
+  }
+  return 0;
+}
+
+uint64_t CWinSystemX11GLContext::GetVblankTiming(uint64_t &msc, uint64_t &interval)
+{
+  if (m_pGLContext)
+  {
+    float micros = m_pGLContext->GetVblankTiming(msc, interval);
+    return micros / 1000;
+  }
+  msc = 0;
+  interval = 0;
+  return 0;
 }
 
 void CWinSystemX11GLContext::delete_CVaapiProxy::operator()(CVaapiProxy *p) const

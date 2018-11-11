@@ -1,28 +1,18 @@
 /*
- *      Copyright (C) 2015-2016 Team KODI
- *      http://kodi.tv
+ *  Copyright (C) 2015-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with KODI; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonGUIWindow.h"
 
 #include "Application.h"
 #include "FileItem.h"
+#include "ServiceBroker.h"
 #include "addons/Addon.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/TextureManager.h"
 #include "input/Key.h"
@@ -97,7 +87,7 @@ bool CGUIAddonWindow::OnMessage(CGUIMessage& message)
 
     case GUI_MSG_SETFOCUS:
     {
-      if (m_viewControl.HasControl(message.GetControlId()) && m_viewControl.GetCurrentControl() != (int)message.GetControlId())
+      if (m_viewControl.HasControl(message.GetControlId()) && m_viewControl.GetCurrentControl() != message.GetControlId())
       {
         m_viewControl.SetFocused();
         return true;
@@ -141,7 +131,7 @@ bool CGUIAddonWindow::OnMessage(CGUIMessage& message)
         return true;
       }
 
-      if (CBOnClick && iControl && iControl != (int)this->GetID())
+      if (CBOnClick && iControl && iControl != this->GetID())
       {
         CGUIControl* controlClicked = this->GetControl(iControl);
 
@@ -184,9 +174,9 @@ void CGUIAddonWindow::AllocResources(bool forceLoad /*= false */)
   m_mediaDir = fallbackMediaPath;
 
   //CLog::Log(LOGDEBUG, "CGUIPythonWindowXML::AllocResources called: %s", fallbackMediaPath.c_str());
-  g_TextureManager.AddTexturePath(m_mediaDir);
+  CServiceBroker::GetGUI()->GetTextureManager().AddTexturePath(m_mediaDir);
   CGUIMediaWindow::AllocResources(forceLoad);
-  g_TextureManager.RemoveTexturePath(m_mediaDir);
+  CServiceBroker::GetGUI()->GetTextureManager().RemoveTexturePath(m_mediaDir);
 }
 
 void CGUIAddonWindow::FreeResources(bool forceUnLoad /*= false */)
@@ -196,9 +186,9 @@ void CGUIAddonWindow::FreeResources(bool forceUnLoad /*= false */)
 
 void CGUIAddonWindow::Render()
 {
-  g_TextureManager.AddTexturePath(m_mediaDir);
+  CServiceBroker::GetGUI()->GetTextureManager().AddTexturePath(m_mediaDir);
   CGUIMediaWindow::Render();
-  g_TextureManager.RemoveTexturePath(m_mediaDir);
+  CServiceBroker::GetGUI()->GetTextureManager().RemoveTexturePath(m_mediaDir);
 }
 
 void CGUIAddonWindow::Update()
@@ -312,9 +302,9 @@ bool CGUIAddonWindowDialog::OnMessage(CGUIMessage &message)
 
 void CGUIAddonWindowDialog::Show(bool show /* = true */)
 {
-  unsigned int iCount = g_graphicsContext.exit();
+  unsigned int iCount = CServiceBroker::GetWinSystem()->GetGfxContext().exit();
   CApplicationMessenger::GetInstance().SendMsg(TMSG_GUI_ADDON_DIALOG, 1, show ? 1 : 0, static_cast<void*>(this));
-  g_graphicsContext.restore(iCount);
+  CServiceBroker::GetWinSystem()->GetGfxContext().restore(iCount);
 }
 
 void CGUIAddonWindowDialog::Show_Internal(bool show /* = true */)
@@ -323,7 +313,7 @@ void CGUIAddonWindowDialog::Show_Internal(bool show /* = true */)
   {
     m_bModal = true;
     m_bRunning = true;
-    g_windowManager.RegisterDialog(this);
+    CServiceBroker::GetGUI()->GetWindowManager().RegisterDialog(this);
 
     // active this window...
     CGUIMessage msg(GUI_MSG_WINDOW_INIT, 0, 0, WINDOW_INVALID, m_iWindowId);
@@ -332,9 +322,10 @@ void CGUIAddonWindowDialog::Show_Internal(bool show /* = true */)
     // this dialog is derived from GUiMediaWindow
     // make sure it is rendered last
     m_renderOrder = RENDER_ORDER_DIALOG;
-    while (m_bRunning && !g_application.m_bStop)
+    while (m_bRunning)
     {
-      ProcessRenderLoop();
+      if (!ProcessRenderLoop(false))
+        break;
     }
   }
   else // hide
@@ -344,7 +335,7 @@ void CGUIAddonWindowDialog::Show_Internal(bool show /* = true */)
     CGUIMessage msg(GUI_MSG_WINDOW_DEINIT,0,0);
     OnMessage(msg);
 
-    g_windowManager.RemoveDialog(GetID());
+    CServiceBroker::GetGUI()->GetWindowManager().RemoveDialog(GetID());
   }
 }
 

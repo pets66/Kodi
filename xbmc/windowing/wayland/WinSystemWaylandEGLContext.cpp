@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WinSystemWaylandEGLContext.h"
@@ -24,9 +12,15 @@
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 #include "utils/log.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
+
+#include <EGL/eglext.h>
 
 using namespace KODI::WINDOWING::WAYLAND;
+
+CWinSystemWaylandEGLContext::CWinSystemWaylandEGLContext()
+: m_eglContext{EGL_PLATFORM_WAYLAND_EXT, "EGL_EXT_platform_wayland"}
+{}
 
 bool CWinSystemWaylandEGLContext::InitWindowSystemEGL(EGLint renderableType, EGLint apiType)
 {
@@ -38,7 +32,17 @@ bool CWinSystemWaylandEGLContext::InitWindowSystemEGL(EGLint renderableType, EGL
     return false;
   }
 
-  if (!m_eglContext.CreateDisplay(GetConnection()->GetDisplay(), renderableType, apiType))
+  if (!m_eglContext.CreatePlatformDisplay(GetConnection()->GetDisplay(), GetConnection()->GetDisplay()))
+  {
+    return false;
+  }
+
+  if (!m_eglContext.InitializeDisplay(apiType))
+  {
+    return false;
+  }
+
+  if (!m_eglContext.ChooseConfig(renderableType))
   {
     return false;
   }
@@ -60,15 +64,17 @@ bool CWinSystemWaylandEGLContext::CreateNewWindow(const std::string& name,
     return false;
   }
 
+  m_nativeWindow = wayland::egl_window_t{GetMainSurface(), GetBufferSize().Width(), GetBufferSize().Height()};
+
   // CWinSystemWayland::CreateNewWindow sets internal m_bufferSize
   // to the resolution that should be used for the initial surface size
   // - the compositor might want something other than the resolution given
-  if (!m_eglContext.CreateSurface(GetMainSurface(), GetBufferSize()))
+  if (!m_eglContext.CreatePlatformSurface(m_nativeWindow.c_ptr(), m_nativeWindow.c_ptr()))
   {
     return false;
   }
 
-  if (!m_eglContext.MakeCurrent())
+  if (!m_eglContext.BindContext())
   {
     return false;
   }
@@ -83,6 +89,7 @@ bool CWinSystemWaylandEGLContext::CreateNewWindow(const std::string& name,
 bool CWinSystemWaylandEGLContext::DestroyWindow()
 {
   m_eglContext.DestroySurface();
+  m_nativeWindow = {};
 
   return CWinSystemWayland::DestroyWindow();
 }
@@ -94,13 +101,20 @@ bool CWinSystemWaylandEGLContext::DestroyWindowSystem()
   return CWinSystemWayland::DestroyWindowSystem();
 }
 
+CSizeInt CWinSystemWaylandEGLContext::GetNativeWindowAttachedSize()
+{
+  int width, height;
+  m_nativeWindow.get_attached_size(width, height);
+  return {width, height};
+}
+
 void CWinSystemWaylandEGLContext::SetContextSize(CSizeInt size)
 {
   // Change EGL surface size if necessary
-  if (m_eglContext.GetAttachedSize() != size)
+  if (GetNativeWindowAttachedSize() != size)
   {
     CLog::LogF(LOGDEBUG, "Updating egl_window size to %dx%d", size.Width(), size.Height());
-    m_eglContext.Resize(size);
+    m_nativeWindow.resize(size.Width(), size.Height(), 0, 0);
   }
 }
 
@@ -110,7 +124,14 @@ void CWinSystemWaylandEGLContext::PresentFrame(bool rendered)
 
   if (rendered)
   {
-    m_eglContext.SwapBuffers();
+    if (!m_eglContext.TrySwapBuffers())
+    {
+      // For now we just hard fail if this fails
+      // Theoretically, EGL_CONTEXT_LOST could be handled, but it needs to be checked
+      // whether egl implementations actually use it (mesa does not)
+      CEGLUtils::LogError("eglSwapBuffers failed");
+      throw std::runtime_error("eglSwapBuffers failed");
+    }
     // eglSwapBuffers() (hopefully) calls commit on the surface and flushes
     // ... well mesa does anyway
   }

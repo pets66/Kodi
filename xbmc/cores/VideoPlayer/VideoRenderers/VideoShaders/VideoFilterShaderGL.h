@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2007-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "system_gl.h"
 #include "guilib/Shader.h"
@@ -43,7 +31,7 @@ namespace Shaders {
     GLint GetVertexLoc() { return m_hVertex; }
     GLint GetCoordLoc() { return m_hCoord; }
 
-    void SetMatrices(GLfloat *p, GLfloat *m) { m_proj = p; m_model = m; }
+    void SetMatrices(const GLfloat *p, const GLfloat *m) { m_proj = p; m_model = m; }
 
   protected:
     int m_width;
@@ -53,8 +41,8 @@ namespace Shaders {
     float m_stretch;
     GLfloat m_alpha;
     GLint m_sourceTexUnit;
-    GLfloat *m_proj = nullptr;
-    GLfloat *m_model = nullptr;
+    const GLfloat *m_proj = nullptr;
+    const GLfloat *m_model = nullptr;
 
     // shader attribute handles
     GLint m_hSourceTex;

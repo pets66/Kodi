@@ -1,29 +1,17 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
+
 /*!
 \file GUIDialog.h
 \brief
 */
-
-#pragma once
-
-/*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
- *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
- */
 
 #include "GUIWindow.h"
 #include "WindowIDs.h"
@@ -34,8 +22,7 @@
 enum class DialogModalityType
 {
   MODELESS,
-  MODAL,
-  PARENTLESS_MODAL
+  MODAL
 };
 #ifdef TARGET_WINDOWS_STORE
 #pragma pack(pop)
@@ -58,12 +45,12 @@ public:
   void Render() override;
 
   void Open(const std::string &param = "");
-  
+
   bool OnBack(int actionID) override;
 
   bool IsDialogRunning() const override { return m_active; };
   bool IsDialog() const override { return true;};
-  bool IsModalDialog() const override { return m_modalityType == DialogModalityType::MODAL || m_modalityType == DialogModalityType::PARENTLESS_MODAL; };
+  bool IsModalDialog() const override { return m_modalityType == DialogModalityType::MODAL; };
   virtual DialogModalityType GetModalityType() const { return m_modalityType; };
 
   void SetAutoClose(unsigned int timeoutMs);

@@ -1,22 +1,10 @@
 /*
  *      Initial code sponsored by: Voddler Inc (voddler.com)
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "OverlayRenderer.h"
@@ -29,14 +17,13 @@
 #include "LinuxRendererGLES.h"
 #include "rendering/gles/RenderSystemGLES.h"
 #endif
-#include "guilib/MatrixGLES.h"
+#include "rendering/MatrixGL.h"
 #include "RenderManager.h"
 #include "ServiceBroker.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlayImage.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlaySpu.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlaySSA.h"
 #include "windowing/WinSystem.h"
-#include "settings/Settings.h"
 #include "utils/MathUtils.h"
 #include "utils/log.h"
 #include "utils/GLUtils.h"
@@ -139,20 +126,20 @@ static void LoadTexture(GLenum target
     glTexSubImage2D( target, 0
                    , 0, height, width, 1
                    , externalFormat, GL_UNSIGNED_BYTE
-                   , (unsigned char*)pixelData + stride * (height-1));
+                   , (const unsigned char*)pixelData + stride * (height-1));
 
   if(width  < width2)
     glTexSubImage2D( target, 0
                    , width, 0, 1, height
                    , externalFormat, GL_UNSIGNED_BYTE
-                   , (unsigned char*)pixelData + bytesPerPixel * (width-1));
+                   , (const unsigned char*)pixelData + bytesPerPixel * (width-1));
 
 #ifndef HAS_GLES
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 #endif
 
   free(pixelVector);
-  
+
   *u = (GLfloat)width  / width2;
   *v = (GLfloat)height / height2;
 }
@@ -204,8 +191,8 @@ COverlayTextureGL::COverlayTextureGL(CDVDOverlayImage* o)
 
   if(o->source_width && o->source_height)
   {
-    float center_x = (float)(0.5f * o->width  + o->x) / o->source_width;
-    float center_y = (float)(0.5f * o->height + o->y) / o->source_height;
+    float center_x = (0.5f * o->width  + o->x) / o->source_width;
+    float center_y = (0.5f * o->height + o->y) / o->source_height;
 
     m_width  = (float)o->width  / o->source_width;
     m_height = (float)o->height / o->source_height;
@@ -381,11 +368,11 @@ void COverlayGlyphGL::Render(SRenderState& state)
   glMatrixModview.Load();
 
 #ifdef HAS_GL
-  CRenderSystemGL& renderSystem = dynamic_cast<CRenderSystemGL&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableShader(SM_FONTS);
-  GLint posLoc  = renderSystem.ShaderGetPos();
-  GLint colLoc  = renderSystem.ShaderGetCol();
-  GLint tex0Loc = renderSystem.ShaderGetCoord0();
+  CRenderSystemGL* renderSystem = dynamic_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableShader(SM_FONTS);
+  GLint posLoc  = renderSystem->ShaderGetPos();
+  GLint colLoc  = renderSystem->ShaderGetCol();
+  GLint tex0Loc = renderSystem->ShaderGetCoord0();
 
   std::vector<VERTEX> vecVertices( 6 * m_count);
   VERTEX *vertices = &vecVertices[0];
@@ -423,14 +410,14 @@ void COverlayGlyphGL::Render(SRenderState& state)
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glDeleteBuffers(1, &VertexVBO);
 
-  renderSystem.DisableShader();
+  renderSystem->DisableShader();
 
 #else
-  CRenderSystemGLES& renderSystem = dynamic_cast<CRenderSystemGLES&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableGUIShader(SM_FONTS);
-  GLint posLoc  = renderSystem.GUIShaderGetPos();
-  GLint colLoc  = renderSystem.GUIShaderGetCol();
-  GLint tex0Loc = renderSystem.GUIShaderGetCoord0();
+  CRenderSystemGLES* renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableGUIShader(SM_FONTS);
+  GLint posLoc  = renderSystem->GUIShaderGetPos();
+  GLint colLoc  = renderSystem->GUIShaderGetCol();
+  GLint tex0Loc = renderSystem->GUIShaderGetCoord0();
 
   // stack object until VBOs will be used
   std::vector<VERTEX> vecVertices( 6 * m_count);
@@ -463,7 +450,7 @@ void COverlayGlyphGL::Render(SRenderState& state)
   glDisableVertexAttribArray(colLoc);
   glDisableVertexAttribArray(tex0Loc);
 
-  renderSystem.DisableGUIShader();
+  renderSystem->DisableGUIShader();
 #endif
 
   glMatrixModview.PopLoad();
@@ -511,11 +498,11 @@ void COverlayTextureGL::Render(SRenderState& state)
   }
 
 #if defined(HAS_GL)
-  CRenderSystemGL& renderSystem = dynamic_cast<CRenderSystemGL&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableShader(SM_TEXTURE);
-  GLint posLoc = renderSystem.ShaderGetPos();
-  GLint tex0Loc = renderSystem.ShaderGetCoord0();
-  GLint uniColLoc = renderSystem.ShaderGetUniCol();
+  CRenderSystemGL* renderSystem = dynamic_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableShader(SM_TEXTURE_LIM);
+  GLint posLoc = renderSystem->ShaderGetPos();
+  GLint tex0Loc = renderSystem->ShaderGetCoord0();
+  GLint uniColLoc = renderSystem->ShaderGetUniCol();
 
   GLfloat col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
@@ -578,15 +565,15 @@ void COverlayTextureGL::Render(SRenderState& state)
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glDeleteBuffers(1, &indexVBO);
 
-  renderSystem.DisableShader();
+  renderSystem->DisableShader();
 
 #else
-  CRenderSystemGLES& renderSystem = dynamic_cast<CRenderSystemGLES&>(CServiceBroker::GetRenderSystem());
-  renderSystem.EnableGUIShader(SM_TEXTURE);
-  GLint posLoc = renderSystem.GUIShaderGetPos();
-  GLint colLoc = renderSystem.GUIShaderGetCol();
-  GLint tex0Loc = renderSystem.GUIShaderGetCoord0();
-  GLint uniColLoc = renderSystem.GUIShaderGetUniCol();
+  CRenderSystemGLES* renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+  renderSystem->EnableGUIShader(SM_TEXTURE);
+  GLint posLoc = renderSystem->GUIShaderGetPos();
+  GLint colLoc = renderSystem->GUIShaderGetCol();
+  GLint tex0Loc = renderSystem->GUIShaderGetCoord0();
+  GLint uniColLoc = renderSystem->GUIShaderGetUniCol();
 
   GLfloat col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
   GLfloat ver[4][2];
@@ -619,7 +606,7 @@ void COverlayTextureGL::Render(SRenderState& state)
   glDisableVertexAttribArray(colLoc);
   glDisableVertexAttribArray(tex0Loc);
 
-  renderSystem.DisableGUIShader();
+  renderSystem->DisableGUIShader();
 #endif
 
   glDisable(GL_BLEND);

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUITextureD3D.h"
@@ -38,17 +26,17 @@ CGUITextureD3D::~CGUITextureD3D()
 {
 }
 
-void CGUITextureD3D::Begin(color_t color)
+void CGUITextureD3D::Begin(UTILS::Color color)
 {
   CBaseTexture* texture = m_texture.m_textures[m_currentFrame];
   texture->LoadToGPU();
 
-  if (m_diffuse.size()) 
+  if (m_diffuse.size())
 	  m_diffuse.m_textures[0]->LoadToGPU();
 
   m_col = color;
 
-  DX::Windowing().SetAlphaBlendEnable(true);
+  DX::Windowing()->SetAlphaBlendEnable(true);
 }
 
 void CGUITextureD3D::End()
@@ -118,7 +106,7 @@ void CGUITextureD3D::Draw(float *x, float *y, float *z, const CRect &texture, co
   verts[3].color = xcolor;
 
   CDXTexture* tex = (CDXTexture *)m_texture.m_textures[m_currentFrame];
-  CGUIShaderDX* pGUIShader = DX::Windowing().GetGUIShader();
+  CGUIShaderDX* pGUIShader = DX::Windowing()->GetGUIShader();
 
   pGUIShader->Begin(m_diffuse.size() ? SHADER_METHOD_RENDER_MULTI_TEXTURE_BLEND : SHADER_METHOD_RENDER_TEXTURE_BLEND);
 
@@ -136,7 +124,7 @@ void CGUITextureD3D::Draw(float *x, float *y, float *z, const CRect &texture, co
   pGUIShader->DrawQuad(verts[0], verts[1], verts[2], verts[3]);
 }
 
-void CGUITextureD3D::DrawQuad(const CRect &rect, color_t color, CBaseTexture *texture, const CRect *texCoords)
+void CGUITextureD3D::DrawQuad(const CRect &rect, UTILS::Color color, CBaseTexture *texture, const CRect *texCoords)
 {
   unsigned numViews = 0;
   ID3D11ShaderResourceView* views = nullptr;

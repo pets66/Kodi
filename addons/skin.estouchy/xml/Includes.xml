@@ -792,8 +792,8 @@
 				<height>760</height>
 				<onleft>9000</onleft>
 				<onright>9003</onright>
-				<onup>10</onup>
-				<ondown>10</ondown>
+				<onup>9002</onup>
+				<ondown>9002</ondown>
 				<scrolltime>300</scrolltime>
 				<orientation>vertical</orientation>
 				<focusposition>1</focusposition>
@@ -943,7 +943,7 @@
 		</item>
 	</include>
 	<include name="KeyboardButton">
-		<width>84</width>
+		<width min="76">auto</width>
 		<height>76</height>
 		<texturenofocus colordiffuse="grey2">white.png</texturenofocus>
 		<texturefocus>list_focus.png</texturefocus>
@@ -1169,12 +1169,6 @@
 			<label>$LOCALIZE[38018]</label>
 			<include>MenuButtonCommonValues</include>
 			<onclick>SetRating</onclick>
-		</control>
-		<control type="button">
-			<label>15047</label>
-			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(OSDAudioDSPSettings)</onclick>
-			<visible>system.getbool(audiooutput.dspaddonsenabled)</visible>
 		</control>
 		<control type="button">
 			<label>29900</label>
@@ -2462,22 +2456,22 @@
 		<control type="button">
 			<label>13395</label>
 			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(123)</onclick>
+			<onclick>ActivateWindow(osdvideosettings)</onclick>
 		</control>
 		<control type="button">
 			<label>31002</label>
 			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(124)</onclick>
+			<onclick>ActivateWindow(osdaudiosettings)</onclick>
+		</control>
+		<control type="button">
+			<label>24133</label>
+			<include>MenuButtonCommonValues</include>
+			<onclick>ActivateWindow(osdsubtitlesettings)</onclick>
 		</control>
 		<control type="button">
 			<label>298</label>
 			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(125)</onclick>
-		</control>
-		<control type="button">
-			<label>31356</label>
-			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(SubtitleSearch)</onclick>
+			<onclick>ActivateWindow(videobookmarks)</onclick>
 		</control>
 		<control type="button">
 			<label>$LOCALIZE[486]$INFO[Playlist.Repeat, : ]</label>
@@ -2496,12 +2490,6 @@
 			<include>MenuButtonCommonValues</include>
 			<onclick>PlayerControl(ShowVideoMenu)</onclick>
 			<visible>VideoPlayer.HasMenu + !VideoPlayer.Content(LiveTV)</visible>
-		</control>
-		<control type="button">
-			<label>15047</label>
-			<include>MenuButtonCommonValues</include>
-			<onclick>ActivateWindow(OSDAudioDSPSettings)</onclick>
-			<visible>system.getbool(audiooutput.dspaddonsenabled)</visible>
 		</control>
 		<control type="button">
 			<label>Player info</label>
@@ -2533,6 +2521,61 @@
 			<include>MenuButtonCommonValues</include>
 		</control>
 	</include>
+	<include name="YesNoDefaultButtons">
+		<control type="group">
+			<posx>145</posx>
+			<posy>240</posy>
+			<width>660</width>
+			<height>60</height>
+			<visible>Window.IsVisible(yesnodialog)</visible>
+			<control type="button" id="11">
+				<description>Yes button</description>
+				<posx>0</posx>
+				<posy>0</posy>
+				<width>200</width>
+				<include>ButtonInfoDialogsCommonValues</include>
+			</control>
+			<control type="button" id="10">
+				<description>No button</description>
+				<posx>210</posx>
+				<posy>0</posy>
+				<width>200</width>
+				<include>ButtonInfoDialogsCommonValues</include>
+			</control>
+		</control>
+	</include>
+	<include name="YesNoExtendedButtons">
+		<control type="grouplist" id="9000">
+			<posx>20</posx>
+			<posy>240</posy>
+			<width>660</width>
+			<height>60</height>
+			<itemgap>10</itemgap>
+			<align>center</align>
+			<orientation>horizontal</orientation>
+			<onleft>9000</onleft>
+			<onright>9000</onright>
+			<onup>9000</onup>
+			<ondown>9000</ondown>
+			<visible>!Window.IsVisible(yesnodialog)</visible>
+			<control type="button" id="10">
+				<description>OK button</description>
+				<width>200</width>
+				<include>ButtonInfoDialogsCommonValues</include>
+			</control>
+			<control type="button" id="11">
+				<description>Cancel button</description>
+				<width>200</width>
+				<include>ButtonInfoDialogsCommonValues</include>
+			</control>
+			<control type="button" id="12">
+				<description>Custom button</description>
+				<width>200</width>
+				<include>ButtonInfoDialogsCommonValues</include>
+			</control>
+		</control>
+	</include>
+
 	<include name="16x9_xPos_Relocation">
 		<animation effect="slide" start="0,0" end="213,0" time="0" condition="String.IsEqual(Skin.AspectRatio,16:9)">conditional</animation>
 	</include>

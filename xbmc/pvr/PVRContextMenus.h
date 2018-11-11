@@ -1,37 +1,53 @@
-#pragma once
 /*
- *      Copyright (C) 2016 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <memory>
 #include <vector>
+
+#include "utils/EventStream.h"
 
 class IContextMenuItem;
 
 namespace PVR
 {
+  enum class PVRContextMenuEventAction
+  {
+    ADD_ITEM,
+    REMOVE_ITEM
+  };
+
+  struct PVRContextMenuEvent
+  {
+    PVRContextMenuEvent(const PVRContextMenuEventAction& a, const std::shared_ptr<IContextMenuItem>& i)
+    : action(a), item(i) {}
+
+    PVRContextMenuEventAction action;
+    std::shared_ptr<IContextMenuItem> item;
+  };
+
+  class CPVRClientMenuHook;
+
   class CPVRContextMenuManager
   {
   public:
     static CPVRContextMenuManager& GetInstance();
 
     std::vector<std::shared_ptr<IContextMenuItem>> GetMenuItems() const { return m_items; }
+
+    void AddMenuHook(const CPVRClientMenuHook& hook);
+    void RemoveMenuHook(const CPVRClientMenuHook& hook);
+
+    /*!
+     * @brief Query the events available for CEventStream
+     */
+    CEventStream<PVRContextMenuEvent>& Events() { return m_events; }
 
   private:
     CPVRContextMenuManager();
@@ -40,6 +56,7 @@ namespace PVR
     virtual ~CPVRContextMenuManager() = default;
 
     std::vector<std::shared_ptr<IContextMenuItem>> m_items;
+    CEventSource<PVRContextMenuEvent> m_events;
   };
 
 } // namespace PVR

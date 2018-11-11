@@ -1,22 +1,11 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "IRenderManager.h"
@@ -67,7 +56,7 @@ namespace RETRO
    *
    * Special behavior is needed when the game is paused. As no new frames are
    * delivered, a newly created renderer will stay black. For this scenario,
-   * when we detect a pause event, the frame is premptively cached so that a
+   * when we detect a pause event, the frame is preemptively cached so that a
    * newly created renderer will have something to display.
    */
   class CRPRenderManager : public IRenderManager,
@@ -86,16 +75,16 @@ namespace RETRO
     CGUIRenderTargetFactory *GetGUIRenderTargetFactory() { return m_renderControlFactory.get(); }
 
     // Functions called from game loop
-    bool Configure(AVPixelFormat format, unsigned int width, unsigned int height, unsigned int orientation);
-    void AddFrame(const uint8_t* data, unsigned int size);
+    bool Configure(AVPixelFormat format, unsigned int nominalWidth, unsigned int nominalHeight, unsigned int maxWidth, unsigned int maxHeight);
+    bool GetVideoBuffer(unsigned int width, unsigned int height, AVPixelFormat &format, uint8_t *&data, size_t &size);
+    void AddFrame(const uint8_t* data, size_t size, unsigned int width, unsigned int height, unsigned int orientationDegCW);
+    void Flush();
 
     // Functions called from the player
     void SetSpeed(double speed);
 
     // Functions called from render thread
     void FrameMove();
-    void Flush();
-    void TriggerUpdateResolution();
 
     // Implementation of IRenderManager
     void RenderWindow(bool bClear, const RESOLUTION_INFO &coordsRes) override;
@@ -103,8 +92,8 @@ namespace RETRO
     void ClearBackground() override;
 
     // Implementation of IRenderCallback
-    bool SupportsRenderFeature(ERENDERFEATURE feature) const override;
-    bool SupportsScalingMethod(ESCALINGMETHOD method) const override;
+    bool SupportsRenderFeature(RENDERFEATURE feature) const override;
+    bool SupportsScalingMethod(SCALINGMETHOD method) const override;
 
   private:
     /*!
@@ -137,26 +126,63 @@ namespace RETRO
      */
     void CreateRenderBuffer(IRenderBufferPool *bufferPool);
 
-    void UpdateResolution();
+    /*!
+     * \brief Create a render buffer and copy the cached data into it
+     *
+     * The cached frame is accessed by both the game and rendering threads,
+     * and therefore requires synchronization.
+     *
+     * However, assuming the memory copy is expensive, we must avoid holding
+     * the mutex during the copy.
+     *
+     * To allow for this, the function is permitted to invalidate its
+     * cachedFrame parameter, as long as it is restored upon exit. While the
+     * mutex is exited inside this function, cachedFrame is guaranteed to be
+     * empty.
+     *
+     * \param cachedFrame The cached frame
+     * \param width The width of the cached frame
+     * \param height The height of the cached frame
+     * \param bufferPool The buffer pool used to create the render buffer
+     * \param mutex The locked mutex, to be unlocked during memory copy
+     *
+     * \return The render buffer if one was created from the cached frame,
+     *         otherwise nullptr
+     */
+    IRenderBuffer *CreateFromCache(std::vector<uint8_t> &cachedFrame, unsigned int width, unsigned int height, IRenderBufferPool *bufferPool, CCriticalSection &mutex);
 
     /*!
      * \brief Utility function to copy a frame and rescale pixels if necessary
      */
-    void CopyFrame(IRenderBuffer *renderBuffer, const uint8_t *data, size_t size, AVPixelFormat format);
+    void CopyFrame(IRenderBuffer *renderBuffer, AVPixelFormat format, const uint8_t *data, size_t size, unsigned int width, unsigned int height);
 
     CRenderVideoSettings GetEffectiveSettings(const IGUIRenderSettings *settings) const;
+
+    void CheckFlush();
 
     // Construction parameters
     CRPProcessInfo &m_processInfo;
     CRenderContext &m_renderContext;
 
+    // Subsystems
+    std::shared_ptr<IGUIRenderSettings> m_renderSettings;
+    std::shared_ptr<CGUIRenderTargetFactory> m_renderControlFactory;
+
     // Stream properties
     AVPixelFormat m_format = AV_PIX_FMT_NONE;
-    unsigned int m_width = 0;
-    unsigned int m_height = 0;
-    unsigned int m_orientation = 0; // Degrees counter-clockwise
+    unsigned int m_maxWidth = 0;
+    unsigned int m_maxHeight = 0;
 
-    // Render properties
+    // Render resources
+    std::set<std::shared_ptr<CRPBaseRenderer>> m_renderers;
+    std::vector<IRenderBuffer*> m_pendingBuffers; // Only access from game thread
+    std::vector<IRenderBuffer*> m_renderBuffers;
+    std::map<AVPixelFormat, SwsContext*> m_scalers;
+    std::vector<uint8_t> m_cachedFrame;
+    unsigned int m_cachedWidth = 0;
+    unsigned int m_cachedHeight = 0;
+
+    // State parameters
     enum class RENDER_STATE
     {
       UNCONFIGURED,
@@ -164,15 +190,14 @@ namespace RETRO
       CONFIGURED,
     };
     RENDER_STATE m_state = RENDER_STATE::UNCONFIGURED;
-    std::atomic<double> m_speed;
-    std::shared_ptr<IGUIRenderSettings> m_renderSettings;
-    std::set<std::shared_ptr<CRPBaseRenderer>> m_renderers;
-    std::shared_ptr<CGUIRenderTargetFactory> m_renderControlFactory;
-    std::vector<IRenderBuffer*> m_renderBuffers;
-    std::vector<uint8_t> m_cachedFrame;
-    std::map<AVPixelFormat, SwsContext*> m_scalers;
-    bool m_bHasCachedFrame = false;
-    bool m_bTriggerUpdateResolution = false;
+    bool m_bHasCachedFrame = false; // Invariant: m_cachedFrame is empty if false
+    std::set<std::string> m_failedShaderPresets;
+    std::atomic<bool> m_bFlush = {false};
+
+    // Playback parameters
+    std::atomic<double> m_speed = {1.0};
+
+    // Synchronization parameters
     CCriticalSection m_stateMutex;
     CCriticalSection m_bufferMutex;
   };

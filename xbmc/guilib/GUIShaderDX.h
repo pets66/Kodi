@@ -1,22 +1,11 @@
 /*
-*      Copyright (C) 2005-2015 Team Kodi
-*      http://kodi.tv
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
 #pragma once
 
 #include "utils/Geometry.h"
@@ -59,10 +48,10 @@ public:
   void SetViewPort(D3D11_VIEWPORT viewPort);
 
   void XM_CALLCONV GetWVP(DirectX::XMMATRIX &w, DirectX::XMMATRIX &v, DirectX::XMMATRIX &p)
-  { 
-    w = m_cbWorldViewProj.world; 
-    v = m_cbWorldViewProj.view; 
-    p = m_cbWorldViewProj.projection; 
+  {
+    w = m_cbWorldViewProj.world;
+    v = m_cbWorldViewProj.view;
+    p = m_cbWorldViewProj.projection;
   }
   DirectX::XMMATRIX XM_CALLCONV GetWorld() const { return m_cbWorldViewProj.world; }
   DirectX::XMMATRIX XM_CALLCONV GetView() const { return m_cbWorldViewProj.view; }
@@ -76,7 +65,7 @@ public:
   void DrawQuad(Vertex& v1, Vertex& v2, Vertex& v3, Vertex& v4);
   void DrawIndexed(unsigned int indexCount, unsigned int startIndex, unsigned int startVertex);
   void Draw(unsigned int vertexCount, unsigned int startVertex);
-  
+
   bool  HardwareClipIsPossible(void) const { return m_clipPossible; }
   float GetClipXFactor(void) const { return m_clipXFactor;  }
   float GetClipXOffset(void) const { return m_clipXOffset;  }

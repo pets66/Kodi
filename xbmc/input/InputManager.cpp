@@ -1,22 +1,10 @@
 /*
-*      Copyright (C) 2005-2014 Team XBMC
-*      http://kodi.tv
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
 
 #include <math.h>
 
@@ -33,8 +21,8 @@
 #include "input/mouse/interfaces/IMouseDriverHandler.h"
 #include "input/mouse/MouseTranslator.h"
 #include "input/Key.h"
-#include "input/WindowTranslator.h"
 #include "messaging/ApplicationMessenger.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIAudioManager.h"
 #include "guilib/GUIControl.h"
 #include "guilib/GUIWindow.h"
@@ -43,14 +31,16 @@
 #include "network/EventServer.h"
 #include "ButtonTranslator.h"
 #include "peripherals/Peripherals.h"
-#include "peripherals/devices/PeripheralImon.h"
 #include "XBMC_vkeys.h"
 #include "utils/Geometry.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "Util.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "AppParamParser.h"
+#include "AppInboundProtocol.h"
 
 #include <algorithm>
 
@@ -59,13 +49,9 @@ using EVENTSERVER::CEventServer;
 using namespace KODI;
 using namespace MESSAGING;
 
-CreateRemoteControlFunc CInputManager::m_createRemoteControl = nullptr;
-
-CInputManager::CInputManager(const CAppParamParser &params,
-                             const CProfilesManager &profileManager) :
+CInputManager::CInputManager(const CAppParamParser &params) :
   m_keymapEnvironment(new CKeymapEnvironment),
   m_buttonTranslator(new CButtonTranslator),
-  m_irTranslator(new CIRTranslator(profileManager)),
   m_customControllerTranslator(new CCustomControllerTranslator),
   m_touchTranslator(new CTouchTranslator),
   m_joystickTranslator(new CJoystickMapper),
@@ -77,29 +63,18 @@ CInputManager::CInputManager(const CAppParamParser &params,
 
   RegisterKeyboardDriverHandler(m_keyboardEasterEgg.get());
 
-  if (m_createRemoteControl)
-    m_RemoteControl.reset(m_createRemoteControl());
-
-  if (!params.RemoteControlName().empty())
-    SetRemoteControlName(params.RemoteControlName());
-
-  if (!params.RemoteControlEnabled())
-    DisableRemoteControl();
-
   // Register settings
   std::set<std::string> settingSet;
   settingSet.insert(CSettings::SETTING_INPUT_ENABLEMOUSE);
-  CServiceBroker::GetSettings().RegisterCallback(this, settingSet);
+  CServiceBroker::GetSettingsComponent()->GetSettings()->RegisterCallback(this, settingSet);
 }
 
 CInputManager::~CInputManager()
 {
   Deinitialize();
 
-  m_RemoteControl.reset();
-
   // Unregister settings
-  CServiceBroker::GetSettings().UnregisterCallback(this);
+  CServiceBroker::GetSettingsComponent()->GetSettings()->UnregisterCallback(this);
 
   UnregisterKeyboardDriverHandler(m_keyboardEasterEgg.get());
 
@@ -110,33 +85,14 @@ CInputManager::~CInputManager()
 
 void CInputManager::InitializeInputs()
 {
-  if (m_RemoteControl)
-    m_RemoteControl->Initialize();
   m_Keyboard.Initialize();
 
   m_Mouse.Initialize();
-  m_Mouse.SetEnabled(CServiceBroker::GetSettings().GetBool(CSettings::SETTING_INPUT_ENABLEMOUSE));
+  m_Mouse.SetEnabled(CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_INPUT_ENABLEMOUSE));
 }
 
 void CInputManager::Deinitialize()
 {
-  if (m_RemoteControl)
-    m_RemoteControl->Disconnect();
-}
-
-bool CInputManager::ProcessRemote(int windowId)
-{
-  if (!m_RemoteControl)
-    return false;
-
-  m_RemoteControl->Update();
-  if (m_RemoteControl->GetButton())
-  {
-    CKey key(m_RemoteControl->GetButton(), m_RemoteControl->GetHoldTimeMs());
-    m_RemoteControl->Reset();
-    return OnKey(key);
-  }
-  return false;
 }
 
 bool CInputManager::ProcessPeripherals(float frameTime)
@@ -248,20 +204,22 @@ bool CInputManager::ProcessEventServer(int windowId, float frameTime)
       {
         int actionID;
         std::string actionName;
-        
+
         // Translate using custom controller translator.
         if (m_customControllerTranslator->TranslateCustomControllerString(windowId, strMapName, wKeyID, actionID, actionName))
         {
           // break screensaver
           g_application.ResetSystemIdleTimer();
           g_application.ResetScreenSaver();
-          
+
           // in case we wokeup the screensaver or screen - eat that action...
           if (g_application.WakeUpScreenSaverAndDPMS())
             return true;
-          
+
           m_Mouse.SetActive(false);
-          
+
+          CLog::Log(LOGDEBUG, "EventServer: key %d translated to action %s", wKeyID, actionName);
+
           return ExecuteInputAction(CAction(actionID, fAmount, 0.0f, actionName));
         }
         else
@@ -275,7 +233,7 @@ bool CInputManager::ProcessEventServer(int windowId, float frameTime)
       CKey key;
       if (wKeyID & ES_FLAG_UNICODE)
       {
-        key = CKey((uint8_t)0, wKeyID & ~ES_FLAG_UNICODE, 0, 0, 0);
+        key = CKey(0u, 0u, static_cast<wchar_t>(wKeyID & ~ES_FLAG_UNICODE), 0, 0, 0, 0);
         return OnKey(key);
       }
 
@@ -314,7 +272,7 @@ bool CInputManager::ProcessEventServer(int windowId, float frameTime)
       newEvent.type = XBMC_MOUSEMOTION;
       newEvent.motion.x = (uint16_t)pos.x;
       newEvent.motion.y = (uint16_t)pos.y;
-      g_application.OnEvent(newEvent);  // had to call this to update g_Mouse position
+      CServiceBroker::GetAppPort()->OnEvent(newEvent);  // had to call this to update g_Mouse position
       return g_application.OnAction(CAction(ACTION_MOUSE_MOVE, pos.x, pos.y));
     }
   }
@@ -354,7 +312,6 @@ void CInputManager::QueueAction(const CAction& action)
 bool CInputManager::Process(int windowId, float frameTime)
 {
   // process input actions
-  ProcessRemote(windowId);
   ProcessEventServer(windowId, frameTime);
   ProcessPeripherals(frameTime);
   ProcessQueuedActions();
@@ -424,7 +381,7 @@ bool CInputManager::OnEvent(XBMC_Event& newEvent)
     if (!handled)
     {
       m_Mouse.HandleEvent(newEvent);
-      ProcessMouse(g_windowManager.GetActiveWindowOrDialog());
+      ProcessMouse(CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog());
     }
     break;
   }
@@ -440,7 +397,7 @@ bool CInputManager::OnEvent(XBMC_Event& newEvent)
       actionId = newEvent.touch.action;
     else
     {
-      int iWin = g_windowManager.GetActiveWindowOrDialog();
+      int iWin = CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog();
       m_touchTranslator->TranslateTouchAction(iWin, newEvent.touch.action, newEvent.touch.pointers, actionId, actionString);
     }
 
@@ -469,6 +426,12 @@ bool CInputManager::OnEvent(XBMC_Event& newEvent)
     }
     break;
   } //case
+  case XBMC_BUTTON:
+  {
+    CKey key(newEvent.keybutton.button, newEvent.keybutton.holdtime);
+    OnKey(key);
+    break;
+  }
   }//switch
 
   return true;
@@ -504,7 +467,7 @@ bool CInputManager::OnKey(const CKey& key)
     }
     else
     {
-      if (!m_buttonTranslator->HasLongpressMapping(g_windowManager.GetActiveWindowOrDialog(), key))
+      if (!m_buttonTranslator->HasLongpressMapping(CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog(), key))
       {
         m_LastKey.Reset();
         bHandled = HandleKey(key);
@@ -531,7 +494,7 @@ bool CInputManager::HandleKey(const CKey& key)
   m_Mouse.SetActive(false);
 
   // get the current active window
-  int iWin = g_windowManager.GetActiveWindowOrDialog();
+  int iWin = CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindowOrDialog();
 
   // this will be checked for certain keycodes that need
   // special handling if the screensaver is active
@@ -578,7 +541,7 @@ bool CInputManager::HandleKey(const CKey& key)
 
     // first determine if we should use keyboard input directly
     bool useKeyboard = key.FromKeyboard() && (iWin == WINDOW_DIALOG_KEYBOARD || iWin == WINDOW_DIALOG_NUMERIC);
-    CGUIWindow *window = g_windowManager.GetWindow(iWin);
+    CGUIWindow *window = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(iWin);
     if (window)
     {
       CGUIControl *control = window->GetFocusedControl();
@@ -716,18 +679,21 @@ bool CInputManager::AlwaysProcess(const CAction& action)
 bool CInputManager::ExecuteInputAction(const CAction &action)
 {
   bool bResult = false;
+  CGUIComponent* gui = CServiceBroker::GetGUI();
 
   // play sound before the action unless the button is held,
   // where we execute after the action as held actions aren't fired every time.
   if (action.GetHoldTime())
   {
     bResult = g_application.OnAction(action);
-    if (bResult)
-      g_audioManager.PlayActionSound(action);
+    if (bResult && gui)
+      gui->GetAudioManager().PlayActionSound(action);
   }
   else
   {
-    g_audioManager.PlayActionSound(action);
+    if (gui)
+      gui->GetAudioManager().PlayActionSound(action);
+
     bResult = g_application.OnAction(action);
   }
   return bResult;
@@ -735,41 +701,11 @@ bool CInputManager::ExecuteInputAction(const CAction &action)
 
 bool CInputManager::HasBuiltin(const std::string& command)
 {
-  if (HasRemoteControl())
-    return command == "lirc.stop"  ||
-           command == "lirc.start" ||
-           command == "lirc.send";
   return false;
 }
 
 int CInputManager::ExecuteBuiltin(const std::string& execute, const std::vector<std::string>& params)
 {
-  if (HasRemoteControl())
-  {
-    if (execute == "lirc.stop")
-    {
-      m_RemoteControl->Disconnect();
-      m_RemoteControl->SetEnabled(false);
-    }
-    else if (execute == "lirc.start")
-    {
-      m_RemoteControl->SetEnabled(true);
-      m_RemoteControl->Initialize();
-    }
-    else if (execute == "lirc.send")
-    {
-      std::string command;
-      for (int i = 0; i < (int)params.size(); i++)
-      {
-        command += params[i];
-        if (i < (int)params.size() - 1)
-          command += ' ';
-      }
-      m_RemoteControl->AddSendCommand(command);
-    }
-    else
-      return -1;
-  }
   return 0;
 }
 
@@ -806,54 +742,6 @@ void CInputManager::SetMouseResolution(int maxX, int maxY, float speedX, float s
 void CInputManager::SetMouseState(MOUSE_STATE mouseState)
 {
   m_Mouse.SetState(mouseState);
-}
-
-bool CInputManager::HasRemoteControl()
-{
-  return m_RemoteControl ? true : false;
-}
-
-bool CInputManager::IsRemoteControlEnabled()
-{
-  return m_RemoteControl && m_RemoteControl->IsInUse();
-}
-
-bool CInputManager::IsRemoteControlInitialized()
-{
-  return m_RemoteControl && m_RemoteControl->IsInitialized();
-}
-
-void CInputManager::EnableRemoteControl()
-{
-  if (!m_RemoteControl)
-    return;
-
-  m_RemoteControl->SetEnabled(true);
-  if (!m_RemoteControl->IsInitialized())
-  {
-    m_RemoteControl->Initialize();
-  }
-}
-
-void CInputManager::DisableRemoteControl()
-{
-  if (m_RemoteControl)
-  {
-    m_RemoteControl->Disconnect();
-    m_RemoteControl->SetEnabled(false);
-  }
-}
-
-void CInputManager::InitializeRemoteControl()
-{
-  if (m_RemoteControl && !m_RemoteControl->IsInitialized())
-    m_RemoteControl->Initialize();
-}
-
-void CInputManager::SetRemoteControlName(const std::string& name)
-{
-  if (m_RemoteControl)
-    m_RemoteControl->SetDeviceName(name);
 }
 
 void CInputManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
@@ -918,8 +806,6 @@ bool CInputManager::LoadKeymaps()
 
   if (m_buttonTranslator->Load())
   {
-    if (m_RemoteControl)
-      m_irTranslator->Load(m_RemoteControl->GetMapFile());
     bSuccess = true;
   }
 
@@ -937,7 +823,6 @@ bool CInputManager::ReloadKeymaps()
 void CInputManager::ClearKeymaps()
 {
   m_buttonTranslator->Clear();
-  m_irTranslator->Clear();
 
   SetChanged();
   NotifyObservers(ObservableMessageButtonMapsChanged);
@@ -981,11 +866,6 @@ std::vector<std::shared_ptr<const IWindowKeymap>> CInputManager::GetJoystickKeym
   return m_joystickTranslator->GetJoystickKeymaps();
 }
 
-int CInputManager::TranslateLircRemoteString(const std::string &szDevice, const std::string &szButton)
-{
-  return m_irTranslator->TranslateButton(szDevice, szButton);
-}
-
 void CInputManager::RegisterKeyboardDriverHandler(KEYBOARD::IKeyboardDriverHandler* handler)
 {
   if (std::find(m_keyboardHandlers.begin(), m_keyboardHandlers.end(), handler) == m_keyboardHandlers.end())
@@ -1006,9 +886,4 @@ void CInputManager::RegisterMouseDriverHandler(MOUSE::IMouseDriverHandler* handl
 void CInputManager::UnregisterMouseDriverHandler(MOUSE::IMouseDriverHandler* handler)
 {
   m_mouseHandlers.erase(std::remove(m_mouseHandlers.begin(), m_mouseHandlers.end(), handler), m_mouseHandlers.end());
-}
-
-void CInputManager::RegisterRemoteControl(CreateRemoteControlFunc createFunc)
-{
-  m_createRemoteControl = createFunc;
 }

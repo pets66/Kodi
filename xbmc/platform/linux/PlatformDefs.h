@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #ifdef TARGET_POSIX
 
@@ -97,7 +85,7 @@
 #endif
 #endif
 #endif
-	
+
 #ifndef PRIdS
 #define PRIdS "zd"
 #endif
@@ -124,11 +112,6 @@ typedef void* HMODULE;
 
 typedef unsigned int  DWORD;
 #define INVALID_HANDLE_VALUE     ((HANDLE)~0U)
-#ifdef UNICODE
-typedef const wchar_t*       LPCTSTR;
-#else
-typedef const char*      LPCTSTR;
-#endif
 
 #define MAXWORD   0xffff
 
@@ -147,9 +130,7 @@ typedef union _LARGE_INTEGER
       DWORD HighPart;
   } u;
   unsigned long long QuadPart;
-} ULARGE_INTEGER, *PULARGE_INTEGER;
-
-void OutputDebugString(LPCTSTR lpOutputString);
+} ULARGE_INTEGER;
 
 // Date / Time
 
@@ -257,12 +238,6 @@ typedef struct _WIN32_FIND_DATA
 } WIN32_FIND_DATA, *PWIN32_FIND_DATA, *LPWIN32_FIND_DATA;
 
 #define FILE_ATTRIBUTE_DIRECTORY           0x00000010
-
-typedef struct _SECURITY_ATTRIBUTES {
-  DWORD nLength;
-  void* lpSecurityDescriptor;
-  int bInheritHandle;
-} SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
 
 #define FILE_BEGIN              0
 #define FILE_CURRENT            1

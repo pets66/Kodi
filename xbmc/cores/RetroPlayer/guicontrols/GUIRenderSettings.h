@@ -1,29 +1,18 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "cores/RetroPlayer/guibridge/IGUIRenderSettings.h"
-#include "cores/RetroPlayer/rendering/RenderGeometry.h"
 #include "cores/RetroPlayer/rendering/RenderSettings.h"
-#include "cores/IPlayer.h"
+#include "cores/GameSettings.h"
 #include "threads/CriticalSection.h"
+#include "utils/Geometry.h"
 
 namespace KODI
 {
@@ -38,16 +27,19 @@ namespace RETRO
     ~CGUIRenderSettings() override = default;
 
     // implementation of IGUIRenderSettings
-    bool HasScalingMethod() const override;
-    bool HasViewMode() const override;
+    bool HasVideoFilter() const override;
+    bool HasStretchMode() const override;
+    bool HasRotation() const override;
     CRenderSettings GetSettings() const override;
+    CRect GetDimensions() const override;
 
     // Render functions
     void Reset();
     void SetSettings(CRenderSettings settings);
-    void SetGeometry(CRenderGeometry geometry);
-    void SetScalingMethod(ESCALINGMETHOD scalingMethod);
-    void SetViewMode(ViewMode viewMode);
+    void SetDimensions(const CRect &dimensions);
+    void SetVideoFilter(const std::string &videoFilter);
+    void SetStretchMode(STRETCHMODE stretchMode);
+    void SetRotationDegCCW(unsigned int rotationDegCCW);
 
   private:
     // Construction parameters
@@ -55,9 +47,10 @@ namespace RETRO
 
     // Render parameters
     CRenderSettings m_renderSettings;
+    CRect m_renderDimensions;
 
     // Synchronization parameters
-    CCriticalSection m_mutex;
+    mutable CCriticalSection m_mutex;
   };
 }
 }

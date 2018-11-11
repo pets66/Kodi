@@ -1,31 +1,19 @@
-#pragma once
 /*
- *      Copyright (C) 2014 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
-#include <vector>
-#include <map>
+#pragma once
 
 #include "threads/CriticalSection.h"
 #include "threads/Thread.h"
-
 #include "utils/GlobalsHandling.h"
+#include <map>
+#include <sys/epoll.h>
+#include <vector>
 
 /**
  * Monitor a file descriptor with callback on poll() events.
@@ -38,15 +26,15 @@ public:
 
   struct MonitoredFD
   {
-    int fd; /**< File descriptor to be monitored */
-    short events; /**< Events to be monitored (see poll(2)) */
+    int fd = -1; /**< File descriptor to be monitored */
+    short events = 0; /**< Events to be monitored (see poll(2)) */
 
-    EventCallback callback; /** Callback to be called on events */
-    void *callbackData; /** data parameter for EventCallback */
+    EventCallback callback = nullptr; /** Callback to be called on events */
+    void *callbackData = nullptr; /** data parameter for EventCallback */
 
     MonitoredFD(int fd_, short events_, EventCallback callback_, void *callbackData_) :
       fd(fd_), events(events_), callback(callback_), callbackData(callbackData_) {}
-    MonitoredFD() : fd(-1), events(0), callback(NULL), callbackData(NULL) {}
+    MonitoredFD() = default;
   };
 
   CFDEventMonitor();
@@ -76,8 +64,8 @@ private:
   std::vector<int> m_monitoredFDbyPollDescs;
   std::vector<struct pollfd> m_pollDescs;
 
-  int m_nextID;
-  int m_wakeupfd;
+  int m_nextID = 0;
+  int m_wakeupfd = -1;
 
   CCriticalSection m_mutex;
   CCriticalSection m_pollMutex;

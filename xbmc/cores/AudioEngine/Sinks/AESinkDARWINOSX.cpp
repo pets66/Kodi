@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "cores/AudioEngine/AESinkFactory.h"
@@ -35,6 +23,7 @@ static void EnumerateDevices(CADeviceList &list)
 {
   std::string defaultDeviceName;
   CCoreAudioHardware::GetOutputDeviceName(defaultDeviceName);
+  AudioDeviceID defaultID = CCoreAudioHardware::GetDefaultOutputDevice();
 
   CoreAudioDeviceList deviceIDList;
   CCoreAudioHardware::GetOutputDevices(&deviceIDList);
@@ -54,7 +43,7 @@ static void EnumerateDevices(CADeviceList &list)
     //like that)
     //fixme taking the first stream device is wrong here
     //we rather might need the concatenation of all streams *sucks*
-    if(defaultDeviceName == devEnum.GetMasterDeviceName())
+    if(defaultID == deviceID && defaultDeviceName == devEnum.GetMasterDeviceName())
     {
       struct CADeviceInstance deviceInstance;
       deviceInstance.audioDeviceId = deviceID;
@@ -129,7 +118,9 @@ OSStatus deviceChangedCB(AudioObjectID                       inObjectID,
   if  (deviceChanged)
   {
     CLog::Log(LOGDEBUG, "CoreAudio: audiodevicelist changed - reenumerating");
-    CServiceBroker::GetActiveAE().DeviceChange();
+    IAE* ae = CServiceBroker::GetActiveAE();
+    if (ae)
+      ae->DeviceChange();
     CLog::Log(LOGDEBUG, "CoreAudio: audiodevicelist changed - done");
   }
   return noErr;
@@ -281,9 +272,9 @@ bool CAESinkDARWINOSX::Initialize(AEAudioFormat &format, std::string &device)
 
   /* Update our AE format */
   format.m_sampleRate    = outputFormat.mSampleRate;
-  
+
   m_outputBufferIndex = requestedStreamIndex;
-  
+
   // if we are in passthrough but didn't have a matching
   // virtual format - enable bitstream which deals with
   // backconverting from float to 16bit
@@ -324,7 +315,7 @@ bool CAESinkDARWINOSX::Initialize(AEAudioFormat &format, std::string &device)
 
   // update the channel map based on the new stream format
   devEnum.GetAEChannelMap(format.m_channelLayout, numOutputChannels);
-   
+
   //! @todo Should we use the virtual format to determine our data format?
   format.m_frameSize     = format.m_channelLayout.Count() * (CAEUtil::DataFormatToBits(format.m_dataFormat) >> 3);
   format.m_frames        = m_device.GetBufferSize();
@@ -436,7 +427,7 @@ unsigned int CAESinkDARWINOSX::AddPackets(uint8_t **data, unsigned int frames, u
     if (!m_started && timer.IsTimePast())
     {
       CLog::Log(LOGERROR, "%s engine didn't start in %d ms!", __FUNCTION__, timeout);
-      return INT_MAX;    
+      return INT_MAX;
     }
   }
 
@@ -487,7 +478,7 @@ inline void LogLevel(unsigned int got, unsigned int wanted)
     {
       CLog::Log(LOGWARNING, "DARWINOSX: %sflow (%u vs %u bytes)", got > wanted ? "over" : "under", got, wanted);
       lastReported = got;
-    }    
+    }
   }
   else
     lastReported = INT_MAX; // indicate we were good at least once
@@ -504,7 +495,7 @@ OSStatus CAESinkDARWINOSX::renderCallback(AudioDeviceID inDevice, const AudioTim
     //planar always starts at outputbuffer/streamidx 0
     unsigned int startIdx = sink->m_buffer->NumPlanes() == 1 ? sink->m_outputBufferIndex : 0;
     unsigned int endIdx = startIdx + sink->m_buffer->NumPlanes();
-    
+
     /* NOTE: We assume that the buffers are all the same size... */
     if (sink->m_outputBitstream)
     {

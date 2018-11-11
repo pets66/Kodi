@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RenderSystem.h"
@@ -23,11 +11,10 @@
 #include "guilib/GUILabelControl.h"
 #include "guilib/GUIFontManager.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "Util.h"
 
 CRenderSystemBase::CRenderSystemBase()
-  : m_stereoView(RENDER_STEREO_VIEW_OFF)
-  , m_stereoMode(RENDER_STEREO_MODE_OFF)
 {
   m_bRenderCreated = false;
   m_bVSync = true;
@@ -69,21 +56,21 @@ bool CRenderSystemBase::SupportsStereo(RENDER_STEREO_MODE mode) const
 
 void CRenderSystemBase::ShowSplash(const std::string& message)
 {
-  if (!g_advancedSettings.m_splashImage && !(m_splashImage || !message.empty()))
+  if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_splashImage && !(m_splashImage || !message.empty()))
     return;
 
   if (!m_splashImage)
   {
-    m_splashImage = std::unique_ptr<CGUIImage>(new CGUIImage(0, 0, 0, 0, g_graphicsContext.GetWidth(),
-                                                       g_graphicsContext.GetHeight(), CTextureInfo(CUtil::GetSplashPath())));
+    m_splashImage = std::unique_ptr<CGUIImage>(new CGUIImage(0, 0, 0, 0, CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth(),
+                                                       CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight(), CTextureInfo(CUtil::GetSplashPath())));
     m_splashImage->SetAspectRatio(CAspectRatio::AR_SCALE);
   }
 
-  g_graphicsContext.lock();
-  g_graphicsContext.Clear();
+  CServiceBroker::GetWinSystem()->GetGfxContext().lock();
+  CServiceBroker::GetWinSystem()->GetGfxContext().Clear();
 
-  RESOLUTION_INFO res = g_graphicsContext.GetResInfo();
-  g_graphicsContext.SetRenderingResolution(res, true);
+  RESOLUTION_INFO res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+  CServiceBroker::GetWinSystem()->GetGfxContext().SetRenderingResolution(res, true);
 
   //render splash image
   BeginRender();
@@ -107,8 +94,8 @@ void CRenderSystemBase::ShowSplash(const std::string& message)
       float textWidth, textHeight;
       m_splashMessageLayout->GetTextExtent(textWidth, textHeight);
 
-      int width = g_graphicsContext.GetWidth();
-      int height = g_graphicsContext.GetHeight();
+      int width = CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth();
+      int height = CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
       float y = height - textHeight - 100;
       m_splashMessageLayout->RenderOutline(width/2, y, 0, 0xFF000000, XBFONT_CENTER_X, width);
     }
@@ -116,7 +103,7 @@ void CRenderSystemBase::ShowSplash(const std::string& message)
 
   //show it on screen
   EndRender();
-  g_graphicsContext.unlock();
-  g_graphicsContext.Flip(true, false);
+  CServiceBroker::GetWinSystem()->GetGfxContext().unlock();
+  CServiceBroker::GetWinSystem()->GetGfxContext().Flip(true, false);
 }
 

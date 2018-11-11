@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <sys/resource.h>
@@ -30,6 +18,7 @@
 #include "playlists/PlayList.h"
 #include "messaging/ApplicationMessenger.h"
 #include "Application.h"
+#include "AppInboundProtocol.h"
 #include "input/touch/generic/GenericTouchActionHandler.h"
 #include "guilib/GUIControl.h"
 #include "input/Key.h"
@@ -54,14 +43,7 @@ using namespace KODI::MESSAGING;
 
 #import <AVFoundation/AVAudioSession.h>
 #import <MediaPlayer/MPMediaItem.h>
-#ifdef __IPHONE_5_0
 #import <MediaPlayer/MPNowPlayingInfoCenter.h>
-#else
-const NSString *MPNowPlayingInfoPropertyElapsedPlaybackTime = @"MPNowPlayingInfoPropertyElapsedPlaybackTime";
-const NSString *MPNowPlayingInfoPropertyPlaybackRate = @"MPNowPlayingInfoPropertyPlaybackRate";
-const NSString *MPNowPlayingInfoPropertyPlaybackQueueIndex = @"MPNowPlayingInfoPropertyPlaybackQueueIndex";
-const NSString *MPNowPlayingInfoPropertyPlaybackQueueCount = @"MPNowPlayingInfoPropertyPlaybackQueueCount";
-#endif
 #import "IOSEAGLView.h"
 
 #import "XBMCController.h"
@@ -96,11 +78,16 @@ XBMCController *g_xbmcController;
 //--------------------------------------------------------------
 - (void) sendKeypressEvent: (XBMC_Event) event
 {
-  event.type = XBMC_KEYDOWN;
-  g_application.OnEvent(event);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
 
-  event.type = XBMC_KEYUP;
-  g_application.OnEvent(event);
+  if (appPort)
+  {
+    event.type = XBMC_KEYDOWN;
+    appPort->OnEvent(event);
+
+    event.type = XBMC_KEYUP;
+    appPort->OnEvent(event);
+  }
 }
 
 // START OF UIKeyInput protocol
@@ -180,34 +167,6 @@ XBMCController *g_xbmcController;
   return NO;
 }
 //--------------------------------------------------------------
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
-{
-#if __IPHONE_8_0
-  if (CDarwinUtils::GetIOSVersion() < 8.0)
-#endif
-  {
-    orientation = toInterfaceOrientation;
-    CGRect srect = [IOSScreenManager getLandscapeResolution: [m_glView getCurrentScreen]];
-    CGRect rect = srect;;
-
-    switch(toInterfaceOrientation)
-    {
-      case UIInterfaceOrientationPortrait:
-      case UIInterfaceOrientationPortraitUpsideDown:
-        if(![[IOSScreenManager sharedInstance] isExternalScreen])
-        {
-          rect.size = CGSizeMake( srect.size.height, srect.size.width );
-        }
-        break;
-      case UIInterfaceOrientationLandscapeLeft:
-      case UIInterfaceOrientationLandscapeRight:
-      case UIInterfaceOrientationUnknown:
-        break;//just leave the rect as is
-    }
-    m_glView.frame = rect;
-  }
-}
-
 - (UIInterfaceOrientation) getOrientation
 {
 	return orientation;
@@ -599,36 +558,12 @@ XBMCController *g_xbmcController;
 
   orientation = UIInterfaceOrientationLandscapeLeft;
 
-#if __IPHONE_8_0
-  if (CDarwinUtils::GetIOSVersion() < 8.0)
-#endif
-  {
-    /* We start in landscape mode */
-    CGRect srect = frame;
-    // in ios sdks older then 8.0 the landscape mode is 90 degrees
-    // rotated
-    srect.size = CGSizeMake( frame.size.height, frame.size.width );
-
-    m_glView = [[IOSEAGLView alloc] initWithFrame: srect withScreen:screen];
-    [[IOSScreenManager sharedInstance] setView:m_glView];
-    [m_glView setMultipleTouchEnabled:YES];
-
-    /* Check if screen is Retina */
-    screenScale = [m_glView getScreenScale:screen];
-
-    [self.view addSubview: m_glView];
-
-    [self createGestureRecognizers];
-    [m_window addSubview: self.view];
-  }
-
   [m_window makeKeyAndVisible];
   g_xbmcController = self;
 
   return self;
 }
 //--------------------------------------------------------------
-#if __IPHONE_8_0
 - (void)loadView
 {
   [super loadView];
@@ -649,7 +584,6 @@ XBMCController *g_xbmcController;
     [self createGestureRecognizers];
   }
 }
-#endif
 //--------------------------------------------------------------
 -(void)viewDidLoad
 {
@@ -754,8 +688,20 @@ XBMCController *g_xbmcController;
 //--------------------------------------------------------------
 - (CGSize) getScreenSize
 {
-  screensize.width  = m_glView.bounds.size.width * screenScale;
-  screensize.height = m_glView.bounds.size.height * screenScale;
+  __block CGSize tmp;
+  if ([NSThread isMainThread])
+  {
+    tmp.width  = m_glView.bounds.size.width * screenScale;
+    tmp.height = m_glView.bounds.size.height * screenScale;
+  }
+  else
+  {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      tmp.width  = m_glView.bounds.size.width * screenScale;
+      tmp.height = m_glView.bounds.size.height * screenScale;
+    });
+  }
+  screensize = tmp;
   return screensize;
 }
 //--------------------------------------------------------------
@@ -857,15 +803,9 @@ XBMCController *g_xbmcController;
   }
   // reset the rotation of the view
   view.layer.transform = CATransform3DMakeRotation(angle, 0, 0.0, 1.0);
-#if __IPHONE_8_0
   view.layer.bounds = view.bounds;
-#else
-  [view setFrame:m_window.frame];
-#endif
   m_window.screen = screen;
-#if __IPHONE_8_0
   [view setFrame:m_window.frame];
-#endif
 }
 //--------------------------------------------------------------
 - (void) remoteControlReceivedWithEvent: (UIEvent *) receivedEvent {
@@ -923,15 +863,16 @@ XBMCController *g_xbmcController;
     m_isPlayingBeforeInactive = YES;
     CApplicationMessenger::GetInstance().SendMsg(TMSG_MEDIA_PAUSE_IF_PLAYING);
   }
-  CWinSystemIOS& winSystem = dynamic_cast<CWinSystemIOS&>(CServiceBroker::GetWinSystem());
-  winSystem.OnAppFocusChange(false);
+  CWinSystemIOS* winSystem = dynamic_cast<CWinSystemIOS*>(CServiceBroker::GetWinSystem());
+  winSystem->OnAppFocusChange(false);
 }
 
 - (void)enterForeground
 {
   PRINT_SIGNATURE();
-  CWinSystemIOS& winSystem = dynamic_cast<CWinSystemIOS&>(CServiceBroker::GetWinSystem());
-  winSystem.OnAppFocusChange(true);
+  CWinSystemIOS* winSystem = dynamic_cast<CWinSystemIOS*>(CServiceBroker::GetWinSystem());
+  if (winSystem)
+    winSystem->OnAppFocusChange(true);
   // when we come back, restore playing if we were.
   if (m_isPlayingBeforeInactive)
   {

@@ -1,26 +1,15 @@
 /*
- *      Copyright (C) 2012-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVRTimerType.h"
 
 #include "ServiceBroker.h"
+#include "addons/PVRClient.h"
 #include "guilib/LocalizeStrings.h"
 #include "utils/StringUtils.h"
 #include "utils/log.h"
@@ -45,49 +34,49 @@ const CPVRTimerTypePtr CPVRTimerType::GetFirstAvailableType()
 
 CPVRTimerTypePtr CPVRTimerType::CreateFromIds(unsigned int iTypeId, int iClientId)
 {
-  std::vector<CPVRTimerTypePtr> types;
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->GetTimerTypes(types, iClientId);
-  if (error == PVR_ERROR_NO_ERROR)
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(iClientId);
+  if (client)
   {
-    for (const auto &type : types)
+    std::vector<CPVRTimerTypePtr> types;
+    if (client->GetTimerTypes(types) == PVR_ERROR_NO_ERROR)
     {
-      if (type->GetTypeId() == iTypeId)
-        return type;
+      for (const auto &type : types)
+      {
+        if (type->GetTypeId() == iTypeId)
+          return type;
+      }
     }
   }
 
-  CLog::Log(LOGERROR, "CPVRTimerType::CreateFromIds unable to resolve numeric timer type (%d, %d)", iTypeId, iClientId);
+  CLog::LogF(LOGERROR, "Unable to resolve numeric timer type (%d, %d)", iTypeId, iClientId);
   return CPVRTimerTypePtr();
 }
 
 CPVRTimerTypePtr CPVRTimerType::CreateFromAttributes(
   unsigned int iMustHaveAttr, unsigned int iMustNotHaveAttr, int iClientId)
 {
-  std::vector<CPVRTimerTypePtr> types;
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->GetTimerTypes(types, iClientId);
-  if (error == PVR_ERROR_NO_ERROR)
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(iClientId);
+  if (client)
   {
-    for (const auto &type : types)
+    std::vector<CPVRTimerTypePtr> types;
+    if (client->GetTimerTypes(types) == PVR_ERROR_NO_ERROR)
     {
-      if (((type->m_iAttributes & iMustHaveAttr)    == iMustHaveAttr) &&
-          ((type->m_iAttributes & iMustNotHaveAttr) == 0))
-        return type;
+      for (const auto &type : types)
+      {
+        if (((type->m_iAttributes & iMustHaveAttr)    == iMustHaveAttr) &&
+            ((type->m_iAttributes & iMustNotHaveAttr) == 0))
+          return type;
+      }
     }
   }
 
-  CLog::Log(LOGERROR, "CPVRTimerType::CreateFromAttributes unable to resolve timer type (0x%x, 0x%x, %d)", iMustHaveAttr, iMustNotHaveAttr, iClientId);
+  CLog::LogF(LOGERROR, "Unable to resolve timer type (0x%x, 0x%x, %d)", iMustHaveAttr, iMustNotHaveAttr, iClientId);
   return CPVRTimerTypePtr();
 }
 
 CPVRTimerType::CPVRTimerType() :
-  m_iClientId(-1),
   m_iTypeId(PVR_TIMER_TYPE_NONE),
-  m_iAttributes(PVR_TIMER_TYPE_ATTRIBUTE_NONE),
-  m_iPriorityDefault(50),
-  m_iLifetimeDefault(365),
-  m_iMaxRecordingsDefault(0),
-  m_iPreventDupEpisodesDefault(0),
-  m_iRecordingGroupDefault(0)
+  m_iAttributes(PVR_TIMER_TYPE_ATTRIBUTE_NONE)
 {
 }
 

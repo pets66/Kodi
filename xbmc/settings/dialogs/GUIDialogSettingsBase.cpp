@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2014 Team XBMC
- *      http://www.xbmc.org
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <set>
@@ -24,7 +12,9 @@
 
 #include "GUIDialogSettingsBase.h"
 #include "GUIUserMessages.h"
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIControlGroupList.h"
 #include "guilib/GUIEditControl.h"
 #include "guilib/GUIImage.h"
@@ -124,12 +114,12 @@ bool CGUIDialogSettingsBase::OnMessage(CGUIMessage &message)
         CGUIMessage message(GUI_MSG_UPDATE_ITEM, GetID(), m_delayedSetting->GetID());
         OnMessage(message);
       }
-      
+
       CGUIDialog::OnMessage(message);
       FreeControls();
       return true;
     }
-    
+
     case GUI_MSG_FOCUSED:
     {
       CGUIDialog::OnMessage(message);
@@ -140,7 +130,7 @@ bool CGUIDialogSettingsBase::OnMessage(CGUIMessage &message)
       {
         m_delayedTimer.Stop();
         CGUIMessage message(GUI_MSG_UPDATE_ITEM, GetID(), m_delayedSetting->GetID(), 1); // param1 = 1 for "reset the control if it's invalid"
-        g_windowManager.SendThreadMessage(message, GetID());
+        CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message, GetID());
       }
       // update the value of the previous setting (in case it was invalid)
       else if (m_iSetting >= CONTROL_SETTINGS_START_CONTROL && m_iSetting < (int)(CONTROL_SETTINGS_START_CONTROL + m_settingControls.size()))
@@ -149,7 +139,7 @@ bool CGUIDialogSettingsBase::OnMessage(CGUIMessage &message)
         if (control != NULL && control->GetSetting() != NULL && !control->IsValid())
         {
           CGUIMessage message(GUI_MSG_UPDATE_ITEM, GetID(), m_iSetting, 1); // param1 = 1 for "reset the control if it's invalid"
-          g_windowManager.SendThreadMessage(message, GetID());
+          CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message, GetID());
         }
       }
 
@@ -214,7 +204,7 @@ bool CGUIDialogSettingsBase::OnMessage(CGUIMessage &message)
 
       break;
     }
-    
+
     case GUI_MSG_UPDATE_ITEM:
     {
       if (m_delayedSetting != NULL && m_delayedSetting->GetID() == message.GetControlId())
@@ -245,7 +235,7 @@ bool CGUIDialogSettingsBase::OnMessage(CGUIMessage &message)
       }
       break;
     }
-    
+
     case GUI_MSG_UPDATE:
     {
       if (IsActive() && HasID(message.GetSenderId()))
@@ -302,7 +292,7 @@ bool CGUIDialogSettingsBase::OnAction(const CAction &action)
 bool CGUIDialogSettingsBase::OnBack(int actionID)
 {
   m_lastControlID = 0; // don't save the control as we go to a different window each time
-  
+
   // if the setting dialog is not a window but a dialog we need to close differently
   if (!IsDialog())
     return CGUIWindow::OnBack(actionID);
@@ -393,7 +383,7 @@ void CGUIDialogSettingsBase::SetupControls(bool createSettings /* = true */)
   SettingSectionPtr section = GetSection();
   if (section == NULL)
     return;
-  
+
   // update the screen string
   if (section->GetLabel() >= 0)
     SetHeading(section->GetLabel());
@@ -584,7 +574,7 @@ std::set<std::string> CGUIDialogSettingsBase::CreateSettings()
     AddSeparator(group->GetWidth(), iControlID);
     AddSetting(m_resetSetting, group->GetWidth(), iControlID);
   }
-  
+
   // update our settings (turns controls on/off as appropriate)
   UpdateSettings();
 
@@ -670,7 +660,7 @@ CGUIControl* CGUIDialogSettingsBase::AddSetting(std::shared_ptr<CSetting> pSetti
       pControl = new CGUIEditControl(*m_pOriginalEdit);
     if (pControl == NULL)
       return NULL;
-      
+
     static_cast<CGUIEditControl*>(pControl)->SetLabel(label);
     pSettingControl.reset(new CGUIControlEditSetting(static_cast<CGUIEditControl*>(pControl), iControlID, pSetting, this));
   }
@@ -693,7 +683,7 @@ CGUIControl* CGUIDialogSettingsBase::AddSetting(std::shared_ptr<CSetting> pSetti
         pControl = new CGUIButtonControl(*m_pOriginalButton);
       if (pControl == NULL)
         return NULL;
-      
+
       static_cast<CGUIButtonControl*>(pControl)->SetLabel(label);
       pSettingControl.reset(new CGUIControlButtonSetting(static_cast<CGUIButtonControl*>(pControl), iControlID, pSetting, this));
     }
@@ -703,7 +693,7 @@ CGUIControl* CGUIDialogSettingsBase::AddSetting(std::shared_ptr<CSetting> pSetti
         pControl = new CGUISettingsSliderControl(*m_pOriginalSlider);
       if (pControl == NULL)
         return NULL;
-      
+
       static_cast<CGUISettingsSliderControl*>(pControl)->SetText(label);
       pSettingControl.reset(new CGUIControlSliderSetting(static_cast<CGUISettingsSliderControl*>(pControl), iControlID, pSetting, this));
     }
@@ -770,11 +760,11 @@ CGUIControl* CGUIDialogSettingsBase::AddSettingControl(CGUIControl *pControl, Ba
     pSettingControl.reset();
     return NULL;
   }
-  
+
   pControl->SetID(iControlID++);
   pControl->SetVisible(true);
   pControl->SetWidth(width);
-  
+
   CGUIControlGroupList *group = dynamic_cast<CGUIControlGroupList *>(GetControl(SETTINGS_GROUP_ID));
   if (group != NULL)
   {
@@ -782,7 +772,7 @@ CGUIControl* CGUIDialogSettingsBase::AddSettingControl(CGUIControl *pControl, Ba
     group->AddControl(pControl);
   }
   m_settingControls.push_back(pSettingControl);
-  
+
   return pControl;
 }
 
@@ -862,7 +852,7 @@ void CGUIDialogSettingsBase::UpdateSettingControl(BaseSettingControlPtr pSetting
   // we send a thread message so that it's processed the following frame (some settings won't
   // like being changed during Render())
   CGUIMessage message(GUI_MSG_UPDATE_ITEM, GetID(), pSettingControl->GetID());
-  g_windowManager.SendThreadMessage(message, GetID());
+  CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message, GetID());
 }
 
 void CGUIDialogSettingsBase::SetControlLabel(int controlId, const CVariant &label)

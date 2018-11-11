@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PeripheralBus.h"
@@ -43,16 +31,6 @@ CPeripheralBus::CPeripheralBus(const std::string &threadname, CPeripherals& mana
 
 bool CPeripheralBus::InitializeProperties(CPeripheral& peripheral)
 {
-  if (peripheral.Type() == PERIPHERAL_JOYSTICK)
-  {
-    // Ensure an add-on is present to translate input
-    if (!m_manager.GetAddonWithButtonMap(&peripheral))
-    {
-      CLog::Log(LOGWARNING, "Button mapping add-on not present for %s (%s), skipping", peripheral.Location().c_str(), peripheral.DeviceName().c_str());
-      return false;
-    }
-  }
-
   return true;
 }
 
@@ -185,9 +163,9 @@ PeripheralPtr CPeripheralBus::GetPeripheral(const std::string &strLocation) cons
   return result;
 }
 
-int CPeripheralBus::GetPeripheralsWithFeature(PeripheralVector &results, const PeripheralFeature feature) const
+unsigned int CPeripheralBus::GetPeripheralsWithFeature(PeripheralVector &results, const PeripheralFeature feature) const
 {
-  int iReturn(0);
+  unsigned int iReturn = 0;
   CSingleLock lock(m_critSection);
   for (auto& peripheral : m_peripherals)
   {
@@ -201,14 +179,14 @@ int CPeripheralBus::GetPeripheralsWithFeature(PeripheralVector &results, const P
   return iReturn;
 }
 
-size_t CPeripheralBus::GetNumberOfPeripheralsWithId(const int iVendorId, const int iProductId) const
+unsigned int CPeripheralBus::GetNumberOfPeripheralsWithId(const int iVendorId, const int iProductId) const
 {
-  int iReturn(0);
+  unsigned int iReturn = 0;
   CSingleLock lock(m_critSection);
-  for (unsigned int iPeripheralPtr = 0; iPeripheralPtr < m_peripherals.size(); iPeripheralPtr++)
+  for (const auto& peripheral : m_peripherals)
   {
-    if (m_peripherals.at(iPeripheralPtr)->VendorId() == iVendorId &&
-        m_peripherals.at(iPeripheralPtr)->ProductId() == iProductId)
+    if (peripheral->VendorId() == iVendorId &&
+        peripheral->ProductId() == iProductId)
       iReturn++;
   }
 
@@ -347,8 +325,8 @@ PeripheralPtr CPeripheralBus::GetByPath(const std::string &strPath) const
   return result;
 }
 
-size_t CPeripheralBus::GetNumberOfPeripherals() const
+unsigned int CPeripheralBus::GetNumberOfPeripherals() const
 {
   CSingleLock lock(m_critSection);
-  return m_peripherals.size();
+  return static_cast<unsigned int>(m_peripherals.size());
 }

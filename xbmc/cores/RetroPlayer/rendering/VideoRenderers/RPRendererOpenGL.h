@@ -1,25 +1,14 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
-#include "RPRendererOpenGLES.h"
+#include "RPBaseRenderer.h"
 #include "cores/RetroPlayer/process/RPProcessInfo.h"
 
 #include "system_gl.h"
@@ -41,39 +30,59 @@ namespace RETRO
     RenderBufferPoolVector CreateBufferPools(CRenderContext &context) override;
   };
 
-  class CRenderBufferOpenGL : public CRenderBufferOpenGLES
-  {
-  public:
-    CRenderBufferOpenGL(CRenderContext &context,
-                        GLuint pixeltype,
-                        GLuint internalformat,
-                        GLuint pixelformat,
-                        GLuint bpp,
-                        unsigned int width,
-                        unsigned int height);
-    ~CRenderBufferOpenGL() override = default;
-
-    // implementation of IRenderBuffer via CRenderBufferOpenGLES
-    bool UploadTexture() override;
-  };
-
-  class CRenderBufferPoolOpenGL : public CRenderBufferPoolOpenGLES
-  {
-  public:
-    CRenderBufferPoolOpenGL(CRenderContext &context);
-    ~CRenderBufferPoolOpenGL() override = default;
-
-  protected:
-    // implementation of CBaseRenderBufferPool via CRenderBufferPoolOpenGLES
-    IRenderBuffer *CreateRenderBuffer(void *header = nullptr) override;
-    bool ConfigureInternal() override;
-  };
-
-  class CRPRendererOpenGL : public CRPRendererOpenGLES
+  class CRPRendererOpenGL : public CRPBaseRenderer
   {
   public:
     CRPRendererOpenGL(const CRenderSettings &renderSettings, CRenderContext &context, std::shared_ptr<IRenderBufferPool> bufferPool);
-    ~CRPRendererOpenGL() override = default;
+    ~CRPRendererOpenGL() override;
+
+    // implementation of CRPBaseRenderer
+    bool Supports(RENDERFEATURE feature) const override;
+    SCALINGMETHOD GetDefaultScalingMethod() const override { return SCALINGMETHOD::NEAREST; }
+
+    static bool SupportsScalingMethod(SCALINGMETHOD method);
+
+  protected:
+    struct PackedVertex
+    {
+      float x, y, z;
+      float u1, v1;
+    };
+    struct Svertex
+    {
+      float x;
+      float y;
+      float z;
+    };
+    
+    // implementation of CRPBaseRenderer
+    void RenderInternal(bool clear, uint8_t alpha) override;
+    void FlushInternal() override;
+
+    /*!
+     * \brief Set the entire backbuffer to black
+     */
+    void ClearBackBuffer();
+
+    /*!
+     * \brief Draw black bars around the video quad
+     *
+     * This is more efficient than glClear() since it only sets pixels to
+     * black that aren't going to be overwritten by the game.
+     */
+    void DrawBlackBars();
+
+    virtual void Render(uint8_t alpha);
+
+    GLuint m_mainVAO;
+    GLuint m_mainVertexVBO;
+    GLuint m_mainIndexVBO;
+
+    GLuint m_blackbarsVAO;
+    GLuint m_blackbarsVertexVBO;
+    
+    GLenum m_textureTarget = GL_TEXTURE_2D;
+    float m_clearColour = 0.0f;
   };
 }
 }

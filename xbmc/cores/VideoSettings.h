@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
+
 // VideoSettings.h: interface for the CVideoSettings class.
 //
 //////////////////////////////////////////////////////////////////////
-
-#pragma once
 
 enum EINTERLACEMETHOD
 {
@@ -58,7 +47,6 @@ enum ESCALINGMETHOD
   VS_SCALINGMETHOD_LANCZOS3_FAST,
   VS_SCALINGMETHOD_LANCZOS3,
   VS_SCALINGMETHOD_SINC8,
-  VS_SCALINGMETHOD_NEDI,
   VS_SCALINGMETHOD_BICUBIC_SOFTWARE,
   VS_SCALINGMETHOD_LANCZOS_SOFTWARE,
   VS_SCALINGMETHOD_SINC_SOFTWARE,
@@ -68,6 +56,13 @@ enum ESCALINGMETHOD
   VS_SCALINGMETHOD_SPLINE36_FAST,
   VS_SCALINGMETHOD_SPLINE36,
   VS_SCALINGMETHOD_MAX // do not use and keep as last enum value.
+};
+
+enum ETONEMAPMETHOD
+{
+  VS_TONEMAPMETHOD_OFF=0,
+  VS_TONEMAPMETHOD_REINHARD,
+  VS_TONEMAPMETHOD_MAX
 };
 
 enum ViewMode
@@ -116,6 +111,10 @@ public:
   int m_StereoMode;
   bool m_StereoInvert;
   int m_VideoStream;
+  int m_ToneMapMethod = VS_TONEMAPMETHOD_REINHARD;
+  float m_ToneMapParam = 1.0;
+  int m_Orientation = 0;
+  int m_CenterMixLevel = 0; // relative to metadata or default
 };
 
 class CCriticalSection;

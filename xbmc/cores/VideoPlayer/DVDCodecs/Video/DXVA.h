@@ -1,22 +1,11 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
@@ -41,19 +30,21 @@ class CDXVAOutputBuffer : public CVideoBuffer
 public:
   virtual ~CDXVAOutputBuffer();
 
-  ID3D11View* GetSRV(unsigned idx);
   void SetRef(AVFrame *frame);
   void Unref();
+
+  HANDLE GetHandle();
+  unsigned GetIdx();
 
   ID3D11View* view{ nullptr };
   DXGI_FORMAT format{ DXGI_FORMAT_UNKNOWN };
   unsigned width{ 0 };
   unsigned height{ 0 };
+  bool shared{ false };
 
 private:
   CDXVAOutputBuffer(int id);
 
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> planes[2];
   AVFrame* m_pFrame{ nullptr };
 };
 
@@ -100,6 +91,7 @@ public:
                    , ID3D11VideoDecoder **decoder, ID3D11VideoContext **context);
   void Release(CDecoder *decoder);
   ID3D11VideoContext* GetVideoContext() const { return m_vcontext.Get(); }
+  bool IsContextShared() const { return m_sharingAllowed; }
 
 private:
   CDXVAContext();
@@ -120,6 +112,7 @@ private:
   GUID *m_input_list;
   std::vector<CDecoder*> m_decoders;
   bool m_atiWorkaround;
+  bool m_sharingAllowed;
 };
 
 class CDecoder

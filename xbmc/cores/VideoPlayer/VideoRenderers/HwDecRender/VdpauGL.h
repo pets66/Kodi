@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2007-2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -46,15 +34,15 @@ struct InteropInfo
 class CInteropState
 {
 public:
-  bool Init(void *device, void *procFunc, void *ident);
+  bool Init(void *device, void *procFunc, int64_t ident);
   void Finish();
   InteropInfo &GetInterop();
-  bool NeedInit(void *device, void *procFunc, void *ident);
+  bool NeedInit(void *device, void *procFunc, int64_t ident);
 
 protected:
   void *m_device = nullptr;
   void *m_procFunc = nullptr;
-  void *m_ident = nullptr;
+  int64_t m_ident = 0;
   InteropInfo m_interop;
 };
 

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogPVRGroupManager.h"
@@ -23,6 +11,7 @@
 #include "FileItem.h"
 #include "ServiceBroker.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIKeyboardFactory.h"
 #include "guilib/GUIRadioButtonControl.h"
 #include "guilib/GUIWindowManager.h"
@@ -117,7 +106,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonNewGroup(CGUIMessage &message)
       if (strGroupName != "")
       {
         /* add the group if it doesn't already exist */
-        CPVRChannelGroups *groups = static_cast<CPVRChannelGroups*>(CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio));
+        CPVRChannelGroups *groups = CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio);
         if (groups->AddGroup(strGroupName))
         {
           CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio)->GetByName(strGroupName)->SetGroupType(PVR_GROUP_TYPE_USER_DEFINED);
@@ -142,7 +131,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonDeleteGroup(CGUIMessage &message)
     if (!m_selectedGroup)
       return bReturn;
 
-    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
+    CGUIDialogYesNo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
     if (!pDialog)
       return bReturn;
 
@@ -154,7 +143,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonDeleteGroup(CGUIMessage &message)
 
     if (pDialog->IsConfirmed())
     {
-      if (static_cast<CPVRChannelGroups*>(CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio))->DeleteGroup(*m_selectedGroup))
+      if (CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio)->DeleteGroup(*m_selectedGroup))
         Update();
     }
 
@@ -411,15 +400,31 @@ void CGUIDialogPVRGroupManager::Update()
       SET_CONTROL_LABEL(CONTROL_IN_GROUP_LABEL, strNewLabel);
     }
 
-    /* get all channels that are not in this group for the center part */
-    m_selectedGroup->GetMembers(*m_ungroupedChannels, false);
-    m_viewUngroupedChannels.SetItems(*m_ungroupedChannels);
-    m_viewUngroupedChannels.SetSelectedItem(m_iSelectedUngroupedChannel);
+    // Slightly different handling for "all" group...
+    if (m_selectedGroup->IsInternalGroup())
+    {
+      m_selectedGroup->GetMembers(*m_groupMembers, CPVRChannelGroup::Include::ONLY_VISIBLE);
+      m_selectedGroup->GetMembers(*m_ungroupedChannels, CPVRChannelGroup::Include::ONLY_HIDDEN);
+    }
+    else
+    {
+      m_selectedGroup->GetMembers(*m_groupMembers, CPVRChannelGroup::Include::ALL);
 
-    /* get all channels in this group for the right side part */
-    m_selectedGroup->GetMembers(*m_groupMembers, true);
+      /* for the center part, get all channels of the "all" channels group that are not in this group */
+      const CPVRChannelGroupPtr allGroup = CServiceBroker::GetPVRManager().ChannelGroups()->GetGroupAll(m_bIsRadio);
+      CFileItemList allChannels;
+      allGroup->GetMembers(allChannels, CPVRChannelGroup::Include::ALL);
+      for (const auto& channelItem : allChannels)
+      {
+        if (!m_selectedGroup->IsGroupMember(channelItem->GetPVRChannelInfoTag()))
+          m_ungroupedChannels->Add(channelItem);
+      }
+    }
     m_viewGroupMembers.SetItems(*m_groupMembers);
     m_viewGroupMembers.SetSelectedItem(m_iSelectedGroupMember);
+
+    m_viewUngroupedChannels.SetItems(*m_ungroupedChannels);
+    m_viewUngroupedChannels.SetSelectedItem(m_iSelectedUngroupedChannel);
   }
 }
 

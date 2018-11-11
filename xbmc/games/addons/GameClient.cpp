@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GameClient.h"
@@ -25,22 +13,20 @@
 #include "GameClientTranslator.h"
 #include "addons/AddonManager.h"
 #include "addons/BinaryAddonCache.h"
-#include "cores/AudioEngine/Utils/AEChannelInfo.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
 #include "games/addons/input/GameClientInput.h"
-#include "games/addons/playback/GameClientRealtimePlayback.h"
-#include "games/addons/playback/GameClientReversiblePlayback.h"
+#include "games/addons/streams/GameClientStreams.h"
+#include "games/addons/streams/IGameClientStream.h"
 #include "games/GameServices.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/WindowIDs.h"
-#include "input/Action.h"
-#include "input/ActionIDs.h"
+#include "input/actions/Action.h"
+#include "input/actions/ActionIDs.h"
 #include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogOKHelper.h"
-#include "settings/Settings.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -118,8 +104,6 @@ CGameClient::CGameClient(ADDON::CAddonInfo addonInfo) :
   m_bSupportsAllExtensions(false),
   m_bIsPlaying(false),
   m_serializeSize(0),
-  m_audio(nullptr),
-  m_video(nullptr),
   m_region(GAME_REGION_UNKNOWN)
 {
   const ADDON::InfoMap& extraInfo = m_addonInfo.ExtraInfo();
@@ -147,8 +131,6 @@ CGameClient::CGameClient(ADDON::CAddonInfo addonInfo) :
   it = extraInfo.find(GAME_PROPERTY_SUPPORTS_STANDALONE);
   if (it != extraInfo.end())
     m_bSupportsStandalone = (it->second == "true");
-
-  ResetPlayback();
 }
 
 CGameClient::~CGameClient(void)
@@ -204,20 +186,17 @@ bool CGameClient::Initialize(void)
   if (!CDirectory::Exists(savestatesDir))
     CDirectory::Create(savestatesDir);
 
-  AddonProperties().InitializeProperties();
+  if (!AddonProperties().InitializeProperties())
+    return false;
 
   m_struct.toKodi.kodiInstance = this;
   m_struct.toKodi.CloseGame = cb_close_game;
-  m_struct.toKodi.OpenPixelStream = cb_open_pixel_stream;
-  m_struct.toKodi.OpenVideoStream = cb_open_video_stream;
-  m_struct.toKodi.OpenPCMStream = cb_open_pcm_stream;
-  m_struct.toKodi.OpenAudioStream = cb_open_audio_stream;
+  m_struct.toKodi.OpenStream = cb_open_stream;
+  m_struct.toKodi.GetStreamBuffer = cb_get_stream_buffer;
   m_struct.toKodi.AddStreamData = cb_add_stream_data;
+  m_struct.toKodi.ReleaseStreamBuffer = cb_release_stream_buffer;
   m_struct.toKodi.CloseStream = cb_close_stream;
-  m_struct.toKodi.EnableHardwareRendering = cb_enable_hardware_rendering;
-  m_struct.toKodi.HwGetCurrentFramebuffer = cb_hw_get_current_framebuffer;
   m_struct.toKodi.HwGetProcAddress = cb_hw_get_proc_address;
-  m_struct.toKodi.RenderFrame = cb_render_frame;
   m_struct.toKodi.InputEvent = cb_input_event;
 
   if (Create(ADDON_INSTANCE_GAME, &m_struct, &m_struct.props) == ADDON_STATUS_OK)
@@ -237,11 +216,8 @@ void CGameClient::Unload()
   Destroy();
 }
 
-bool CGameClient::OpenFile(const CFileItem& file, IGameAudioCallback* audio, IGameVideoCallback* video, IGameInputCallback *input)
+bool CGameClient::OpenFile(const CFileItem& file, RETRO::IStreamManager& streamManager, IGameInputCallback *input)
 {
-  if (audio == nullptr || video == nullptr)
-    return false;
-
   // Check if we should open in standalone mode
   if (file.GetPath().empty())
     return false;
@@ -276,6 +252,8 @@ bool CGameClient::OpenFile(const CFileItem& file, IGameAudioCallback* audio, IGa
 
   CloseFile();
 
+  Streams().Initialize(streamManager);
+
   GAME_ERROR error = GAME_ERROR_FAILED;
 
   try { LogError(error = m_struct.toAddon.LoadGame(path.c_str()), "LoadGame()"); }
@@ -284,16 +262,20 @@ bool CGameClient::OpenFile(const CFileItem& file, IGameAudioCallback* audio, IGa
   if (error != GAME_ERROR_NO_ERROR)
   {
     NotifyError(error);
+    Streams().Deinitialize();
     return false;
   }
 
-  if (!InitializeGameplay(file.GetPath(), audio, video, input))
+  if (!InitializeGameplay(file.GetPath(), streamManager, input))
+  {
+    Streams().Deinitialize();
     return false;
+  }
 
   return true;
 }
 
-bool CGameClient::OpenStandalone(IGameAudioCallback* audio, IGameVideoCallback* video, IGameInputCallback *input)
+bool CGameClient::OpenStandalone(RETRO::IStreamManager& streamManager, IGameInputCallback *input)
 {
   CLog::Log(LOGDEBUG, "GameClient: Loading %s in standalone mode", ID().c_str());
 
@@ -304,6 +286,8 @@ bool CGameClient::OpenStandalone(IGameAudioCallback* audio, IGameVideoCallback* 
 
   CloseFile();
 
+  Streams().Initialize(streamManager);
+
   GAME_ERROR error = GAME_ERROR_FAILED;
 
   try { LogError(error = m_struct.toAddon.LoadStandalone(), "LoadStandalone()"); }
@@ -312,31 +296,31 @@ bool CGameClient::OpenStandalone(IGameAudioCallback* audio, IGameVideoCallback* 
   if (error != GAME_ERROR_NO_ERROR)
   {
     NotifyError(error);
+    Streams().Deinitialize();
     return false;
   }
 
-  if (!InitializeGameplay(ID(), audio, video, input))
+  if (!InitializeGameplay("", streamManager, input))
+  {
+    Streams().Deinitialize();
     return false;
+  }
 
   return true;
 }
 
-bool CGameClient::InitializeGameplay(const std::string& gamePath, IGameAudioCallback* audio, IGameVideoCallback* video, IGameInputCallback *input)
+bool CGameClient::InitializeGameplay(const std::string& gamePath, RETRO::IStreamManager& streamManager, IGameInputCallback *input)
 {
-  if (LoadGameInfo() && NormalizeAudio(audio))
+  if (LoadGameInfo())
   {
+    Input().Start(input);
+
     m_bIsPlaying      = true;
     m_gamePath        = gamePath;
-    m_serializeSize   = GetSerializeSize();
-    m_audio           = audio;
-    m_video           = video;
     m_input           = input;
 
     m_inGameSaves.reset(new CGameClientInGameSaves(this, &m_struct.toAddon));
     m_inGameSaves->Load();
-
-    // Start playback
-    CreatePlayback();
 
     return true;
   }
@@ -344,63 +328,60 @@ bool CGameClient::InitializeGameplay(const std::string& gamePath, IGameAudioCall
   return false;
 }
 
-bool CGameClient::NormalizeAudio(IGameAudioCallback* audioCallback)
-{
-  unsigned int originalSampleRate = m_timing.GetSampleRate();
-
-  if (m_timing.NormalizeAudio(audioCallback))
-  {
-    const bool bChanged = (originalSampleRate != m_timing.GetSampleRate());
-    if (bChanged)
-    {
-      CLog::Log(LOGDEBUG, "GAME: Correcting audio and video by %f to avoid resampling", m_timing.GetCorrectionFactor());
-      CLog::Log(LOGDEBUG, "GAME: Audio sample rate normalized to %u", m_timing.GetSampleRate());
-      CLog::Log(LOGDEBUG, "GAME: Video frame rate scaled to %f", m_timing.GetFrameRate());
-    }
-    else
-    {
-      CLog::Log(LOGDEBUG, "GAME: Audio sample rate is supported, no scaling or resampling needed");
-    }
-  }
-  else
-  {
-    CLog::Log(LOGERROR, "GAME: Failed to normalize audio sample rate: exceeds %u%% difference", CGameClientTiming::MAX_CORRECTION_FACTOR_PERCENT);
-    return false;
-  }
-
-  return true;
-}
-
 bool CGameClient::LoadGameInfo()
 {
-  // Get information about system audio/video timings and geometry
+  bool bRequiresGameLoop;
+  try
+  {
+    bRequiresGameLoop = m_struct.toAddon.RequiresGameLoop();
+  }
+  catch (...)
+  {
+    LogException("RequiresGameLoop()");
+    return false;
+  }
+
+  // Get information about system timings
   // Can be called only after retro_load_game()
-  game_system_av_info av_info = { };
+  game_system_timing timingInfo = { };
 
   bool bSuccess = false;
-  try { bSuccess = LogError(m_struct.toAddon.GetGameInfo(&av_info), "GetGameInfo()"); }
-  catch (...) { LogException("GetGameInfo()"); }
+  try { bSuccess = LogError(m_struct.toAddon.GetGameTiming(&timingInfo), "GetGameTiming()"); }
+  catch (...) { LogException("GetGameTiming()"); }
 
   if (!bSuccess)
+  {
+    CLog::Log(LOGERROR, "GameClient: Failed to get timing info");
     return false;
+  }
 
   GAME_REGION region;
   try { region = m_struct.toAddon.GetRegion(); }
   catch (...) { LogException("GetRegion()"); return false; }
 
+  size_t serializeSize;
+  try
+  {
+    serializeSize = m_struct.toAddon.SerializeSize();
+  }
+  catch (...)
+  {
+    LogException("SerializeSize()");
+    return false;
+  }
+
   CLog::Log(LOGINFO, "GAME: ---------------------------------------");
-  CLog::Log(LOGINFO, "GAME: Base Width:   %u", av_info.geometry.base_width);
-  CLog::Log(LOGINFO, "GAME: Base Height:  %u", av_info.geometry.base_height);
-  CLog::Log(LOGINFO, "GAME: Max Width:    %u", av_info.geometry.max_width);
-  CLog::Log(LOGINFO, "GAME: Max Height:   %u", av_info.geometry.max_height);
-  CLog::Log(LOGINFO, "GAME: Aspect Ratio: %f", av_info.geometry.aspect_ratio);
-  CLog::Log(LOGINFO, "GAME: FPS:          %f", av_info.timing.fps);
-  CLog::Log(LOGINFO, "GAME: Sample Rate:  %f", av_info.timing.sample_rate);
-  CLog::Log(LOGINFO, "GAME: Region:       %s", CGameClientTranslator::TranslateRegion(region));
+  CLog::Log(LOGINFO, "GAME: Game loop:      %s", bRequiresGameLoop ? "true" : "false");
+  CLog::Log(LOGINFO, "GAME: FPS:            %f", timingInfo.fps);
+  CLog::Log(LOGINFO, "GAME: Sample Rate:    %f", timingInfo.sample_rate);
+  CLog::Log(LOGINFO, "GAME: Region:         %s", CGameClientTranslator::TranslateRegion(region));
+  CLog::Log(LOGINFO, "GAME: Savestate size: %u", serializeSize);
   CLog::Log(LOGINFO, "GAME: ---------------------------------------");
 
-  m_timing.SetFrameRate(av_info.timing.fps);
-  m_timing.SetSampleRate(av_info.timing.sample_rate);
+  m_bRequiresGameLoop = bRequiresGameLoop;
+  m_serializeSize = serializeSize;
+  m_framerate = timingInfo.fps;
+  m_samplerate = timingInfo.sample_rate;
   m_region = region;
 
   return true;
@@ -452,47 +433,19 @@ std::string CGameClient::GetMissingResource()
   return strAddonId;
 }
 
-void CGameClient::CreatePlayback()
-{
-  bool bRequiresGameLoop = false;
-
-  try { bRequiresGameLoop = m_struct.toAddon.RequiresGameLoop(); }
-  catch (...) { LogException("RequiresGameLoop()"); }
-
-  if (bRequiresGameLoop)
-  {
-    m_playback.reset(new CGameClientReversiblePlayback(this, m_timing.GetFrameRate(), m_serializeSize));
-  }
-  else
-  {
-    ResetPlayback();
-  }
-}
-
-void CGameClient::ResetPlayback()
-{
-  m_playback.reset(new CGameClientRealtimePlayback);
-}
-
 void CGameClient::Reset()
 {
-  ResetPlayback();
-
   CSingleLock lock(m_critSection);
 
   if (m_bIsPlaying)
   {
     try { LogError(m_struct.toAddon.Reset(), "Reset()"); }
     catch (...) { LogException("Reset()"); }
-
-    CreatePlayback();
   }
 }
 
 void CGameClient::CloseFile()
 {
-  ResetPlayback();
-
   CSingleLock lock(m_critSection);
 
   if (m_bIsPlaying)
@@ -500,18 +453,18 @@ void CGameClient::CloseFile()
     m_inGameSaves->Save();
     m_inGameSaves.reset();
 
+    m_bIsPlaying = false;
+    m_gamePath.clear();
+    m_serializeSize = 0;
+    m_input = nullptr;
+
+    Input().Stop();
+
     try { LogError(m_struct.toAddon.UnloadGame(), "UnloadGame()"); }
     catch (...) { LogException("UnloadGame()"); }
+
+    Streams().Deinitialize();
   }
-
-  m_bIsPlaying = false;
-  m_gamePath.clear();
-  m_serializeSize = 0;
-
-  m_audio = nullptr;
-  m_video = nullptr;
-  m_input = nullptr;
-  m_timing.Reset();
 }
 
 void CGameClient::RunFrame()
@@ -533,162 +486,6 @@ void CGameClient::RunFrame()
     try { LogError(m_struct.toAddon.RunFrame(), "RunFrame()"); }
     catch (...) { LogException("RunFrame()"); }
   }
-}
-
-bool CGameClient::OpenPixelStream(GAME_PIXEL_FORMAT format, unsigned int width, unsigned int height, GAME_VIDEO_ROTATION rotation)
-{
-  if (!m_video)
-    return false;
-
-  AVPixelFormat pixelFormat = CGameClientTranslator::TranslatePixelFormat(format);
-  if (pixelFormat == AV_PIX_FMT_NONE)
-  {
-    CLog::Log(LOGERROR, "GAME: Unknown pixel format: %d", format);
-    return false;
-  }
-
-  unsigned int orientation = 0;
-  switch (rotation)
-  {
-  case GAME_VIDEO_ROTATION_90:
-    orientation = 360 - 90;
-    break;
-  case GAME_VIDEO_ROTATION_180:
-    orientation = 360 - 180;
-    break;
-  case GAME_VIDEO_ROTATION_270:
-    orientation = 360 - 270;
-    break;
-  default:
-    break;
-  }
-
-  return m_video->OpenPixelStream(pixelFormat, width, height, orientation);
-}
-
-bool CGameClient::OpenVideoStream(GAME_VIDEO_CODEC codec)
-{
-  if (!m_video)
-    return false;
-
-  AVCodecID videoCodec = CGameClientTranslator::TranslateVideoCodec(codec);
-  if (videoCodec == AV_CODEC_ID_NONE)
-  {
-    CLog::Log(LOGERROR, "GAME: Unknown video format: %d", codec);
-    return false;
-  }
-
-  return m_video->OpenEncodedStream(videoCodec);
-}
-
-bool CGameClient::OpenPCMStream(GAME_PCM_FORMAT format, const GAME_AUDIO_CHANNEL* channelMap)
-{
-  if (!m_audio || channelMap == nullptr)
-    return false;
-
-  AEDataFormat pcmFormat = CGameClientTranslator::TranslatePCMFormat(format);
-  if (pcmFormat == AE_FMT_INVALID)
-  {
-    CLog::Log(LOGERROR, "GAME: Unknown PCM format: %d", format);
-    return false;
-  }
-
-  CAEChannelInfo channelLayout;
-  for (const GAME_AUDIO_CHANNEL* channelPtr = channelMap; *channelPtr != GAME_CH_NULL; channelPtr++)
-  {
-    AEChannel channel = CGameClientTranslator::TranslateAudioChannel(*channelPtr);
-    if (channel == AE_CH_NULL)
-    {
-      CLog::Log(LOGERROR, "GAME: Unknown channel ID: %d", *channelPtr);
-      return false;
-    }
-    channelLayout += channel;
-  }
-
-  return m_audio->OpenPCMStream(pcmFormat, m_timing.GetSampleRate(), channelLayout);
-}
-
-bool CGameClient::OpenAudioStream(GAME_AUDIO_CODEC codec, const GAME_AUDIO_CHANNEL* channelMap)
-{
-  if (!m_audio)
-    return false;
-
-  AVCodecID audioCodec = CGameClientTranslator::TranslateAudioCodec(codec);
-  if (audioCodec == AV_CODEC_ID_NONE)
-  {
-    CLog::Log(LOGERROR, "GAME: Unknown audio codec: %d", codec);
-    return false;
-  }
-
-  CAEChannelInfo channelLayout;
-  for (const GAME_AUDIO_CHANNEL* channelPtr = channelMap; *channelPtr != GAME_CH_NULL; channelPtr++)
-  {
-    AEChannel channel = CGameClientTranslator::TranslateAudioChannel(*channelPtr);
-    if (channel == AE_CH_NULL)
-    {
-      CLog::Log(LOGERROR, "GAME: Unknown channel ID: %d", *channelPtr);
-      return false;
-    }
-    channelLayout += channel;
-  }
-
-  return m_audio->OpenEncodedStream(audioCodec, m_timing.GetSampleRate(), channelLayout);
-}
-
-void CGameClient::AddStreamData(GAME_STREAM_TYPE stream, const uint8_t* data, unsigned int size)
-{
-  switch (stream)
-  {
-  case GAME_STREAM_AUDIO:
-  {
-    if (m_audio)
-      m_audio->AddData(data, size);
-    break;
-  }
-  case GAME_STREAM_VIDEO:
-  {
-    if (m_video)
-      m_video->AddData(data, size);
-    break;
-  }
-  default:
-    break;
-  }
-}
-
-void CGameClient::CloseStream(GAME_STREAM_TYPE stream)
-{
-  switch (stream)
-  {
-  case GAME_STREAM_AUDIO:
-  {
-    if (m_audio)
-      m_audio->CloseStream();
-    break;
-  }
-  case GAME_STREAM_VIDEO:
-  {
-    if (m_video)
-      m_video->CloseStream();
-    break;
-  }
-  default:
-    break;
-  }
-}
-
-size_t CGameClient::GetSerializeSize()
-{
-  CSingleLock lock(m_critSection);
-
-  size_t serializeSize = 0;
-  if (m_bIsPlaying)
-  {
-    try { serializeSize = m_struct.toAddon.SerializeSize(); }
-    catch (...) { LogException("SerializeSize()"); }
-  }
-
-  return serializeSize;
 }
 
 bool CGameClient::Serialize(uint8_t* data, size_t size)
@@ -762,77 +559,65 @@ void CGameClient::cb_close_game(void* kodiInstance)
   CApplicationMessenger::GetInstance().PostMsg(TMSG_GUI_ACTION, WINDOW_INVALID, -1, static_cast<void*>(new CAction(ACTION_STOP)));
 }
 
-int CGameClient::cb_open_pixel_stream(void* kodiInstance, GAME_PIXEL_FORMAT format, unsigned int width, unsigned int height, GAME_VIDEO_ROTATION rotation)
+void* CGameClient::cb_open_stream(void* kodiInstance, const game_stream_properties *properties)
 {
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return -1;
+  if (properties == nullptr)
+    return nullptr;
 
-  return gameClient->OpenPixelStream(format, width, height, rotation) ? 0 : -1;
+  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
+  if (gameClient == nullptr)
+    return nullptr;
+
+  return gameClient->Streams().OpenStream(*properties);
 }
 
-int CGameClient::cb_open_video_stream(void* kodiInstance, GAME_VIDEO_CODEC codec)
+bool CGameClient::cb_get_stream_buffer(void* kodiInstance, void *stream, unsigned int width, unsigned int height, game_stream_buffer *buffer)
 {
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return -1;
+  if (buffer == nullptr)
+    return false;
 
-  return gameClient->OpenVideoStream(codec) ? 0 : -1;
+  IGameClientStream *gameClientStream = static_cast<IGameClientStream*>(stream);
+  if (gameClientStream == nullptr)
+    return false;
+
+  return gameClientStream->GetBuffer(width, height, *buffer);
 }
 
-int CGameClient::cb_open_pcm_stream(void* kodiInstance, GAME_PCM_FORMAT format, const GAME_AUDIO_CHANNEL* channel_map)
+void CGameClient::cb_add_stream_data(void* kodiInstance, void *stream, const game_stream_packet *packet)
 {
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return -1;
-
-  return gameClient->OpenPCMStream(format, channel_map) ? 0 : -1;
-}
-
-int CGameClient::cb_open_audio_stream(void* kodiInstance, GAME_AUDIO_CODEC codec, const GAME_AUDIO_CHANNEL* channel_map)
-{
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return -1;
-
-  return gameClient->OpenAudioStream(codec, channel_map) ? 0 : -1;
-}
-
-void CGameClient::cb_add_stream_data(void* kodiInstance, GAME_STREAM_TYPE stream, const uint8_t* data, unsigned int size)
-{
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
+  if (packet == nullptr)
     return;
 
-  gameClient->AddStreamData(stream, data, size);
-}
-
-void CGameClient::cb_close_stream(void* kodiInstance, GAME_STREAM_TYPE stream)
-{
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
+  IGameClientStream *gameClientStream = static_cast<IGameClientStream*>(stream);
+  if (gameClientStream == nullptr)
     return;
 
-  gameClient->CloseStream(stream);
+  gameClientStream->AddData(*packet);
 }
 
-void CGameClient::cb_enable_hardware_rendering(void* kodiInstance, const game_hw_info *hw_info)
+void CGameClient::cb_release_stream_buffer(void* kodiInstance, void *stream, game_stream_buffer *buffer)
 {
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
+  if (buffer == nullptr)
     return;
 
-  //! @todo
+  IGameClientStream *gameClientStream = static_cast<IGameClientStream*>(stream);
+  if (gameClientStream == nullptr)
+    return;
+
+  gameClientStream->ReleaseBuffer(*buffer);
 }
 
-uintptr_t CGameClient::cb_hw_get_current_framebuffer(void* kodiInstance)
+void CGameClient::cb_close_stream(void* kodiInstance, void *stream)
 {
   CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return 0;
+  if (gameClient == nullptr)
+    return;
 
-  //! @todo
-  return 0;
+  IGameClientStream *gameClientStream = static_cast<IGameClientStream*>(stream);
+  if (gameClientStream == nullptr)
+    return;
+
+  gameClient->Streams().CloseStream(gameClientStream);
 }
 
 game_proc_address_t CGameClient::cb_hw_get_proc_address(void* kodiInstance, const char *sym)
@@ -843,15 +628,6 @@ game_proc_address_t CGameClient::cb_hw_get_proc_address(void* kodiInstance, cons
 
   //! @todo
   return nullptr;
-}
-
-void CGameClient::cb_render_frame(void* kodiInstance)
-{
-  CGameClient *gameClient = static_cast<CGameClient*>(kodiInstance);
-  if (!gameClient)
-    return;
-
-  //! @todo
 }
 
 bool CGameClient::cb_input_event(void* kodiInstance, const game_input_event* event)

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RBP.h"
@@ -23,6 +11,7 @@
 #include <assert.h>
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 
 #include "cores/omxplayer/OMXImage.h"
@@ -129,7 +118,7 @@ bool CRBP::Initialize()
   if (m_gpu_mem < 128)
     setenv("V3D_DOUBLE_BUFFER", "1", 1);
 
-  m_gui_resolution_limit = CServiceBroker::GetSettings().GetInt("videoscreen.limitgui");
+  m_gui_resolution_limit = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt("videoscreen.limitgui");
   if (!m_gui_resolution_limit)
     m_gui_resolution_limit = m_gpu_mem < 128 ? 720:1080;
 
@@ -390,7 +379,7 @@ static int get_image_params(int file_desc, VC_IMAGE_T * img)
 CGPUMEM::CGPUMEM(unsigned int numbytes, bool cached)
 {
   m_numbytes = numbytes;
-  m_vcsm_handle = vcsm_malloc_cache(numbytes, cached ? VCSM_CACHE_TYPE_HOST : VCSM_CACHE_TYPE_NONE, (char *)"CGPUMEM");
+  m_vcsm_handle = vcsm_malloc_cache(numbytes, static_cast<VCSM_CACHE_TYPE_T>(0x80 | static_cast<unsigned>(cached ? VCSM_CACHE_TYPE_HOST : VCSM_CACHE_TYPE_NONE)), const_cast<char*>("CGPUMEM"));
   if (m_vcsm_handle)
     m_vc_handle = vcsm_vc_hdl_from_hdl(m_vcsm_handle);
   if (m_vc_handle)

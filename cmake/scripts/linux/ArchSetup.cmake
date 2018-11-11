@@ -40,7 +40,6 @@ endif()
 # temp until further cleanup is done
 # add Raspberry Pi 2 and 3 specific flags
 if(CORE_PLATFORM_NAME_LC STREQUAL rbpi)
-  list(APPEND ARCH_DEFINES -D_ARMEL -DTARGET_RASPBERRY_PI)
   if(CPU MATCHES "cortex-a7")
     set(NEON_FLAGS "-fPIC -mcpu=cortex-a7 -mfloat-abi=hard -mfpu=neon-vfpv4 -mvectorize-with-neon-quad")
   elseif(CPU MATCHES "cortex-a53")
@@ -107,10 +106,6 @@ if(CMAKE_BUILD_TYPE STREQUAL Coverage)
   set(COVERAGE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
   set(COVERAGE_DEPENDS "\${APP_NAME_LC}" "\${APP_NAME_LC}-test")
   set(COVERAGE_EXCLUDES */test/* lib/* */lib/*)
-endif()
-
-if(ENABLE_MIR)
-  set(ENABLE_VDPAU OFF CACHE BOOL "Disabling VDPAU since no Mir support" FORCE)
 endif()
 
 if(ENABLE_GBM)

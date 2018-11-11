@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2014-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ButtonMapping.h"
@@ -376,16 +364,25 @@ CButtonMapping::CButtonMapping(IButtonMapper* buttonMapper, IButtonMap* buttonMa
 
 bool CButtonMapping::OnButtonMotion(unsigned int buttonIndex, bool bPressed)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::BUTTON))
+    return false;
+
   return GetButton(buttonIndex).OnMotion(bPressed);
 }
 
 bool CButtonMapping::OnHatMotion(unsigned int hatIndex, HAT_STATE state)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::HAT))
+    return false;
+
   return GetHat(hatIndex).OnMotion(state);
 }
 
 bool CButtonMapping::OnAxisMotion(unsigned int axisIndex, float position, int center, unsigned int range)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::SEMIAXIS))
+    return false;
+
   return GetAxis(axisIndex, position).OnMotion(position);
 }
 
@@ -401,21 +398,33 @@ void CButtonMapping::ProcessAxisMotions(void)
 
 bool CButtonMapping::OnKeyPress(const CKey& key)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::KEY))
+    return false;
+
   return GetKey(static_cast<XBMCKey>(key.GetKeycode())).OnMotion(true);
 }
 
 bool CButtonMapping::OnPosition(int x, int y)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::RELATIVE_POINTER))
+    return false;
+
   return GetPointer().OnMotion(x, y);
 }
 
 bool CButtonMapping::OnButtonPress(MOUSE::BUTTON_ID button)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::MOUSE_BUTTON))
+    return false;
+
   return GetMouseButton(button).OnMotion(true);
 }
 
 void CButtonMapping::OnButtonRelease(MOUSE::BUTTON_ID button)
 {
+  if (!m_buttonMapper->AcceptsPrimitive(PRIMITIVE_TYPE::MOUSE_BUTTON))
+    return;
+
   GetMouseButton(button).OnMotion(false);
 }
 

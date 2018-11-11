@@ -1,28 +1,18 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIGameRenderManager.h"
+#include "GUIGameSettingsHandle.h"
 #include "GUIGameVideoHandle.h"
 #include "GUIRenderHandle.h"
 #include "GUIRenderTarget.h"
 #include "GUIRenderTargetFactory.h"
+#include "IGameCallback.h"
 #include "IRenderCallback.h"
 #include "threads/SingleLock.h"
 
@@ -31,7 +21,9 @@ using namespace RETRO;
 
 CGUIGameRenderManager::~CGUIGameRenderManager() = default;
 
-void CGUIGameRenderManager::RegisterPlayer(CGUIRenderTargetFactory *factory, IRenderCallback *callback)
+void CGUIGameRenderManager::RegisterPlayer(CGUIRenderTargetFactory *factory,
+                                           IRenderCallback *callback,
+                                           IGameCallback *gameCallback)
 {
   // Set factory
   {
@@ -45,10 +37,22 @@ void CGUIGameRenderManager::RegisterPlayer(CGUIRenderTargetFactory *factory, IRe
     CSingleLock lock(m_callbackMutex);
     m_callback = callback;
   }
+
+  // Set game callback
+  {
+    CSingleLock lock(m_gameCallbackMutex);
+    m_gameCallback = gameCallback;
+  }
 }
 
 void CGUIGameRenderManager::UnregisterPlayer()
 {
+  // Reset game callback
+  {
+    CSingleLock lock(m_gameCallbackMutex);
+    m_gameCallback = nullptr;
+  }
+
   // Reset callback
   {
     CSingleLock lock(m_callbackMutex);
@@ -98,6 +102,11 @@ std::shared_ptr<CGUIRenderHandle> CGUIGameRenderManager::RegisterWindow(CGameWin
 std::shared_ptr<CGUIGameVideoHandle> CGUIGameRenderManager::RegisterDialog(GAME::CDialogGameVideoSelect &dialog)
 {
   return std::make_shared<CGUIGameVideoHandle>(*this);
+}
+
+std::shared_ptr<CGUIGameSettingsHandle> CGUIGameRenderManager::RegisterGameSettingsDialog()
+{
+  return std::make_shared<CGUIGameSettingsHandle>(*this);
 }
 
 void CGUIGameRenderManager::UnregisterHandle(CGUIRenderHandle *handle)
@@ -168,7 +177,7 @@ bool CGUIGameRenderManager::IsPlayingGame()
   return m_callback != nullptr;
 }
 
-bool CGUIGameRenderManager::SupportsRenderFeature(ERENDERFEATURE feature)
+bool CGUIGameRenderManager::SupportsRenderFeature(RENDERFEATURE feature)
 {
   CSingleLock lock(m_callbackMutex);
 
@@ -178,7 +187,7 @@ bool CGUIGameRenderManager::SupportsRenderFeature(ERENDERFEATURE feature)
   return false;
 }
 
-bool CGUIGameRenderManager::SupportsScalingMethod(ESCALINGMETHOD method)
+bool CGUIGameRenderManager::SupportsScalingMethod(SCALINGMETHOD method)
 {
   CSingleLock lock(m_callbackMutex);
 
@@ -186,6 +195,16 @@ bool CGUIGameRenderManager::SupportsScalingMethod(ESCALINGMETHOD method)
     return m_callback->SupportsScalingMethod(method);
 
   return false;
+}
+
+std::string CGUIGameRenderManager::GameClientID()
+{
+  CSingleLock lock(m_callbackMutex);
+
+  if (m_gameCallback != nullptr)
+    return m_gameCallback->GameClientID();
+
+  return "";
 }
 
 void CGUIGameRenderManager::UpdateRenderTargets()

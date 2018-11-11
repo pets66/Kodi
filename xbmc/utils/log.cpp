@@ -1,36 +1,26 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "log.h"
 #include "CompileInfo.h"
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/CriticalSection.h"
 #include "threads/SingleLock.h"
 #include "threads/Thread.h"
 #include "utils/StringUtils.h"
 
 #if defined(TARGET_POSIX)
-#include "posix/PosixInterfaceForCLog.h"
+#include "platform/posix/utils/PosixInterfaceForCLog.h"
 typedef class CPosixInterfaceForCLog PlatformInterfaceForCLog;
 #elif defined(TARGET_WINDOWS)
-#include "win32/Win32InterfaceForCLog.h"
+#include "platform/win32/utils/Win32InterfaceForCLog.h"
 typedef class CWin32InterfaceForCLog PlatformInterfaceForCLog;
 #endif
 
@@ -47,14 +37,13 @@ namespace
 class CLogGlobals
 {
 public:
-  CLogGlobals(void) : m_repeatCount(0), m_repeatLogLevel(-1), m_logLevel(LOG_LEVEL_DEBUG), m_extraLogLevels(0) {}
   ~CLogGlobals() = default;
   PlatformInterfaceForCLog m_platform;
-  int         m_repeatCount;
-  int         m_repeatLogLevel;
+  int         m_repeatCount = 0;
+  int         m_repeatLogLevel = -1;
   std::string m_repeatLine;
-  int         m_logLevel;
-  int         m_extraLogLevels;
+  int         m_logLevel = LOG_LEVEL_DEBUG;
+  int         m_extraLogLevels = 0;
   CCriticalSection critSec;
 };
 
@@ -104,7 +93,7 @@ void CLog::LogString(int logLevel, std::string&& logString)
 
 void CLog::LogString(int logLevel, int component, std::string&& logString)
 {
-  if (g_advancedSettings.CanLogComponent(component) && IsLogLevelLogged(logLevel))
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(component) && IsLogLevelLogged(logLevel))
     LogString(logLevel, std::move(logString));
 }
 

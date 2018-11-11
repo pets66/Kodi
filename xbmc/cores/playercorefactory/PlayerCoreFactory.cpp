@@ -1,35 +1,23 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PlayerCoreFactory.h"
 #include "threads/SingleLock.h"
-#include "cores/VideoPlayer/VideoPlayer.h"
 #include "cores/paplayer/PAPlayer.h"
 #include "cores/IPlayerCallback.h"
 #include "dialogs/GUIDialogContextMenu.h"
 #include "URL.h"
 #include "FileItem.h"
-#include "profiles/ProfilesManager.h"
+#include "profiles/ProfileManager.h"
 #include "settings/lib/SettingsManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "PlayerCoreConfig.h"
 #include "PlayerSelectionRule.h"
 #include "guilib/LocalizeStrings.h"
@@ -39,20 +27,20 @@
 
 #define PLAYERCOREFACTORY_XML "playercorefactory.xml"
 
-CPlayerCoreFactory::CPlayerCoreFactory(CSettings &settings,
-                                       const CProfilesManager &profileManager) :
-  m_settings(settings),
+CPlayerCoreFactory::CPlayerCoreFactory(const CProfileManager &profileManager) :
   m_profileManager(profileManager)
 {
-  if (m_settings.IsLoaded())
+  m_settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+
+  if (m_settings->IsLoaded())
     OnSettingsLoaded();
 
-  m_settings.GetSettingsManager()->RegisterSettingsHandler(this);
+  m_settings->GetSettingsManager()->RegisterSettingsHandler(this);
 }
 
 CPlayerCoreFactory::~CPlayerCoreFactory()
 {
-  m_settings.GetSettingsManager()->UnregisterSettingsHandler(this);
+  m_settings->GetSettingsManager()->UnregisterSettingsHandler(this);
 
   for(std::vector<CPlayerCoreConfig *>::iterator it = m_vecPlayerConfigs.begin(); it != m_vecPlayerConfigs.end(); ++it)
     delete *it;
@@ -70,7 +58,7 @@ IPlayer* CPlayerCoreFactory::CreatePlayer(const std::string& nameId, IPlayerCall
 {
   CSingleLock lock(m_section);
   size_t idx = GetPlayerIndex(nameId);
-  
+
   if (m_vecPlayerConfigs.empty() || idx > m_vecPlayerConfigs.size())
     return nullptr;
 
@@ -99,7 +87,7 @@ void CPlayerCoreFactory::GetPlayers(std::vector<std::string>&players, const bool
     {
       if (std::find(players.begin(), players.end(), conf->m_name) != players.end())
         continue;
-      
+
       CLog::Log(LOGDEBUG, "CPlayerCoreFactory::GetPlayers: adding player: %s", conf->m_name.c_str());
       players.push_back(conf->m_name);
     }
@@ -108,9 +96,9 @@ void CPlayerCoreFactory::GetPlayers(std::vector<std::string>&players, const bool
 
 void CPlayerCoreFactory::GetPlayers(const CFileItem& item, std::vector<std::string>&players) const
 {
-  CURL url(item.GetPath());
+  CURL url(item.GetDynPath());
 
-  CLog::Log(LOGDEBUG, "CPlayerCoreFactory::GetPlayers(%s)", CURL::GetRedacted(item.GetPath()).c_str());
+  CLog::Log(LOGDEBUG, "CPlayerCoreFactory::GetPlayers(%s)", CURL::GetRedacted(item.GetDynPath()).c_str());
 
   std::vector<std::string>validPlayers;
   GetPlayers(validPlayers);
@@ -170,9 +158,9 @@ int CPlayerCoreFactory::GetPlayerIndex(const std::string& strCoreName) const
     // Dereference "*default*player" aliases
     std::string strRealCoreName;
     if (StringUtils::EqualsNoCase(strCoreName, "audiodefaultplayer"))
-      strRealCoreName = g_advancedSettings.m_audioDefaultPlayer;
+      strRealCoreName = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_audioDefaultPlayer;
     else if (StringUtils::EqualsNoCase(strCoreName, "videodefaultplayer"))
-      strRealCoreName = g_advancedSettings.m_videoDefaultPlayer;
+      strRealCoreName = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoDefaultPlayer;
     else
       strRealCoreName = strCoreName;
 

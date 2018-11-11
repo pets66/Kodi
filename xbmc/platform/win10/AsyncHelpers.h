@@ -1,22 +1,11 @@
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #ifdef TARGET_WINDOWS_STORE
@@ -24,69 +13,77 @@
 #include <ppl.h>
 #include <ppltasks.h>
 
-inline void Wait(Windows::Foundation::IAsyncAction^ asyncOp)
+namespace winrt
 {
+  using namespace Windows::Foundation;
+}
+
+inline void Wait(const winrt::IAsyncAction& asyncOp)
+{
+  if (asyncOp.Status() == winrt::AsyncStatus::Completed)
+    return;
+
+  if (!winrt::impl::is_sta())
+    return asyncOp.get();
+
   auto __sync = std::make_shared<Concurrency::event>();
-  asyncOp->Completed = ref new Windows::Foundation::AsyncActionCompletedHandler(
-    [&](Windows::Foundation::IAsyncAction^ op, Windows::Foundation::AsyncStatus st)
-  {
+  asyncOp.Completed([&](auto&&, auto&&) {
     __sync->set();
   });
-
   __sync->wait();
 }
 
 template <typename TResult, typename TProgress> inline
-TResult Wait(Windows::Foundation::IAsyncOperationWithProgress<TResult, TProgress>^ asyncOp)
+TResult Wait(const winrt::IAsyncOperationWithProgress<TResult, TProgress>& asyncOp)
 {
-  auto __sync = std::make_shared<Concurrency::event>();
+  if (asyncOp.Status() == winrt::AsyncStatus::Completed)
+    return asyncOp.GetResults();
 
-  asyncOp->Completed = ref new Windows::Foundation::AsyncOperationWithProgressCompletedHandler<TResult, TProgress>(
-    [&](Windows::Foundation::IAsyncOperationWithProgress<TResult, TProgress>^ op, Windows::Foundation::AsyncStatus st)
+  if (!winrt::impl::is_sta())
+    return asyncOp.get();
+
+  auto __sync = std::make_shared<Concurrency::event>();
+  asyncOp.Completed([&](auto&&, auto&&) {
+    __sync->set();
+  });
+  __sync->wait();
+
+  return asyncOp.GetResults();
+}
+
+template <typename TResult> inline
+TResult Wait(const winrt::IAsyncOperation<TResult>& asyncOp)
+{
+  if (asyncOp.Status() == winrt::AsyncStatus::Completed)
+    return asyncOp.GetResults();
+
+  if (!winrt::impl::is_sta())
+    return asyncOp.get();
+
+  auto __sync = std::make_shared<Concurrency::event>();
+  asyncOp.Completed([&](auto&&, auto&&)
   {
     __sync->set();
   });
   __sync->wait();
 
-  return asyncOp->GetResults();
+  return asyncOp.GetResults();
 }
 
 template <typename TResult> inline
-TResult Wait(Windows::Foundation::IAsyncOperation<TResult>^ asyncOp)
+TResult Wait(const Concurrency::task<TResult>& asyncOp)
 {
-  auto __sync = std::make_shared<Concurrency::event>();
-  Windows::Foundation::AsyncStatus __status;
+  if (asyncOp.is_done())
+    return asyncOp.get();
 
-  asyncOp->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<TResult>(
-    [&](Windows::Foundation::IAsyncOperation<TResult>^ op, Windows::Foundation::AsyncStatus st)
-  {
-    __status = st;
-    __sync->set();
-  });
-  __sync->wait();
-
-  return asyncOp->GetResults();
-}
-
-template <typename TResult> inline
-TResult Wait(Concurrency::task<TResult> &asyncOp)
-{
-  auto dispatcher = Windows::UI::Core::CoreWindow::GetForCurrentThread()->Dispatcher;
-  if (!dispatcher->HasThreadAccess)
+  if (!winrt::impl::is_sta()) // blocking suspend is allowed
     return asyncOp.get();
 
   auto _sync = std::make_shared<Concurrency::event>();
-
-  auto workItem = ref new Windows::System::Threading::WorkItemHandler(
-    [&](Windows::Foundation::IAsyncAction^ workItem)
+  asyncOp.then([&](TResult result)
   {
-    asyncOp.then(
-      [&](TResult result)
-    {
-      _sync->set();
-    });
+    _sync->set();
   });
-  Windows::System::Threading::ThreadPool::RunAsync(workItem);
   _sync->wait();
 
   return asyncOp.get();

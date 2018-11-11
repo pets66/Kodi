@@ -1,32 +1,16 @@
-#pragma once
+/*
+ *  Copyright (C) 2004, Leo Seib, Hannover
+ *
+ *  Project:Dataset C++ Dynamic Library
+ *  Module: FieldValue class and result sets classes header file
+ *  Author: Leo Seib      E-Mail: leoseib@web.de
+ *  Begin: 5/04/2002
+ *
+ *  SPDX-License-Identifier: MIT
+ *  See LICENSES/README.md for more information.
+ */
 
-/**********************************************************************
- * Copyright (c) 2004, Leo Seib, Hannover
- *
- * Project:Dataset C++ Dynamic Library
- * Module: FieldValue class and result sets classes header file
- * Author: Leo Seib      E-Mail: leoseib@web.de
- * Begin: 5/04/2002
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- **********************************************************************/
+#pragma once
 
 #include <map>
 #include <vector>
@@ -36,7 +20,7 @@
 
 namespace dbiplus {
 
-enum fType { 
+enum fType {
 	ft_String,
 	ft_Boolean,
 	ft_Char,
@@ -127,7 +111,7 @@ public:
   field_value& operator= (const int64_t i)
     {set_asInt64(i); return *this;}
   field_value& operator= (const field_value & fv);
-  
+
   //class ostream;
   friend std::ostream& operator<< (std::ostream& os, const field_value &fv)
   {switch (fv.get_fType()) {
@@ -137,7 +121,7 @@ public:
     }
     case ft_Boolean:{
       return os << fv.get_asBool();
-      break;     
+      break;
     }
     case ft_Char: {
       return os << fv.get_asChar();
@@ -208,7 +192,7 @@ struct field_prop {
 struct field {
   field_prop props;
   field_value val;
-}; 
+};
 
 
 typedef std::vector<field> Fields;

@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "RPBaseRenderer.h"
-#include "cores/RetroPlayer/process/BaseRenderBufferPool.h"
-#include "cores/RetroPlayer/process/RenderBufferSysMem.h"
+#include "cores/RetroPlayer/buffers/BaseRenderBufferPool.h"
+#include "cores/RetroPlayer/buffers/video/RenderBufferSysMem.h"
 #include "cores/RetroPlayer/process/RPProcessInfo.h"
 
 #include <dxgi.h>
@@ -53,7 +42,7 @@ namespace RETRO
   class CWinRenderBuffer : public CRenderBufferSysMem
   {
   public:
-    CWinRenderBuffer(AVPixelFormat pixFormat, DXGI_FORMAT dxFormat, unsigned int width, unsigned int height);
+    CWinRenderBuffer(AVPixelFormat pixFormat, DXGI_FORMAT dxFormat);
     ~CWinRenderBuffer() override = default;
 
     // implementation of IRenderBuffer via CRenderBufferSysMem
@@ -63,19 +52,17 @@ namespace RETRO
 
   private:
     bool CreateTexture();
-    uint8_t *GetTexture();
+    bool GetTexture(uint8_t*& data, unsigned int& stride);
     bool ReleaseTexture();
 
     bool CreateScalingContext();
-    void ScalePixels(uint8_t *source, size_t sourceSize, uint8_t *target, size_t targetSize);
+    void ScalePixels(uint8_t *source, unsigned int sourceStride, uint8_t *target, unsigned int targetStride);
 
     static AVPixelFormat GetPixFormat(DXGI_FORMAT dxFormat);
 
     // Construction parameters
     const AVPixelFormat m_pixFormat;
     const DXGI_FORMAT m_targetDxFormat;
-    const unsigned int m_width;
-    const unsigned int m_height;
 
     AVPixelFormat m_targetPixFormat;
     std::unique_ptr<CD3DTexture> m_intermediateTarget;
@@ -97,33 +84,33 @@ namespace RETRO
 
     // DirectX interface
     bool ConfigureDX(DXGI_FORMAT dxFormat);
-    CRPWinOutputShader *GetShader(ESCALINGMETHOD scalingMethod) const;
+    CRPWinOutputShader *GetShader(SCALINGMETHOD scalingMethod) const;
 
   private:
-    static const std::vector<ESCALINGMETHOD> &GetScalingMethods();
+    static const std::vector<SCALINGMETHOD> &GetScalingMethods();
 
     void CompileOutputShaders();
 
     DXGI_FORMAT m_targetDxFormat = DXGI_FORMAT_UNKNOWN;
-    std::map<ESCALINGMETHOD, std::unique_ptr<CRPWinOutputShader>> m_outputShaders;
+    std::map<SCALINGMETHOD, std::unique_ptr<CRPWinOutputShader>> m_outputShaders;
   };
 
   class CRPWinRenderer : public CRPBaseRenderer
   {
   public:
     CRPWinRenderer(const CRenderSettings &renderSettings, CRenderContext &context, std::shared_ptr<IRenderBufferPool> bufferPool);
-    ~CRPWinRenderer() override;
+    ~CRPWinRenderer() override = default;
 
     // implementation of CRPBaseRenderer
-    bool Supports(ERENDERFEATURE feature) const override;
-    ESCALINGMETHOD GetDefaultScalingMethod() const override { return DEFAULT_SCALING_METHOD; }
+    bool Supports(RENDERFEATURE feature) const override;
+    SCALINGMETHOD GetDefaultScalingMethod() const override { return DEFAULT_SCALING_METHOD; }
 
-    static bool SupportsScalingMethod(ESCALINGMETHOD method);
+    static bool SupportsScalingMethod(SCALINGMETHOD method);
 
     /*!
      * \brief The default scaling method of the renderer
      */
-    static const ESCALINGMETHOD DEFAULT_SCALING_METHOD = VS_SCALINGMETHOD_NEAREST;
+    static const SCALINGMETHOD DEFAULT_SCALING_METHOD = SCALINGMETHOD::NEAREST;
 
   protected:
     // implementation of CRPBaseRenderer

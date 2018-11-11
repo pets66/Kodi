@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DirectoryNodeMusicVideosOverview.h"
@@ -45,18 +33,18 @@ CDirectoryNodeMusicVideosOverview::CDirectoryNodeMusicVideosOverview(const std::
 
 NODE_TYPE CDirectoryNodeMusicVideosOverview::GetChildType() const
 {
-  for (unsigned int i = 0; i < sizeof(MusicVideoChildren) / sizeof(Node); ++i)
-    if (GetName() == MusicVideoChildren[i].id)
-      return MusicVideoChildren[i].node;
+  for (const Node& node : MusicVideoChildren)
+    if (GetName() == node.id)
+      return node.node;
 
   return NODE_TYPE_NONE;
 }
 
 std::string CDirectoryNodeMusicVideosOverview::GetLocalizedName() const
 {
-  for (unsigned int i = 0; i < sizeof(MusicVideoChildren) / sizeof(Node); ++i)
-    if (GetName() == MusicVideoChildren[i].id)
-      return g_localizeStrings.Get(MusicVideoChildren[i].label);
+  for (const Node& node : MusicVideoChildren)
+    if (GetName() == node.id)
+      return g_localizeStrings.Get(node.label);
   return "";
 }
 
@@ -65,13 +53,13 @@ bool CDirectoryNodeMusicVideosOverview::GetContent(CFileItemList& items) const
   CVideoDbUrl videoUrl;
   if (!videoUrl.FromString(BuildPath()))
     return false;
-  
-  for (unsigned int i = 0; i < sizeof(MusicVideoChildren) / sizeof(Node); ++i)
+
+  for (const Node& node : MusicVideoChildren)
   {
-    CFileItemPtr pItem(new CFileItem(g_localizeStrings.Get(MusicVideoChildren[i].label)));
+    CFileItemPtr pItem(new CFileItem(g_localizeStrings.Get(node.label)));
 
     CVideoDbUrl itemUrl = videoUrl;
-    std::string strDir = StringUtils::Format("%s/", MusicVideoChildren[i].id.c_str());
+    std::string strDir = StringUtils::Format("%s/", node.id.c_str());
     itemUrl.AppendPath(strDir);
     pItem->SetPath(itemUrl.ToString());
 

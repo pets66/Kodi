@@ -11,7 +11,7 @@ ffmpg_config = --prefix=$(PREFIX) --extra-version="kodi-$(VERSION)"
 ffmpg_config += --cc="$(CC)" --cxx="$(CXX)" --ar=$(AR) --ranlib=$(RANLIB) --strip=$(STRIP)
 ffmpg_config += --disable-devices --disable-doc
 ffmpg_config += --disable-ffplay --disable-ffmpeg
-ffmpg_config += --disable-ffprobe --disable-ffserver
+ffmpg_config += --disable-ffprobe
 ffmpg_config += --disable-sdl2
 ffmpg_config += --enable-gpl --enable-runtime-cpudetect
 ffmpg_config += --enable-postproc --enable-pthreads
@@ -38,6 +38,7 @@ ifeq ($(OS), android)
       ffmpg_config += --cpu=cortex-a9
     else
       ffmpg_config += --cpu=i686 --disable-mmx
+      ffmpg_config += --extra-cflags=-no-integrated-as --extra-cflags=-mno-stackrealign
     endif
   endif
   ffmpg_config += --target-os=linux --extra-libs=-liconv --disable-linux-perf
@@ -49,11 +50,11 @@ ifeq ($(OS), ios)
     ffmpg_config += --as="$(NATIVEPREFIX)/bin/gas-preprocessor.pl -arch aarch64 -- $(CC)"
   endif
   ffmpg_config += --yasmexe=$(NATIVEPREFIX)/bin/yasm
-  ffmpg_config += --disable-decoder=mpeg_xvmc --disable-vda --disable-crystalhd --enable-videotoolbox
+  ffmpg_config += --disable-decoder=mpeg_xvmc --disable-crystalhd --enable-videotoolbox
   ffmpg_config += --target-os=darwin
 endif
 ifeq ($(OS), osx)
-  ffmpg_config += --disable-decoder=mpeg_xvmc --disable-vda --disable-crystalhd --enable-videotoolbox
+  ffmpg_config += --disable-decoder=mpeg_xvmc --disable-crystalhd --enable-videotoolbox
   ffmpg_config += --target-os=darwin
   ffmpg_config += --disable-securetransport
 endif
@@ -61,7 +62,7 @@ ifeq ($(findstring arm, $(CPU)), arm)
   ffmpg_config += --enable-pic --disable-armv5te --disable-armv6t2
 endif
 ifeq ($(findstring mips, $(CPU)), mips)
-  ffmpg_config += --disable-mips32r2 --disable-mipsdspr1 --disable-mipsdspr2
+  ffmpg_config += --disable-mips32r2 --disable-mipsdsp --disable-mipsdspr2
 endif
 ifeq ($(Configuration), Release)
   ffmpg_config += --disable-debug

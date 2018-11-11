@@ -1,28 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RenderSystemGL.h"
 #include "filesystem/File.h"
-#include "guilib/GraphicContext.h"
+#include "rendering/MatrixGL.h"
+#include "windowing/GraphicContext.h"
 #include "settings/AdvancedSettings.h"
-#include "guilib/MatrixGLES.h"
 #include "settings/DisplaySettings.h"
 #include "utils/log.h"
 #include "utils/GLUtils.h"
@@ -36,7 +24,6 @@
 
 CRenderSystemGL::CRenderSystemGL() : CRenderSystemBase()
 {
-  m_pShader.reset(new CGLShader*[SM_MAX]);
 }
 
 CRenderSystemGL::~CRenderSystemGL() = default;
@@ -112,7 +99,7 @@ bool CRenderSystemGL::InitRenderSystem()
     glBindVertexArray(m_vertexArray);
   }
 
-  InitialiseShader();
+  InitialiseShaders();
 
   if (IsExtSupported("GL_ARB_texture_non_power_of_two"))
     m_supportsNPOT = true;
@@ -135,6 +122,9 @@ bool CRenderSystemGL::ResetRenderSystem(int width, int height)
     glGenVertexArrays(1, &m_vertexArray);
     glBindVertexArray(m_vertexArray);
   }
+
+  ReleaseShaders();
+  InitialiseShaders();
 
   glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
@@ -202,6 +192,7 @@ bool CRenderSystemGL::DestroyRenderSystem()
     glDeleteVertexArrays(1, &m_vertexArray);
   }
 
+  ReleaseShaders();
   m_bRenderCreated = false;
 
   return true;
@@ -212,6 +203,15 @@ bool CRenderSystemGL::BeginRender()
   if (!m_bRenderCreated)
     return false;
 
+  bool useLimited = CServiceBroker::GetWinSystem()->UseLimitedColor();
+
+  if (m_limitedColorRange != useLimited)
+  {
+    ReleaseShaders();
+    InitialiseShaders();
+  }
+
+  m_limitedColorRange = useLimited;
   return true;
 }
 
@@ -223,7 +223,7 @@ bool CRenderSystemGL::EndRender()
   return true;
 }
 
-bool CRenderSystemGL::ClearBuffers(color_t color)
+bool CRenderSystemGL::ClearBuffers(UTILS::Color color)
 {
   if (!m_bRenderCreated)
     return false;
@@ -366,53 +366,6 @@ void CRenderSystemGL::Project(float &x, float &y, float &z)
     y = (float)(m_viewPort[1] + m_viewPort[3] - coordY);
     z = 0;
   }
-}
-
-bool CRenderSystemGL::TestRender()
-{
-  static float theta = 0.0;
-
-  glPushMatrix();
-  glRotatef( theta, 0.0f, 0.0f, 1.0f );
-  glBegin( GL_TRIANGLES );
-  glColor3f( 1.0f, 0.0f, 0.0f ); glVertex2f( 0.0f, 1.0f );
-  glColor3f( 0.0f, 1.0f, 0.0f ); glVertex2f( 0.87f, -0.5f );
-  glColor3f( 0.0f, 0.0f, 1.0f ); glVertex2f( -0.87f, -0.5f );
-  glEnd();
-  glPopMatrix();
-
-  theta += 1.0f;
-
-  return true;
-}
-
-void CRenderSystemGL::ApplyHardwareTransform(const TransformMatrix &finalMatrix)
-{
-  if (!m_bRenderCreated)
-    return;
-
-  glMatrixModview.Push();
-  GLfloat matrix[4][4];
-
-  for(int i = 0; i < 3; i++)
-    for(int j = 0; j < 4; j++)
-      matrix[j][i] = finalMatrix.m[i][j];
-
-  matrix[0][3] = 0.0f;
-  matrix[1][3] = 0.0f;
-  matrix[2][3] = 0.0f;
-  matrix[3][3] = 1.0f;
-
-  glMatrixModview->MultMatrixf(&matrix[0][0]);
-  glMatrixModview.Load();
-}
-
-void CRenderSystemGL::RestoreHardwareTransform()
-{
-  if (!m_bRenderCreated)
-    return;
-
-  glMatrixModview.PopLoad();
 }
 
 void CRenderSystemGL::CalculateMaxTexturesize()
@@ -652,61 +605,101 @@ bool CRenderSystemGL::SupportsStereo(RENDER_STEREO_MODE mode) const
 // -----------------------------------------------------------------------------
 // shaders
 // -----------------------------------------------------------------------------
-void CRenderSystemGL::InitialiseShader()
+void CRenderSystemGL::InitialiseShaders()
 {
-  m_pShader[SM_DEFAULT] = new CGLShader("gl_shader_vert_default.glsl", "gl_shader_frag_default.glsl");
+  std::string defines;
+  m_limitedColorRange = CServiceBroker::GetWinSystem()->UseLimitedColor();
+  if (m_limitedColorRange)
+  {
+    defines += "#define KODI_LIMITED_RANGE 1\n";
+  }
+
+  m_pShader[SM_DEFAULT].reset(new CGLShader("gl_shader_vert_default.glsl", "gl_shader_frag_default.glsl", defines));
   if (!m_pShader[SM_DEFAULT]->CompileAndLink())
   {
     m_pShader[SM_DEFAULT]->Free();
-    delete m_pShader[SM_DEFAULT];
-    m_pShader[SM_DEFAULT] = nullptr;
+    m_pShader[SM_DEFAULT].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_default.glsl - compile and link failed");
   }
 
-  m_pShader[SM_TEXTURE] = new CGLShader("gl_shader_frag_texture.glsl");
+  m_pShader[SM_TEXTURE].reset(new CGLShader("gl_shader_frag_texture.glsl", defines));
   if (!m_pShader[SM_TEXTURE]->CompileAndLink())
   {
     m_pShader[SM_TEXTURE]->Free();
-    delete m_pShader[SM_TEXTURE];
-    m_pShader[SM_TEXTURE] = nullptr;
+    m_pShader[SM_TEXTURE].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_texture.glsl - compile and link failed");
   }
 
-  m_pShader[SM_MULTI] = new CGLShader("gl_shader_frag_multi.glsl");
+  m_pShader[SM_TEXTURE_LIM].reset(new CGLShader("gl_shader_frag_texture_lim.glsl", defines));
+  if (!m_pShader[SM_TEXTURE_LIM]->CompileAndLink())
+  {
+    m_pShader[SM_TEXTURE_LIM]->Free();
+    m_pShader[SM_TEXTURE_LIM].reset();
+    CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_texture_lim.glsl - compile and link failed");
+  }
+
+  m_pShader[SM_MULTI].reset(new CGLShader("gl_shader_frag_multi.glsl", defines));
   if (!m_pShader[SM_MULTI]->CompileAndLink())
   {
     m_pShader[SM_MULTI]->Free();
-    delete m_pShader[SM_MULTI];
-    m_pShader[SM_MULTI] = nullptr;
+    m_pShader[SM_MULTI].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_multi.glsl - compile and link failed");
   }
 
-  m_pShader[SM_FONTS] = new CGLShader("gl_shader_frag_fonts.glsl");
+  m_pShader[SM_FONTS].reset(new CGLShader("gl_shader_frag_fonts.glsl", defines));
   if (!m_pShader[SM_FONTS]->CompileAndLink())
   {
     m_pShader[SM_FONTS]->Free();
-    delete m_pShader[SM_FONTS];
-    m_pShader[SM_FONTS] = nullptr;
+    m_pShader[SM_FONTS].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_fonts.glsl - compile and link failed");
   }
 
-  m_pShader[SM_TEXTURE_NOBLEND] = new CGLShader("gl_shader_frag_texture_noblend.glsl");
+  m_pShader[SM_TEXTURE_NOBLEND].reset(new CGLShader("gl_shader_frag_texture_noblend.glsl", defines));
   if (!m_pShader[SM_TEXTURE_NOBLEND]->CompileAndLink())
   {
     m_pShader[SM_TEXTURE_NOBLEND]->Free();
-    delete m_pShader[SM_TEXTURE_NOBLEND];
-    m_pShader[SM_TEXTURE_NOBLEND] = nullptr;
+    m_pShader[SM_TEXTURE_NOBLEND].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_texture_noblend.glsl - compile and link failed");
   }
 
-  m_pShader[SM_MULTI_BLENDCOLOR] = new CGLShader("gl_shader_frag_multi_blendcolor.glsl");
+  m_pShader[SM_MULTI_BLENDCOLOR].reset(new CGLShader("gl_shader_frag_multi_blendcolor.glsl", defines));
   if (!m_pShader[SM_MULTI_BLENDCOLOR]->CompileAndLink())
   {
     m_pShader[SM_MULTI_BLENDCOLOR]->Free();
-    delete m_pShader[SM_MULTI_BLENDCOLOR];
-    m_pShader[SM_MULTI_BLENDCOLOR] = nullptr;
+    m_pShader[SM_MULTI_BLENDCOLOR].reset();
     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_multi_blendcolor.glsl - compile and link failed");
   }
+}
+
+void CRenderSystemGL::ReleaseShaders()
+{
+  if (m_pShader[SM_DEFAULT])
+    m_pShader[SM_DEFAULT]->Free();
+  m_pShader[SM_DEFAULT].reset();
+
+  if (m_pShader[SM_TEXTURE])
+    m_pShader[SM_TEXTURE]->Free();
+  m_pShader[SM_TEXTURE].reset();
+
+  if (m_pShader[SM_TEXTURE_LIM])
+    m_pShader[SM_TEXTURE_LIM]->Free();
+  m_pShader[SM_TEXTURE_LIM].reset();
+
+  if (m_pShader[SM_MULTI])
+    m_pShader[SM_MULTI]->Free();
+  m_pShader[SM_MULTI].reset();
+
+  if (m_pShader[SM_FONTS])
+    m_pShader[SM_FONTS]->Free();
+  m_pShader[SM_FONTS].reset();
+
+  if (m_pShader[SM_TEXTURE_NOBLEND])
+    m_pShader[SM_TEXTURE_NOBLEND]->Free();
+  m_pShader[SM_TEXTURE_NOBLEND].reset();
+
+  if (m_pShader[SM_MULTI_BLENDCOLOR])
+    m_pShader[SM_MULTI_BLENDCOLOR]->Free();
+  m_pShader[SM_MULTI_BLENDCOLOR].reset();
 }
 
 void CRenderSystemGL::EnableShader(ESHADERMETHOD method)

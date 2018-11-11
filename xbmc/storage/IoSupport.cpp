@@ -1,23 +1,11 @@
 /*
- *      Copyright (c) 2002 Frodo
+ *  Copyright (c) 2002 Frodo
  *      Portions Copyright (c) by the authors of ffmpeg and xvid
- *      Copyright (C) 2002-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2002-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 // IoSupport.cpp: implementation of the CIoSupport class.
@@ -145,7 +133,6 @@ int CIoSupport::ReadSector(HANDLE hDevice, DWORD dwSector, char* lpczBuffer)
     {
       CLog::Log(LOGERROR, "CD: ReadSector Request to read sector %d\n", (int)dwSector);
       CLog::Log(LOGERROR, "CD: ReadSector error: %s\n", strerror(errno));
-      OutputDebugString("CD Read error\n");
       return (-1);
     }
 
@@ -159,7 +146,6 @@ int CIoSupport::ReadSector(HANDLE hDevice, DWORD dwSector, char* lpczBuffer)
       // error reading sector
       CLog::Log(LOGERROR, "CD: ReadSector Request to read sector %d\n", (int)dwSector);
       CLog::Log(LOGERROR, "CD: ReadSector error: %s\n", strerror(errno));
-      OutputDebugString("CD Read error\n");
       return (-1);
     }
 
@@ -241,7 +227,6 @@ int CIoSupport::ReadSectorMode2(HANDLE hDevice, DWORD dwSector, char* lpczBuffer
     CLog::Log(LOGERROR, "CD: ReadSectorMode2 Request to read sector %d\n", (int)dwSector);
     CLog::Log(LOGERROR, "CD: ReadSectorMode2 error: %s\n", strerror(errno));
     CLog::Log(LOGERROR, "CD: ReadSectorMode2 minute %d, second %d, frame %d\n", m, s, f);
-    OutputDebugString("CD Read error\n");
     return -1;
   }
 #elif defined(TARGET_WINDOWS_STORE)

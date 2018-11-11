@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <stdlib.h>
@@ -38,6 +26,7 @@
 #include "platform/android/activity/JNIXBMCNsdManagerResolveListener.h"
 #include "platform/android/activity/JNIXBMCJsonHandler.h"
 #include "platform/android/activity/JNIXBMCFile.h"
+#include "platform/android/activity/JNIXBMCDisplayManagerDisplayListener.h"
 #include "utils/StringUtils.h"
 #include "XBMCApp.h"
 
@@ -96,7 +85,7 @@ static void process_input(struct android_app* app, struct android_poll_source* s
         AInputQueue_finishEvent(app->inputQueue, event, handled);
         processed = 1;
     }
-    if (processed == 0) {
+    if (processed == 0 && errno != EAGAIN) {
         CXBMCApp::android_printf("process_input: Failure reading next input event: %s", strerror(errno));
     }
 }
@@ -104,9 +93,6 @@ static void process_input(struct android_app* app, struct android_poll_source* s
 extern void android_main(struct android_app* state)
 {
   {
-    // make sure that the linker doesn't strip out our glue
-    app_dummy();
-
     // revector inputPollSource.process so we can shut up
     // its useless verbose logging on new events (see ouya)
     // and fix the error in handling multiple input events.
@@ -143,16 +129,18 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
     return -1;
 
   std::string pkgRoot = CCompileInfo::GetClass();
-  
-  std::string mainClass = pkgRoot + "/Main";
-  std::string bcReceiver = pkgRoot + "/XBMCBroadcastReceiver";
-  std::string settingsObserver = pkgRoot + "/XBMCSettingsContentObserver";
-  std::string inputDeviceListener = pkgRoot + "/XBMCInputDeviceListener";
+
+  const std::string mainClass = pkgRoot + "/Main";
+  const std::string bcReceiver = pkgRoot + "/XBMCBroadcastReceiver";
+  const std::string settingsObserver = pkgRoot + "/XBMCSettingsContentObserver";
+  const std::string inputDeviceListener = pkgRoot + "/XBMCInputDeviceListener";
 
   CJNIXBMCAudioManagerOnAudioFocusChangeListener::RegisterNatives(env);
   CJNIXBMCSurfaceTextureOnFrameAvailableListener::RegisterNatives(env);
   CJNIXBMCMainView::RegisterNatives(env);
   CJNIXBMCVideoView::RegisterNatives(env);
+  CJNIXBMCDisplayManagerDisplayListener::RegisterNatives(env);
+
   jni::CJNIXBMCNsdManagerDiscoveryListener::RegisterNatives(env);
   jni::CJNIXBMCNsdManagerRegistrationListener::RegisterNatives(env);
   jni::CJNIXBMCNsdManagerResolveListener::RegisterNatives(env);
@@ -163,7 +151,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
   jclass cMain = env->FindClass(mainClass.c_str());
   if(cMain)
   {
-    JNINativeMethod methods[] = 
+    JNINativeMethod methods[] =
     {
       {"_onNewIntent", "(Landroid/content/Intent;)V", (void*)&CJNIMainActivity::_onNewIntent},
       {"_onActivityResult", "(IILandroid/content/Intent;)V", (void*)&CJNIMainActivity::_onActivityResult},
@@ -177,7 +165,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
   jclass cBroadcastReceiver = env->FindClass(bcReceiver.c_str());
   if(cBroadcastReceiver)
   {
-    JNINativeMethod methods[] = 
+    JNINativeMethod methods[] =
     {
       {"_onReceive", "(Landroid/content/Intent;)V", (void*)&CJNIBroadcastReceiver::_onReceive},
     };
@@ -187,7 +175,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
   jclass cSettingsObserver = env->FindClass(settingsObserver.c_str());
   if(cSettingsObserver)
   {
-    JNINativeMethod methods[] = 
+    JNINativeMethod methods[] =
     {
       {"_onVolumeChanged", "(I)V", (void*)&CJNIMainActivity::_onVolumeChanged},
     };
@@ -197,7 +185,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
   jclass cInputDeviceListener = env->FindClass(inputDeviceListener.c_str());
   if(cInputDeviceListener)
   {
-    JNINativeMethod methods[] = 
+    JNINativeMethod methods[] =
     {
       { "_onInputDeviceAdded", "(I)V", (void*)&CJNIMainActivity::_onInputDeviceAdded },
       { "_onInputDeviceChanged", "(I)V", (void*)&CJNIMainActivity::_onInputDeviceChanged },

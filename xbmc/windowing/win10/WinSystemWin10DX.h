@@ -1,27 +1,13 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
-#ifndef WIN_SYSTEM_WIN10_DX_H
-#define WIN_SYSTEM_WIN10_DX_H
+#pragma once
 
-#include "utils/GlobalsHandling.h"
 #include "WinSystemWin10.h"
 #include "rendering/dx/RenderSystemDX.h"
 
@@ -38,7 +24,6 @@ public:
   bool SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays) override;
   void PresentRenderImpl(bool rendered) override;
   bool DPIChanged(WORD dpi, RECT windowRect) const override;
-  void SetWindow(HWND hWnd) const;
   bool DestroyRenderSystem() override;
 
   void UninitHooks();
@@ -46,8 +31,8 @@ public:
 
   void OnMove(int x, int y) override;
   void OnResize(int width, int height);
-  Windows::Foundation::Size GetOutputSize() { return m_deviceResources->GetOutputSize(); };
-  void TrimDevice() { m_deviceResources->Trim(); };
+  winrt::Windows::Foundation::Size GetOutputSize() const { return m_deviceResources->GetOutputSize(); }
+  void TrimDevice() const { m_deviceResources->Trim(); }
 
   /*!
   \brief Register as a dependent of the DirectX Render System
@@ -77,7 +62,6 @@ public:
   void ShowSplash(const std::string& message) override;
 
 protected:
-  void UpdateMonitor() const;
   void SetDeviceFullScreen(bool fullScreen, RESOLUTION_INFO& res) override;
   void ReleaseBackBuffer() override;
   void CreateBackBuffer() override;
@@ -85,4 +69,3 @@ protected:
   bool IsStereoEnabled() override;
 };
 
-#endif // WIN_SYSTEM_WIN32_DX_H

@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "dialogs/GUIDialogContextMenu.h"
 #include "filesystem/DirectoryHistory.h"
@@ -27,8 +15,14 @@
 #include "playlists/SmartPlayList.h"
 #include "view/GUIViewControl.h"
 
+#include <atomic>
+
 class CFileItemList;
 class CGUIViewState;
+namespace
+{
+class CGetDirectoryItems;
+}
 
 // base class for all media windows
 class CGUIMediaWindow : public CGUIWindow
@@ -164,8 +158,10 @@ protected:
   void UpdateFileList();
   virtual void OnDeleteItem(int iItem);
   void OnRenameItem(int iItem);
-
   bool WaitForNetwork() const;
+  bool GetDirectoryItems(CURL &url, CFileItemList &items, bool useDir);
+  bool WaitGetDirectoryItems(CGetDirectoryItems &items);
+  void CancelUpdateItems();
 
   /*! \brief Translate the folder to start in from the given quick path
    \param url the folder the user wants
@@ -179,7 +175,7 @@ protected:
    */
   static std::string RemoveParameterFromPath(const std::string &strDirectory, const std::string &strParameter);
 
-  void ProcessRenderLoop(bool renderOnly = false);
+  bool ProcessRenderLoop(bool renderOnly);
 
   XFILE::CVirtualDirectory m_rootDir;
   CGUIViewControl m_viewControl;
@@ -189,6 +185,24 @@ protected:
   CFileItemList* m_unfilteredItems;        ///< \brief items prior to filtering using FilterItems()
   CDirectoryHistory m_history;
   std::unique_ptr<CGUIViewState> m_guiState;
+  std::atomic_bool m_vecItemsUpdating = {false};
+  class CUpdateGuard
+  {
+  public:
+    CUpdateGuard(std::atomic_bool &update) : m_update(update)
+    {
+      m_update = true;
+    }
+    ~CUpdateGuard()
+    {
+      m_update = false;
+    }
+  protected:
+    std::atomic_bool &m_update;
+  };
+  CEvent m_updateEvent;
+  std::atomic_bool m_updateAborted = {false};
+  std::atomic_bool m_updateJobActive = {false};
 
   // save control state on window exit
   int m_iLastControl;
@@ -209,4 +223,5 @@ protected:
    \sa Update
    */
   std::string m_strFilterPath;
+  bool m_backgroundLoad = false;
 };

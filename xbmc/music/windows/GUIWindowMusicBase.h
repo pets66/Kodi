@@ -1,27 +1,17 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
+
 /*!
 \file GUIWindowMusicBase.h
 \brief
 */
-#pragma once
-/*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
- *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
- */
 
 #include <vector>
 
@@ -48,14 +38,16 @@ public:
   bool OnAction(const CAction &action) override;
   bool OnBack(int actionID) override;
 
-  void OnItemInfo(CFileItem *pItem, bool bShowInfo = false);
-
   void DoScan(const std::string &strPath, bool bRescan = false);
+  void RefreshContent(const std::string& strContent);
 
-  /*! \brief Prompt the user if he wants to start a scan for this folder
-  \param path the path to assign content for
+  /*! \brief Once a music source is added, store source in library, and prompt
+  the user to scan this folder into the library
+  \param oldName the original music source name 
+  \param source details of the music source (just added or edited)
   */
-  static void OnAssignContent(const std::string &path);
+  static void OnAssignContent(const std::string& oldName, const CMediaSource& source);
+
 protected:
   void OnInitWindow() override;
   /*!
@@ -89,20 +81,12 @@ protected:
   bool OnPlayMedia(int iItem, const std::string &player = "") override;
 
   void RetrieveMusicInfo();
-  void OnItemInfo(int iItem, bool bShowInfo = true);
+  void OnItemInfo(int iItem);
   void OnItemInfoAll(const std::string strPath, bool refresh = false);
   virtual void OnQueueItem(int iItem);
   enum ALLOW_SELECTION { SELECTION_ALLOWED = 0, SELECTION_AUTO, SELECTION_FORCED };
-  bool FindAlbumInfo(const CFileItem* album, MUSIC_GRABBER::CMusicAlbumInfo& albumInfo, ALLOW_SELECTION allowSelection);
-  bool FindArtistInfo(const CFileItem* artist, MUSIC_GRABBER::CMusicArtistInfo& artistInfo, ALLOW_SELECTION allowSelection);
-
-  bool ShowAlbumInfo(const CFileItem *pItem, bool bShowInfo = true);
-  void ShowArtistInfo(const CFileItem *pItem, bool bShowInfo = true);
-  void ShowSongInfo(CFileItem* pItem);
-  void UpdateThumb(const CAlbum &album, const std::string &path);
 
   void OnRipTrack(int iItem);
-  void OnSearch();
   void LoadPlayList(const std::string& strPlayList) override;
   virtual void OnRemoveSource(int iItem);
 

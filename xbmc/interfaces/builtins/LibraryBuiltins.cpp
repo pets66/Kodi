@@ -1,40 +1,28 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "LibraryBuiltins.h"
 
 #include "Application.h"
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "MediaSource.h"
 #include "messaging/helpers/DialogHelper.h"
-#include "music/MusicDatabase.h"
 #include "music/MusicLibraryQueue.h"
 #include "settings/LibExportSettings.h"
 #include "storage/MediaManager.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
 #include "video/VideoDatabase.h"
 
 using namespace KODI::MESSAGING;
@@ -116,7 +104,7 @@ static int ExportLibrary(const std::vector<std::string>& params)
       thumbs = StringUtils::EqualsNoCase(params[2], "true");
     else
     {
-      HELPERS::DialogResponse result = HELPERS::ShowYesNoDialogText(CVariant{iHeading}, CVariant{20430}); 
+      HELPERS::DialogResponse result = HELPERS::ShowYesNoDialogText(CVariant{iHeading}, CVariant{20430});
       cancelled = result == HELPERS::DialogResponse::CANCELLED;
       thumbs = result == HELPERS::DialogResponse::YES;
     }
@@ -288,7 +276,7 @@ static int UpdateLibrary(const std::vector<std::string>& params)
 static int SearchVideoLibrary(const std::vector<std::string>& params)
 {
   CGUIMessage msg(GUI_MSG_SEARCH, 0, 0, 0);
-  g_windowManager.SendMessage(msg, WINDOW_VIDEO_NAV);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, WINDOW_VIDEO_NAV);
 
   return 0;
 }
@@ -308,7 +296,7 @@ static int SearchVideoLibrary(const std::vector<std::string>& params)
 ///     <b>`cleanlibrary(type)`</b>
 ///     ,
 ///      Clean the video/music library
-///     @param[in] type                  "video", "movies", "tvshows", "musicvideos" or "music".
+///     @param[in] type                  "video"\, "movies"\, "tvshows"\, "musicvideos" or "music".
 ///   }
 ///   \table_row2_l{
 ///     <b>`exportlibrary(type [\, exportSingeFile\, exportThumbs\, overwrite\, exportActorThumbs])`</b>
@@ -326,9 +314,9 @@ static int SearchVideoLibrary(const std::vector<std::string>& params)
 ///     ,
 ///     Export the video/music library with extended parameters
 ///     @param[in] library               "video" or "music".
-///     @param[in] exportFiletype        "singlefile", "separate" or "library"
-///     @param[in] path                  Path to destination folder
-///     @param[in] unscraped             Add "unscraped" to include unscraped items
+///     @param[in] exportFiletype        "singlefile"\, "separate" or "library".
+///     @param[in] path                  Path to destination folder.
+///     @param[in] unscraped             Add "unscraped" to include unscraped items.
 ///     @param[in] overwrite             Add "overwrite" to overwrite exitsing files.
 ///     @param[in] artwork               Add "artwork" to include images such as thumbs and fanart.
 ///     @param[in] skipnfo               Add "skipnfo" to not include nfo files(just art).

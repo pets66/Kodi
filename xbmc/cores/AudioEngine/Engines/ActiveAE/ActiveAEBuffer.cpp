@@ -1,28 +1,14 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ *  SPDX-License-Identifier: LGPL-2.1-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ActiveAE.h"
 #include "ActiveAEBuffer.h"
 #include "ActiveAEFilter.h"
-#include "cores/AudioEngine/Engines/ActiveAE/AudioDSPAddons/ActiveAEDSPProcess.h"
-#include "cores/AudioEngine/Engines/ActiveAE/ActiveAE.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "cores/AudioEngine/AEResampleFactory.h"
 
@@ -42,11 +28,8 @@ CSoundPacket::~CSoundPacket()
     CActiveAE::FreeSoundSample(data);
 }
 
-CSampleBuffer::CSampleBuffer() : pkt(NULL), pool(NULL)
+CSampleBuffer::CSampleBuffer()
 {
-  refCount = 0;
-  timestamp = 0;
-  pkt_start_offset = 0;
 }
 
 CSampleBuffer::~CSampleBuffer()
@@ -99,6 +82,7 @@ CSampleBuffer* CActiveAEBufferPool::GetFreeBuffer()
     buf = m_freeSamples.front();
     m_freeSamples.pop_front();
     buf->refCount = 1;
+    buf->centerMixLevel = M_SQRT1_2;
   }
   return buf;
 }
@@ -158,18 +142,7 @@ CActiveAEBufferPoolResample::CActiveAEBufferPoolResample(const AEAudioFormat& in
     m_inputFormat.m_channelLayout.Reset();
     m_inputFormat.m_channelLayout += AE_CH_FC;
   }
-  m_resampler = nullptr;
-  m_fillPackets = false;
-  m_drain = false;
-  m_empty = true;
-  m_procSample = nullptr;
-  m_resampleRatio = 1.0;
   m_resampleQuality = quality;
-  m_forceResampler = false;
-  m_stereoUpmix = false;
-  m_normalize = true;
-  m_changeResampler = false;
-  m_lastSamplePts = 0;
 }
 
 CActiveAEBufferPoolResample::~CActiveAEBufferPoolResample()
@@ -195,30 +168,7 @@ bool CActiveAEBufferPoolResample::Create(unsigned int totaltime, bool remap, boo
       m_inputFormat.m_dataFormat != m_format.m_dataFormat ||
       m_changeResampler)
   {
-    if (!m_resampler)
-    {
-      m_resampler = CAEResampleFactory::Create();
-    }
-
-    m_resampler->Init(CAEUtil::GetAVChannelLayout(m_format.m_channelLayout),
-                                m_format.m_channelLayout.Count(),
-                                m_format.m_sampleRate,
-                                CAEUtil::GetAVSampleFormat(m_format.m_dataFormat),
-                                CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat),
-                                CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat),
-                                CAEUtil::GetAVChannelLayout(m_inputFormat.m_channelLayout),
-                                m_inputFormat.m_channelLayout.Count(),
-                                m_inputFormat.m_sampleRate,
-                                CAEUtil::GetAVSampleFormat(m_inputFormat.m_dataFormat),
-                                CAEUtil::DataFormatToUsedBits(m_inputFormat.m_dataFormat),
-                                CAEUtil::DataFormatToDitherBits(m_inputFormat.m_dataFormat),
-                                upmix,
-                                m_normalize,
-                                remap ? &m_format.m_channelLayout : NULL,
-                                m_resampleQuality,
-                                m_forceResampler);
-
-    m_changeResampler = false;
+    ChangeResampler();
   }
   return true;
 }
@@ -232,23 +182,29 @@ void CActiveAEBufferPoolResample::ChangeResampler()
   }
 
   m_resampler = CAEResampleFactory::Create();
-  m_resampler->Init(CAEUtil::GetAVChannelLayout(m_format.m_channelLayout),
-                                m_format.m_channelLayout.Count(),
-                                m_format.m_sampleRate,
-                                CAEUtil::GetAVSampleFormat(m_format.m_dataFormat),
-                                CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat),
-                                CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat),
-                                CAEUtil::GetAVChannelLayout(m_inputFormat.m_channelLayout),
-                                m_inputFormat.m_channelLayout.Count(),
-                                m_inputFormat.m_sampleRate,
-                                CAEUtil::GetAVSampleFormat(m_inputFormat.m_dataFormat),
-                                CAEUtil::DataFormatToUsedBits(m_inputFormat.m_dataFormat),
-                                CAEUtil::DataFormatToDitherBits(m_inputFormat.m_dataFormat),
-                                m_stereoUpmix,
-                                m_normalize,
-                                m_remap ? &m_format.m_channelLayout : NULL,
-                                m_resampleQuality,
-                                m_forceResampler);
+
+  SampleConfig dstConfig, srcConfig;
+  dstConfig.channel_layout = CAEUtil::GetAVChannelLayout(m_format.m_channelLayout);
+  dstConfig.channels = m_format.m_channelLayout.Count();
+  dstConfig.sample_rate = m_format.m_sampleRate;
+  dstConfig.fmt = CAEUtil::GetAVSampleFormat(m_format.m_dataFormat);
+  dstConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_format.m_dataFormat);
+  dstConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_format.m_dataFormat);
+
+  srcConfig.channel_layout = CAEUtil::GetAVChannelLayout(m_inputFormat.m_channelLayout);
+  srcConfig.channels = m_inputFormat.m_channelLayout.Count();
+  srcConfig.sample_rate = m_inputFormat.m_sampleRate;
+  srcConfig.fmt = CAEUtil::GetAVSampleFormat(m_inputFormat.m_dataFormat);
+  srcConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_inputFormat.m_dataFormat);
+  srcConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_inputFormat.m_dataFormat);
+
+  m_resampler->Init(dstConfig, srcConfig,
+                    m_stereoUpmix,
+                    m_normalize,
+                    m_centerMixLevel,
+                    m_remap ? &m_format.m_channelLayout : nullptr,
+                    m_resampleQuality,
+                    m_forceResampler);
 
   m_changeResampler = false;
 }
@@ -303,10 +259,17 @@ bool CActiveAEBufferPoolResample::ResampleBuffers(int64_t timestamp)
       if (hasInput && !skipInput && !m_changeResampler)
       {
         in = m_inputSamples.front();
-        m_inputSamples.pop_front();
+        if (in->centerMixLevel != m_centerMixLevel)
+        {
+          m_centerMixLevel = in->centerMixLevel;
+          m_changeResampler = true;
+          in = nullptr;
+        }
+        else
+          m_inputSamples.pop_front();
       }
       else
-        in = NULL;
+        in = nullptr;
 
       int start = m_procSample->pkt->nb_samples *
                   m_procSample->pkt->bytes_per_sample *

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <array>
@@ -30,16 +18,14 @@
 #include "interfaces/generic/ScriptInvocationManager.h"
 #include "FileItem.h"
 #include "addons/AddonInstaller.h"
-#include "addons/BinaryAddonCache.h"
 #include "addons/PluginSource.h"
 #include "addons/RepositoryUpdater.h"
 #include "games/addons/GameClient.h"
 #include "games/GameUtils.h"
 #include "guilib/TextureManager.h"
-#include "File.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "settings/Settings.h"
-#include "SpecialProtocol.h"
+#include "settings/SettingsComponent.h"
 #include "utils/URIUtils.h"
 #include "utils/StringUtils.h"
 #include "URL.h"
@@ -198,7 +184,7 @@ static void GenerateTypeListing(const CURL& path, const std::set<TYPE>& types,
         item->SetPath(itemPath.Get());
         item->m_bIsFolder = true;
         std::string thumb = CAddonInfo::TranslateIconType(type);
-        if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+        if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
           item->SetArt("thumb", thumb);
         items.Add(item);
         break;
@@ -221,7 +207,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAME_CONTROLLER);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -238,7 +224,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAMEDLL);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -255,7 +241,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAMEDLL);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -272,7 +258,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAMEDLL);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -289,7 +275,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAMEDLL);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -306,7 +292,7 @@ static void GenerateGameListing(const CURL& path, const VECADDONS& addons, CFile
       item->SetPath(itemPath.Get());
       item->m_bIsFolder = true;
       std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAMEDLL);
-      if (!thumb.empty() && g_TextureManager.HasTexture(thumb))
+      if (!thumb.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
         item->SetArt("thumb", thumb);
       items.Add(item);
       break;
@@ -324,7 +310,7 @@ static void GenerateMainCategoryListing(const CURL& path, const VECADDONS& addon
     item->SetPath(URIUtils::AddFileToFolder(path.Get(), CATEGORY_INFO_PROVIDERS));
     item->m_bIsFolder = true;
     const std::string thumb = "DefaultAddonInfoProvider.png";
-    if (g_TextureManager.HasTexture(thumb))
+    if (CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
       item->SetArt("thumb", thumb);
     items.Add(item);
   }
@@ -334,7 +320,7 @@ static void GenerateMainCategoryListing(const CURL& path, const VECADDONS& addon
     item->SetPath(URIUtils::AddFileToFolder(path.Get(), CATEGORY_LOOK_AND_FEEL));
     item->m_bIsFolder = true;
     const std::string thumb = "DefaultAddonLookAndFeel.png";
-    if (g_TextureManager.HasTexture(thumb))
+    if (CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
       item->SetArt("thumb", thumb);
     items.Add(item);
   }
@@ -344,7 +330,7 @@ static void GenerateMainCategoryListing(const CURL& path, const VECADDONS& addon
     item->SetPath(URIUtils::AddFileToFolder(path.Get(), CATEGORY_GAME_ADDONS));
     item->m_bIsFolder = true;
     const std::string thumb = CAddonInfo::TranslateIconType(ADDON_GAME);
-    if (g_TextureManager.HasTexture(thumb))
+    if (CServiceBroker::GetGUI()->GetTextureManager().HasTexture(thumb))
       item->SetArt("thumb", thumb);
     items.Add(item);
   }
@@ -453,7 +439,7 @@ static void UserInstalledAddons(const CURL& path, CFileItemList &items)
   VECADDONS addons;
   CServiceBroker::GetAddonMgr().GetInstalledAddons(addons);
   addons.erase(std::remove_if(addons.begin(), addons.end(),
-                              std::not1(std::ptr_fun(IsUserInstalled))), addons.end());
+                              std::not1(std::function<bool(const AddonPtr&)>(IsUserInstalled))), addons.end());
   if (addons.empty())
     return;
 
@@ -641,7 +627,7 @@ static void RootDirectory(CFileItemList& items)
     item->SetIconImage("DefaultNetwork.png");
     items.Add(item);
   }
-  if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == ADDON::AUTO_UPDATES_ON
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == ADDON::AUTO_UPDATES_ON
       && HasRecentlyUpdatedAddons())
   {
     CFileItemPtr item(new CFileItem("addons://recently_updated/", true));
@@ -696,7 +682,7 @@ bool CAddonsDirectory::GetDirectory(const CURL& url, CFileItemList &items)
     DependencyAddons(path, items);
     return true;
   }
-  // PVR & adsp hardcodes this view so keep for compatibility
+  // PVR hardcodes this view so keep for compatibility
   else if (endpoint == "disabled")
   {
     VECADDONS addons;
@@ -704,8 +690,6 @@ bool CAddonsDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 
     if (path.GetFileName() == "xbmc.pvrclient")
       type = ADDON_PVRDLL;
-    else if (path.GetFileName() == "kodi.adsp")
-      type = ADDON_ADSPDLL;
     else if (path.GetFileName() == "kodi.vfs")
       type = ADDON_VFS;
     else
@@ -814,7 +798,7 @@ void CAddonsDirectory::GenerateAddonListing(const CURL &path,
       pItem->SetProperty("Addon.Status", g_localizeStrings.Get(24023));
     if (hasUpdate)
       pItem->SetProperty("Addon.Status", g_localizeStrings.Get(24068));
-    else if (!addon->Broken().empty())
+    else if (addon->IsBroken())
       pItem->SetProperty("Addon.Status", g_localizeStrings.Get(24098));
 
     items.Add(pItem);

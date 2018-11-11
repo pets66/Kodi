@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "Addon.h"
 #include "AddonDatabase.h"
@@ -74,7 +63,7 @@ namespace ADDON
     bool Init();
     void DeInit();
 
-    CAddonMgr();
+    CAddonMgr() = default;
     CAddonMgr(const CAddonMgr&) = delete;
     virtual ~CAddonMgr();
 
@@ -149,7 +138,7 @@ namespace ADDON
     bool FindInstallableById(const std::string& addonId, AddonPtr& addon);
 
     void AddToUpdateableAddons(AddonPtr &pAddon);
-    void RemoveFromUpdateableAddons(AddonPtr &pAddon);    
+    void RemoveFromUpdateableAddons(AddonPtr &pAddon);
     bool ReloadSettings(const std::string &id);
 
     /*! Get addons with available updates */
@@ -233,8 +222,7 @@ namespace ADDON
     /*! \brief Retrieve an element from a given configuration element
      \param base the base configuration element.
      \param path the path to the configuration element from the base element.
-     \param element [out] returned element.
-     \return true if the configuration element is present
+     \return a pointer to the retrieved element if it was found, nullptr otherwise
      */
     cp_cfg_element_t *GetExtElement(cp_cfg_element_t *base, const char *path);
 
@@ -287,13 +275,13 @@ namespace ADDON
     std::vector<DependencyInfo> GetDepsRecursive(const std::string& id);
 
     static AddonPtr Factory(const cp_plugin_info_t* plugin, TYPE type);
-    static bool Factory(const cp_plugin_info_t* plugin, TYPE type, CAddonBuilder& builder, bool ignoreExtensions = false);
-    static void FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder& builder);
+    static bool Factory(const cp_plugin_info_t* plugin, TYPE type, CAddonBuilder& builder, bool ignoreExtensions = false, const CRepository::DirInfo& repo = {});
+    static void FillCpluffMetadata(const cp_plugin_info_t* plugin, CAddonBuilder& builder, const CRepository::DirInfo& repo);
 
   private:
     CAddonMgr& operator=(CAddonMgr const&) = delete;
     /* libcpluff */
-    cp_context_t *m_cp_context;
+    cp_context_t *m_cp_context = nullptr;
     VECADDONS    m_updateableAddons;
 
     /*! \brief Check whether this addon is supported on the current platform
@@ -308,7 +296,7 @@ namespace ADDON
     std::set<std::string> m_disabled;
     std::set<std::string> m_updateBlacklist;
     static std::map<TYPE, IAddonMgrCallback*> m_managers;
-    CCriticalSection m_critSection;
+    mutable CCriticalSection m_critSection;
     CAddonDatabase m_database;
     CEventSource<AddonEvent> m_events;
     CBlockingEventSource<AddonEvent> m_unloadEvents;

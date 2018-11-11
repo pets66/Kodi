@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2018 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 /**
@@ -64,8 +52,8 @@ int CEnvironment::win_setenv(const std::string &name, const std::string &value /
     EnvString = Wname + L"=" + Wvalue;
 
   #ifdef _DEBUG
-    // Most dependencies are built in release and use non-debug runtime libs, 
-    // and so we have to sync environment vars for these during debug because 
+    // Most dependencies are built in release and use non-debug runtime libs,
+    // and so we have to sync environment vars for these during debug because
     // they don't share environments between themselves
     typedef int(_cdecl * wputenvPtr) (const wchar_t *envstring);
     static const wchar_t *modulesList[] =
@@ -74,14 +62,14 @@ int CEnvironment::win_setenv(const std::string &name, const std::string &value /
       { L"ucrtbase.dll" },
       { nullptr } // Terminating NULL for list
     };
-  
+
     // Check all modules each function run, because modules can be loaded/unloaded at runtime
     for (int i = 0; modulesList[i]; i++)
     {
       HMODULE hModule;
       if (!GetModuleHandleExW(0, modulesList[i], &hModule) || hModule == nullptr) // Flag 0 ensures that module will be kept loaded until it'll be freed
          continue; // Module not loaded
-  
+
       wputenvPtr wputenvFunc = (wputenvPtr)GetProcAddress(hModule, "_wputenv");
       if (wputenvFunc != nullptr && wputenvFunc(EnvString.c_str()) != 0)
          retValue |= 2; // At lest one external runtime library Environment update failed

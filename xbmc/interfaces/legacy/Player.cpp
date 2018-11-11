@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Player.h"
@@ -24,9 +12,11 @@
 #include "PlayListPlayer.h"
 #include "settings/MediaSettings.h"
 #include "Application.h"
+#include "ServiceBroker.h"
 #include "messaging/ApplicationMessenger.h"
 #include "GUIInfoManager.h"
 #include "GUIUserMessages.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "AddonUtils.h"
 #include "utils/log.h"
@@ -187,19 +177,37 @@ namespace XBMCAddon
     }
 
     void Player::OnPlayBackStarted(const CFileItem &file)
-    { 
+    {
+      // We only have fileItem due to us having to
+      // implement the interface, we can't send it to python
+      // as we're not able to serialize it.
       XBMC_TRACE;
-      invokeCallback(new CallbackFunction<Player>(this,&Player::onPlayBackStarted));
+      invokeCallback(new CallbackFunction<Player>(this, &Player::onPlayBackStarted));
+    }
+
+    void Player::OnAVStarted(const CFileItem &file)
+    {
+      // We only have fileItem due to us having to
+      // implement the interface, we can't send it to python
+      // as we're not able to serialize it.
+      XBMC_TRACE;
+      invokeCallback(new CallbackFunction<Player>(this, &Player::onAVStarted));
+    }
+
+    void Player::OnAVChange()
+    {
+      XBMC_TRACE;
+      invokeCallback(new CallbackFunction<Player>(this, &Player::onAVChange));
     }
 
     void Player::OnPlayBackEnded()
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player>(this,&Player::onPlayBackEnded));
     }
 
     void Player::OnPlayBackStopped()
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player>(this,&Player::onPlayBackStopped));
     }
@@ -211,42 +219,52 @@ namespace XBMCAddon
     }
 
     void Player::OnPlayBackPaused()
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player>(this,&Player::onPlayBackPaused));
     }
 
     void Player::OnPlayBackResumed()
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player>(this,&Player::onPlayBackResumed));
     }
 
     void Player::OnQueueNextItem()
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player>(this,&Player::onQueueNextItem));
     }
 
     void Player::OnPlayBackSpeedChanged(int speed)
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player,int>(this,&Player::onPlayBackSpeedChanged,speed));
     }
 
     void Player::OnPlayBackSeek(int64_t time, int64_t seekOffset)
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player,int,int>(this,&Player::onPlayBackSeek,static_cast<int>(time),static_cast<int>(seekOffset)));
     }
 
     void Player::OnPlayBackSeekChapter(int chapter)
-    { 
+    {
       XBMC_TRACE;
       invokeCallback(new CallbackFunction<Player,int>(this,&Player::onPlayBackSeekChapter,chapter));
     }
 
     void Player::onPlayBackStarted()
+    {
+      XBMC_TRACE;
+    }
+
+    void Player::onAVStarted()
+    {
+      XBMC_TRACE;
+    }
+
+    void Player::onAVChange()
     {
       XBMC_TRACE;
     }
@@ -282,17 +300,17 @@ namespace XBMCAddon
     }
 
     void Player::onPlayBackSpeedChanged(int speed)
-    { 
+    {
       XBMC_TRACE;
     }
 
     void Player::onPlayBackSeek(int time, int seekOffset)
-    { 
+    {
       XBMC_TRACE;
     }
 
     void Player::onPlayBackSeekChapter(int chapter)
-    { 
+    {
       XBMC_TRACE;
     }
 
@@ -320,13 +338,19 @@ namespace XBMCAddon
       return g_application.GetAppPlayer().IsPlayingRDS();
     }
 
+    bool Player::isExternalPlayer()
+    {
+      XBMC_TRACE;
+      return g_application.GetAppPlayer().IsExternalPlaying();
+    }
+
     String Player::getPlayingFile()
     {
       XBMC_TRACE;
       if (!g_application.GetAppPlayer().IsPlaying())
         throw PlayerException("XBMC is not playing any file");
 
-      return g_application.CurrentFile();
+      return g_application.CurrentFileItem().GetDynPath();
     }
 
     InfoTagVideo* Player::getVideoInfoTag()
@@ -335,7 +359,7 @@ namespace XBMCAddon
       if (!g_application.GetAppPlayer().IsPlayingVideo())
         throw PlayerException("XBMC is not playing any videofile");
 
-      const CVideoInfoTag* movie = g_infoManager.GetCurrentMovieTag();
+      const CVideoInfoTag* movie = CServiceBroker::GetGUI()->GetInfoManager().GetCurrentMovieTag();
       if (movie)
         return new InfoTagVideo(*movie);
 
@@ -348,7 +372,7 @@ namespace XBMCAddon
       if (g_application.GetAppPlayer().IsPlayingVideo() || !g_application.GetAppPlayer().IsPlayingAudio())
         throw PlayerException("XBMC is not playing any music file");
 
-      const MUSIC_INFO::CMusicInfoTag* tag = g_infoManager.GetCurrentSongTag();
+      const MUSIC_INFO::CMusicInfoTag* tag = CServiceBroker::GetGUI()->GetInfoManager().GetCurrentSongTag();
       if (tag)
         return new InfoTagMusic(*tag);
 
@@ -362,18 +386,18 @@ namespace XBMCAddon
         throw PlayerException("Kodi is not playing any file");
 
       CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_ITEM, 0, item->item);
-      g_windowManager.SendMessage(msg);
+      CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg);
     }
 
     InfoTagRadioRDS* Player::getRadioRDSInfoTag()
     {
       XBMC_TRACE;
       if (g_application.GetAppPlayer().IsPlayingVideo() || !g_application.GetAppPlayer().IsPlayingRDS())
-        throw PlayerException("XBMC is not playing any music file with RDS");
+        throw PlayerException("Kodi is not playing any music file with RDS");
 
-      const PVR::CPVRRadioRDSInfoTagPtr tag = g_infoManager.GetCurrentRadioRDSInfoTag();
-      if (tag)
-        return new InfoTagRadioRDS(tag);
+      std::shared_ptr<CFileItem> item = g_application.CurrentFileItemPtr();
+      if (item && item->HasPVRChannelInfoTag())
+        return new InfoTagRadioRDS(item->GetPVRChannelInfoTag());
 
       return new InfoTagRadioRDS();
     }
@@ -429,7 +453,7 @@ namespace XBMCAddon
       if (g_application.GetAppPlayer().HasPlayer())
       {
         SubtitleStreamInfo info;
-        g_application.GetAppPlayer().GetSubtitleStreamInfo(g_application.GetAppPlayer().GetSubtitle(), info);
+        g_application.GetAppPlayer().GetSubtitleStreamInfo(CURRENT_STREAM, info);
 
         if (info.language.length() > 0)
           return info.language;
@@ -493,9 +517,9 @@ namespace XBMCAddon
         }
         return ret;
       }
-    
+
       return std::vector<String>();
-    } 
+    }
 
     void Player::setAudioStream(int iStream)
     {

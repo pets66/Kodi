@@ -1,22 +1,11 @@
 /*
- *      Copyright (C) 2010-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "cores/AudioEngine/Utils/AEDeviceInfo.h"
@@ -78,7 +67,7 @@ DEFINE_GUIDSTRUCT("00000008-0000-0010-8000-00aa00389b71", KSDATAFORMAT_SUBTYPE_I
 static const unsigned int WASAPISampleRateCount = 10;
 static const unsigned int WASAPISampleRates[] = { 384000, 192000, 176400, 96000, 88200, 48000, 44100, 32000, 22050, 11025 };
 
-static const enum AEChannel layoutsList[][16] = 
+static const enum AEChannel layoutsList[][16] =
 {
   /* Most common configurations */
   {AE_CH_FC,  AE_CH_NULL}, // Mono
@@ -206,7 +195,7 @@ struct IAEWASAPIDevice
 class CAESinkFactoryWin
 {
 public:
-  /* 
+  /*
     Gets list of audio renderers available on platform
   */
   static std::vector<RendererDetail> GetRendererDetails();

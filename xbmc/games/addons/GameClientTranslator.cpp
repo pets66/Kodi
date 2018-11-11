@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2016-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GameClientTranslator.h"
@@ -59,11 +47,32 @@ const char* CGameClientTranslator::ToString(GAME_MEMORY memory)
   return "unknown memory";
 }
 
+bool CGameClientTranslator::TranslateStreamType(GAME_STREAM_TYPE gameType, RETRO::StreamType &retroType)
+{
+  switch (gameType)
+  {
+  case GAME_STREAM_AUDIO:
+    retroType = RETRO::StreamType::AUDIO;
+    return true;
+  case GAME_STREAM_VIDEO:
+    retroType = RETRO::StreamType::VIDEO;
+    return true;
+  case GAME_STREAM_SW_FRAMEBUFFER:
+    retroType = RETRO::StreamType::SW_BUFFER;
+    return true;
+  case GAME_STREAM_HW_FRAMEBUFFER:
+    retroType = RETRO::StreamType::HW_BUFFER;
+    return true;
+  default:
+    break;
+  }
+  return false;
+}
+
 AVPixelFormat CGameClientTranslator::TranslatePixelFormat(GAME_PIXEL_FORMAT format)
 {
   switch (format)
   {
-  case GAME_PIXEL_FORMAT_YUV420P:  return AV_PIX_FMT_YUV420P;
   case GAME_PIXEL_FORMAT_0RGB8888: return AV_PIX_FMT_0RGB32;
   case GAME_PIXEL_FORMAT_RGB565:   return AV_PIX_FMT_RGB565;
   case GAME_PIXEL_FORMAT_0RGB1555: return AV_PIX_FMT_RGB555;
@@ -73,67 +82,74 @@ AVPixelFormat CGameClientTranslator::TranslatePixelFormat(GAME_PIXEL_FORMAT form
   return AV_PIX_FMT_NONE;
 }
 
-AVCodecID CGameClientTranslator::TranslateVideoCodec(GAME_VIDEO_CODEC codec)
-{
-  switch (codec)
-  {
-  case GAME_VIDEO_CODEC_H264: return AV_CODEC_ID_H264;
-  default:
-    break;
-  }
-  return AV_CODEC_ID_NONE;
-}
-
-AEDataFormat CGameClientTranslator::TranslatePCMFormat(GAME_PCM_FORMAT format)
+GAME_PIXEL_FORMAT CGameClientTranslator::TranslatePixelFormat(AVPixelFormat format)
 {
   switch (format)
   {
-  case GAME_PCM_FORMAT_S16NE: return AE_FMT_S16NE;
+  case AV_PIX_FMT_0RGB32: return GAME_PIXEL_FORMAT_0RGB8888;
+  case AV_PIX_FMT_RGB565: return GAME_PIXEL_FORMAT_RGB565;
+  case AV_PIX_FMT_RGB555: return GAME_PIXEL_FORMAT_0RGB1555;
   default:
     break;
   }
-  return AE_FMT_INVALID;
+  return GAME_PIXEL_FORMAT_UNKNOWN;
 }
 
-AEChannel CGameClientTranslator::TranslateAudioChannel(GAME_AUDIO_CHANNEL channel)
+RETRO::PCMFormat CGameClientTranslator::TranslatePCMFormat(GAME_PCM_FORMAT format)
+{
+  switch (format)
+  {
+  case GAME_PCM_FORMAT_S16NE: return RETRO::PCMFormat::FMT_S16NE;
+  default:
+    break;
+  }
+  return RETRO::PCMFormat::FMT_UNKNOWN;
+}
+
+RETRO::AudioChannel CGameClientTranslator::TranslateAudioChannel(GAME_AUDIO_CHANNEL channel)
 {
   switch (channel)
   {
-  case GAME_CH_FL:   return AE_CH_FL;
-  case GAME_CH_FR:   return AE_CH_FR;
-  case GAME_CH_FC:   return AE_CH_FC;
-  case GAME_CH_LFE:  return AE_CH_LFE;
-  case GAME_CH_BL:   return AE_CH_BL;
-  case GAME_CH_BR:   return AE_CH_BR;
-  case GAME_CH_FLOC: return AE_CH_FLOC;
-  case GAME_CH_FROC: return AE_CH_FROC;
-  case GAME_CH_BC:   return AE_CH_BC;
-  case GAME_CH_SL:   return AE_CH_SL;
-  case GAME_CH_SR:   return AE_CH_SR;
-  case GAME_CH_TFL:  return AE_CH_TFL;
-  case GAME_CH_TFR:  return AE_CH_TFR;
-  case GAME_CH_TFC:  return AE_CH_TFC;
-  case GAME_CH_TC:   return AE_CH_TC;
-  case GAME_CH_TBL:  return AE_CH_TBL;
-  case GAME_CH_TBR:  return AE_CH_TBR;
-  case GAME_CH_TBC:  return AE_CH_TBC;
-  case GAME_CH_BLOC: return AE_CH_BLOC;
-  case GAME_CH_BROC: return AE_CH_BROC;
+  case GAME_CH_FL:   return RETRO::AudioChannel::CH_FL;
+  case GAME_CH_FR:   return RETRO::AudioChannel::CH_FR;
+  case GAME_CH_FC:   return RETRO::AudioChannel::CH_FC;
+  case GAME_CH_LFE:  return RETRO::AudioChannel::CH_LFE;
+  case GAME_CH_BL:   return RETRO::AudioChannel::CH_BL;
+  case GAME_CH_BR:   return RETRO::AudioChannel::CH_BR;
+  case GAME_CH_FLOC: return RETRO::AudioChannel::CH_FLOC;
+  case GAME_CH_FROC: return RETRO::AudioChannel::CH_FROC;
+  case GAME_CH_BC:   return RETRO::AudioChannel::CH_BC;
+  case GAME_CH_SL:   return RETRO::AudioChannel::CH_SL;
+  case GAME_CH_SR:   return RETRO::AudioChannel::CH_SR;
+  case GAME_CH_TFL:  return RETRO::AudioChannel::CH_TFL;
+  case GAME_CH_TFR:  return RETRO::AudioChannel::CH_TFR;
+  case GAME_CH_TFC:  return RETRO::AudioChannel::CH_TFC;
+  case GAME_CH_TC:   return RETRO::AudioChannel::CH_TC;
+  case GAME_CH_TBL:  return RETRO::AudioChannel::CH_TBL;
+  case GAME_CH_TBR:  return RETRO::AudioChannel::CH_TBR;
+  case GAME_CH_TBC:  return RETRO::AudioChannel::CH_TBC;
+  case GAME_CH_BLOC: return RETRO::AudioChannel::CH_BLOC;
+  case GAME_CH_BROC: return RETRO::AudioChannel::CH_BROC;
   default:
     break;
   }
-  return AE_CH_NULL;
+  return RETRO::AudioChannel::CH_NULL;
 }
 
-AVCodecID CGameClientTranslator::TranslateAudioCodec(GAME_AUDIO_CODEC codec)
+RETRO::VideoRotation CGameClientTranslator::TranslateRotation(GAME_VIDEO_ROTATION rotation)
 {
-  switch (codec)
+  switch (rotation)
   {
-  case GAME_AUDIO_CODEC_OPUS: return AV_CODEC_ID_OPUS;
+  case GAME_VIDEO_ROTATION_90_CCW:
+    return RETRO::VideoRotation::ROTATION_90_CCW;
+  case GAME_VIDEO_ROTATION_180_CCW:
+    return RETRO::VideoRotation::ROTATION_180_CCW;
+  case GAME_VIDEO_ROTATION_270_CCW:
+    return RETRO::VideoRotation::ROTATION_270_CCW;
   default:
     break;
   }
-  return AV_CODEC_ID_NONE;
+  return RETRO::VideoRotation::ROTATION_0;
 }
 
 GAME_KEY_MOD CGameClientTranslator::GetModifiers(KEYBOARD::Modifier modifier)

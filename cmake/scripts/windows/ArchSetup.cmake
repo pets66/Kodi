@@ -32,9 +32,9 @@ set(DEPS_FOLDER_RELATIVE project/BuildDependencies)
 set(DEPENDENCIES_DIR ${CMAKE_SOURCE_DIR}/${DEPS_FOLDER_RELATIVE}/${ARCH})
 set(MINGW_LIBS_DIR ${CMAKE_SOURCE_DIR}/${DEPS_FOLDER_RELATIVE}/mingwlibs/${ARCH})
 
-list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${MINGW_LIBS_DIR})
-list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${MINGW_LIBS_DIR}/bin)
-list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${DEPENDENCIES_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${MINGW_LIBS_DIR})
+list(APPEND CMAKE_LIBRARY_PATH ${MINGW_LIBS_DIR}/bin)
+list(APPEND CMAKE_PREFIX_PATH ${DEPENDENCIES_DIR})
 set(PYTHON_INCLUDE_DIR ${DEPENDENCIES_DIR}/include/python)
 
 # -------- Compiler options ---------
@@ -73,8 +73,8 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
 link_directories(${DEPENDENCIES_DIR}/lib)
 
 # Additional libraries
-list(APPEND DEPLIBS d3d11.lib DInput8.lib DSound.lib winmm.lib Mpr.lib Iphlpapi.lib WS2_32.lib
-                    PowrProf.lib setupapi.lib dwmapi.lib dxguid.lib DelayImp.lib)
+list(APPEND DEPLIBS bcrypt.lib d3d11.lib DInput8.lib DSound.lib winmm.lib Mpr.lib Iphlpapi.lib WS2_32.lib
+                    PowrProf.lib setupapi.lib Shlwapi.lib dwmapi.lib dxguid.lib DelayImp.lib)
 
 # NODEFAULTLIB option
 set(_nodefaultlibs_RELEASE libcmt)
@@ -87,9 +87,8 @@ foreach(_lib ${_nodefaultlibs_DEBUG})
 endforeach()
 
 # DELAYLOAD option
-set(_delayloadlibs zlib.dll libmysql.dll libxslt.dll dnssd.dll dwmapi.dll ssh.dll sqlite3.dll
-                   avcodec-57.dll avfilter-6.dll avformat-57.dll avutil-55.dll
-                   postproc-54.dll swresample-2.dll swscale-4.dll d3dcompiler_47.dll)
+set(_delayloadlibs zlib.dll libmysql.dll libxslt.dll dnssd.dll dwmapi.dll sqlite3.dll
+                   d3dcompiler_47.dll)
 foreach(_lib ${_delayloadlibs})
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DELAYLOAD:\"${_lib}\"")
 endforeach()

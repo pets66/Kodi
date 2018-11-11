@@ -1,26 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogGamepad.h"
-#include "utils/md5.h"
+#include "ServiceBroker.h"
+#include "utils/Digest.h"
 #include "utils/StringUtils.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIAudioManager.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
@@ -31,6 +21,7 @@
 #include <utility>
 
 using namespace KODI::MESSAGING;
+using KODI::UTILITY::CDigest;
 
 CGUIDialogGamepad::CGUIDialogGamepad(void)
     : CGUIDialogBoxBase(WINDOW_DIALOG_GAMEPAD, "DialogConfirm.xml")
@@ -115,7 +106,7 @@ bool CGUIDialogGamepad::OnAction(const CAction &action)
     m_bConfirmed = false;
     m_bCanceled = false;
 
-    std::string md5pword2 = XBMC::XBMC_MD5::GetMD5(m_strUserInput);
+    std::string md5pword2 = CDigest::Calculate(CDigest::Type::MD5, m_strUserInput);
 
     if (!StringUtils::EqualsNoCase(m_strPassword, md5pword2))
     {
@@ -275,7 +266,7 @@ bool CGUIDialogGamepad::ShowAndVerifyInput(std::string& strToVerify, const std::
     const std::string& dlgLine2, bool bGetUserInput, bool bHideInputChars)
 {
   // Prompt user for password input
-  CGUIDialogGamepad *pDialog = g_windowManager.GetWindow<CGUIDialogGamepad>(WINDOW_DIALOG_GAMEPAD);
+  CGUIDialogGamepad *pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogGamepad>(WINDOW_DIALOG_GAMEPAD);
   pDialog->m_strPassword = strToVerify;
   pDialog->m_bUserInputCleanup = !bGetUserInput;
   pDialog->m_bHideInputChars = bHideInputChars;
@@ -301,14 +292,18 @@ bool CGUIDialogGamepad::ShowAndVerifyInput(std::string& strToVerify, const std::
   else
     pDialog->SetLine(2, CVariant{atoi(dlgLine2.c_str())});
 
-  g_audioManager.Enable(false); // dont do sounds during pwd input
+  CGUIComponent* gui = CServiceBroker::GetGUI();
+  if (gui)
+    gui->GetAudioManager().Enable(false); // don't do sounds during pwd input
+
   pDialog->Open();
-  g_audioManager.Enable(true);
+
+  if (gui)
+    gui->GetAudioManager().Enable(true);
 
   if (bGetUserInput && !pDialog->IsCanceled())
   {
-    strToVerify = XBMC::XBMC_MD5::GetMD5(pDialog->m_strUserInput);
-    StringUtils::ToLower(strToVerify);
+    strToVerify = CDigest::Calculate(CDigest::Type::MD5, pDialog->m_strUserInput);
     pDialog->m_strUserInput = "";
   }
 

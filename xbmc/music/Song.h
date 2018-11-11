@@ -1,27 +1,17 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
+
 /*!
  \file Song.h
 \brief
 */
-#pragma once
 
 #include "utils/ISerializable.h"
 #include "XBDateTime.h"
@@ -54,12 +44,11 @@ class CFileItem;
  \brief Class to store and read song information from CMusicDatabase
  \sa CAlbum, CMusicDatabase
  */
-class CSong: public ISerializable
+class CSong final : public ISerializable
 {
 public:
   CSong() ;
   explicit CSong(CFileItem& item);
-  ~CSong() override = default;
   void Clear() ;
   void MergeScrapedSong(const CSong& source, bool override);
   void Serialize(CVariant& value) const override;
@@ -76,8 +65,8 @@ public:
   \return artist names as a vector of strings
   */
   const std::vector<std::string> GetArtist() const;
-  
-  /*! \brief Get artist sort name string 
+
+  /*! \brief Get artist sort name string
   \return artist sort name as a single string
   */
   const std::string GetArtistSort() const;
@@ -99,12 +88,12 @@ public:
   const std::vector<int> GetArtistIDArray() const;
 
   /*! \brief Get album artist names associated with song from tag data
-   Note for initial album processing only, normalised album artist data belongs to album 
+   Note for initial album processing only, normalised album artist data belongs to album
    and is stored in album artist credits
   \return album artist names as a vector of strings
   */
   const std::vector<std::string> GetAlbumArtist() const { return m_albumArtist; }
-  
+
   /*! \brief Get album artist sort name string
   \return album artist sort name as a single string
   */
@@ -124,13 +113,13 @@ public:
   //void AddArtistRole(const int &role, const std::string &artist);
   void AppendArtistRole(const CMusicRole& musicRole);
 
-  /*! \brief Set album artist vector. 
+  /*! \brief Set album artist vector.
    Album artist is held local to song until album created for inital processing only.
    Normalised album artist data belongs to album and is stored in album artist credits
   \param album artist names as a vector of strings
   */
   void SetAlbumArtist(const std::vector<std::string>& albumartists) { m_albumArtist = albumartists; }
-  
+
   /*! \brief Whether this song has any artists in artist credits vector
     Tests if artist credits has been populated yet, during processing there can be
     artists in the artist description but not yet in the credits

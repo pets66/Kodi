@@ -1,34 +1,21 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <list>
 
 #include "cores/VideoPlayer/VideoRenderers/BaseRenderer.h"
 #include "cores/VideoPlayer/VideoRenderers/OverlayRenderer.h"
 #include "utils/Geometry.h"
-#include "guilib/Resolution.h"
+#include "windowing/Resolution.h"
 #include "threads/CriticalSection.h"
 #include "cores/VideoSettings.h"
-#include "OverlayRenderer.h"
 #include "DebugRenderer.h"
 #include <deque>
 #include <map>
@@ -78,11 +65,11 @@ public:
   bool IsVideoLayer();
   RESOLUTION GetResolution();
   void UpdateResolution();
-  void TriggerUpdateResolution(float fps, int width, std::string &stereomode);
+  void TriggerUpdateResolution(float fps, int width, int height, std::string &stereomode);
   void SetViewMode(int iViewMode);
   void PreInit();
   void UnInit();
-  bool Flush(bool wait);
+  bool Flush(bool wait, bool saveBuffers);
   bool IsConfigured() const;
   void ToggleDebug();
 
@@ -97,9 +84,10 @@ public:
 
   int GetSkippedFrames()  { return m_QueueSkip; }
 
-  bool Configure(const VideoPicture& picture, float fps, bool fullscreen, unsigned int orientation, int buffers = 0);
+  bool Configure(const VideoPicture& picture, float fps, unsigned int orientation, int buffers = 0);
   bool AddVideoPicture(const VideoPicture& picture, volatile std::atomic_bool& bStop, EINTERLACEMETHOD deintMethod, bool wait);
   void AddOverlay(CDVDOverlay* o, double pts);
+  void ShowVideo(bool enable);
 
   /**
    * If player uses buffering it has to wait for a buffer before it calls
@@ -146,7 +134,7 @@ protected:
   CBaseRenderer *m_pRenderer = nullptr;
   OVERLAY::CRenderer m_overlays;
   CDebugRenderer m_debugRenderer;
-  CCriticalSection m_statelock;
+  mutable CCriticalSection m_statelock;
   CCriticalSection m_presentlock;
   CCriticalSection m_datalock;
   bool m_bTriggerUpdateResolution = false;
@@ -154,7 +142,7 @@ protected:
   bool m_renderedOverlay = false;
   bool m_renderDebug = false;
   XbmcThreads::EndTime m_debugTimer;
-
+  std::atomic_bool m_showVideo = {false};
 
   enum EPRESENTSTEP
   {
@@ -210,7 +198,6 @@ protected:
   float m_fps = 0.0;
   unsigned int m_orientation = 0;
   int m_NumberBuffers = 0;
-  bool m_fullscreen = false;
   std::string m_stereomode;
 
   int m_lateframes = -1;

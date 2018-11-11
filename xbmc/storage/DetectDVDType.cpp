@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DetectDVDType.h"
@@ -35,12 +23,12 @@
 #endif
 #endif
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "GUIUserMessages.h"
-#include "utils/URIUtils.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "FileItem.h"
 #include "Application.h"
-#include "IoSupport.h"
+#include "ServiceBroker.h"
 #include "storage/MediaManager.h"
 
 
@@ -57,9 +45,6 @@ std::string CDetectDVDMedia::m_diskLabel = "";
 std::string CDetectDVDMedia::m_diskPath = "";
 
 CDetectDVDMedia::CDetectDVDMedia() : CThread("DetectDVDMedia"),
-  m_bStartup(true),  // Do not autorun on startup
-  m_bAutorun(false),
-  m_dwLastTrayState(0),
   m_cdio(CLibcdio::GetInstance())
 {
   m_bStop = false;
@@ -131,7 +116,7 @@ void CDetectDVDMedia::UpdateDvdrom()
           SetNewDVDShareUrl("D:\\", false, g_localizeStrings.Get(502));
           m_isoReader.Reset();
           CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_REMOVED_MEDIA);
-          g_windowManager.SendThreadMessage( msg );
+          CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage( msg );
           waitLock.Leave();
           m_DriveState = DRIVE_OPEN;
           return;
@@ -153,7 +138,7 @@ void CDetectDVDMedia::UpdateDvdrom()
           }
           waitLock.Leave();
           CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_SOURCES);
-          g_windowManager.SendThreadMessage( msg );
+          CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage( msg );
           // Do we really need sleep here? This will fix: [ 1530771 ] "Open tray" problem
           // Sleep(6000);
           return ;
@@ -169,7 +154,7 @@ void CDetectDVDMedia::UpdateDvdrom()
           // Send Message to GUI that disc has changed
           CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_SOURCES);
           waitLock.Leave();
-          g_windowManager.SendThreadMessage( msg );
+          CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage( msg );
           return ;
         }
         break;
@@ -186,7 +171,7 @@ void CDetectDVDMedia::UpdateDvdrom()
             DetectMediaType();
             CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_SOURCES);
             waitLock.Leave();
-            g_windowManager.SendThreadMessage( msg );
+            CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage( msg );
             // Tell the application object that a new Cd is inserted
             // So autorun can be started.
             if ( !m_bStartup )
@@ -254,7 +239,7 @@ void CDetectDVDMedia::DetectMediaType()
 
   if (m_pCdInfo->IsISOUDF(1))
   {
-    if (!g_advancedSettings.m_detectAsUdf)
+    if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_detectAsUdf)
     {
       strNewUrl = "iso9660://";
       m_isoReader.Scan();

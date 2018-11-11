@@ -1,42 +1,30 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "EventServer.h"
-#include "EventPacket.h"
 #include "EventClient.h"
+#include "EventPacket.h"
 #include "Socket.h"
-#include "threads/CriticalSection.h"
-#include "Application.h"
-#include "ServiceBroker.h"
-#include "interfaces/builtins/Builtins.h"
-#include "input/ActionTranslator.h"
-#include "threads/SingleLock.h"
 #include "Zeroconf.h"
 #include "guilib/GUIAudioManager.h"
+#include "input/actions/ActionTranslator.h"
 #include "input/Key.h"
+#include "interfaces/builtins/Builtins.h"
+#include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/SystemInfo.h"
+#include "Application.h"
+#include "ServiceBroker.h"
 #include "Util.h"
+
+#include <cassert>
 #include <map>
 #include <queue>
-#include <cassert>
 
 using namespace EVENTSERVER;
 using namespace EVENTPACKET;
@@ -80,15 +68,16 @@ CEventServer* CEventServer::GetInstance()
 void CEventServer::StartServer()
 {
   CSingleLock lock(m_critSection);
-  if(m_bRunning)
+  if (m_bRunning)
     return;
 
   // set default port
-  m_iPort = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SERVICES_ESPORT);
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  m_iPort = settings->GetInt(CSettings::SETTING_SERVICES_ESPORT);
   assert(m_iPort <= 65535 && m_iPort >= 1);
 
   // max clients
-  m_iMaxClients = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SERVICES_ESMAXCLIENTS);
+  m_iMaxClients = settings->GetInt(CSettings::SETTING_SERVICES_ESMAXCLIENTS);
   if (m_iMaxClients < 0)
   {
     CLog::Log(LOGERROR, "ES: Invalid maximum number of clients specified %d", m_iMaxClients);
@@ -173,13 +162,14 @@ void CEventServer::Run()
   }
 
   // bind to IP and start listening on port
-  int port_range = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SERVICES_ESPORTRANGE);
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  int port_range = settings->GetInt(CSettings::SETTING_SERVICES_ESPORTRANGE);
   if (port_range < 1 || port_range > 100)
   {
     CLog::Log(LOGERROR, "ES: Invalid port range specified %d, defaulting to 10", port_range);
     port_range = 10;
   }
-  if (!m_pSocket->Bind(!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_SERVICES_ESALLINTERFACES), m_iPort, port_range))
+  if (!m_pSocket->Bind(!settings->GetBool(CSettings::SETTING_SERVICES_ESALLINTERFACES), m_iPort, port_range))
   {
     CLog::Log(LOGERROR, "ES: Could not listen on port %d", m_iPort);
     return;
@@ -347,7 +337,10 @@ bool CEventServer::ExecuteNextAction()
           unsigned int actionID;
           CActionTranslator::TranslateString(actionEvent.actionName, actionID);
           CAction action(actionID, 1.0f, 0.0f, actionEvent.actionName);
-          g_audioManager.PlayActionSound(action);
+          CGUIComponent* gui = CServiceBroker::GetGUI();
+          if (gui)
+            gui->GetAudioManager().PlayActionSound(action);
+
           g_application.OnAction(action);
         }
         break;

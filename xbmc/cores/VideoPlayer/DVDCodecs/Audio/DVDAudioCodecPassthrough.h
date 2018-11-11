@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <list>
 #include <memory>
@@ -40,14 +28,14 @@ public:
   void Dispose() override;
   bool AddData(const DemuxPacket &packet) override;
   void GetData(DVDAudioFrame &frame) override;
-  int GetData(uint8_t** dst) override;
   void Reset() override;
   AEAudioFormat GetFormat() override { return m_format; }
   bool NeedPassthrough() override { return true; }
-  const char* GetName() override { return "passthrough"; }
+  std::string GetName() override { return m_codecName; }
   int GetBufferSize() override;
 
 private:
+  int GetData(uint8_t** dst);
   CAEStreamParser m_parser;
   uint8_t* m_buffer = nullptr;
   unsigned int m_bufferSize = 0;
@@ -58,6 +46,7 @@ private:
   unsigned int m_backlogSize = 0;
   double m_currentPts = DVD_NOPTS_VALUE;
   double m_nextPts = DVD_NOPTS_VALUE;
+  std::string m_codecName;
 
   // TrueHD specifics
   std::unique_ptr<uint8_t[]> m_trueHDBuffer;

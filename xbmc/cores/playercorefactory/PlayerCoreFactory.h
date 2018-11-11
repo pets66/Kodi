@@ -1,30 +1,19 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
-#include <vector>
+#pragma once
 
 #include "settings/lib/ISettingsHandler.h"
 #include "threads/CriticalSection.h"
+
+#include <memory>
 #include <string>
+#include <vector>
 
 // forward references
 
@@ -32,7 +21,7 @@ class TiXmlElement;
 class CFileItem;
 class CPlayerCoreConfig;
 class CPlayerSelectionRule;
-class CProfilesManager;
+class CProfileManager;
 class CSettings;
 class IPlayer;
 class IPlayerCallback;
@@ -40,8 +29,7 @@ class IPlayerCallback;
 class CPlayerCoreFactory : public ISettingsHandler
 {
 public:
-  CPlayerCoreFactory(CSettings &settings,
-                     const CProfilesManager &profileManager);
+  CPlayerCoreFactory(const CProfileManager &profileManager);
   CPlayerCoreFactory(const CPlayerCoreFactory&) = delete;
   CPlayerCoreFactory& operator=(CPlayerCoreFactory const&) = delete;
   ~CPlayerCoreFactory() override;
@@ -66,8 +54,8 @@ public:
 
 private:
   // Construction parameters
-  CSettings &m_settings;
-  const CProfilesManager &m_profileManager;
+  std::shared_ptr<CSettings> m_settings;
+  const CProfileManager &m_profileManager;
 
   int GetPlayerIndex(const std::string& strCoreName) const;
   std::string GetPlayerName(size_t idx) const;
@@ -76,5 +64,5 @@ private:
 
   std::vector<CPlayerCoreConfig *> m_vecPlayerConfigs;
   std::vector<CPlayerSelectionRule *> m_vecCoreSelectionRules;
-  CCriticalSection m_section;
+  mutable CCriticalSection m_section;
 };

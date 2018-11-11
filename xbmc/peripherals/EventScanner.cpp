@@ -1,30 +1,18 @@
 /*
- *      Copyright (C) 2016-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2016-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "EventScanner.h"
+#include "IEventScannerCallback.h"
 #include "threads/SingleLock.h"
 #include "threads/SystemClock.h"
 #include "utils/log.h"
 
 #include <algorithm>
-#include <assert.h>
 
 using namespace PERIPHERALS;
 using namespace XbmcThreads;
@@ -36,19 +24,18 @@ using namespace XbmcThreads;
 // input latency when the game is running at < 1/4 speed.
 #define WATCHDOG_TIMEOUT_MS   80
 
-CEventScanner::CEventScanner(IEventScannerCallback* callback) :
+CEventScanner::CEventScanner(IEventScannerCallback &callback) :
   CThread("PeripEventScanner"),
   m_callback(callback)
 {
-  assert(m_callback != nullptr);
 }
 
-void CEventScanner::Start(void)
+void CEventScanner::Start()
 {
   Create();
 }
 
-void CEventScanner::Stop(void)
+void CEventScanner::Stop()
 {
   StopThread(false);
   m_scanEvent.Set();
@@ -57,10 +44,10 @@ void CEventScanner::Stop(void)
 
 EventPollHandlePtr CEventScanner::RegisterPollHandle()
 {
-  EventPollHandlePtr handle(new CEventPollHandle(this));
+  EventPollHandlePtr handle(new CEventPollHandle(*this));
 
   {
-    CSingleLock lock(m_mutex);
+    CSingleLock lock(m_handleMutex);
     m_activeHandles.insert(handle.get());
   }
 
@@ -69,21 +56,21 @@ EventPollHandlePtr CEventScanner::RegisterPollHandle()
   return handle;
 }
 
-void CEventScanner::Activate(CEventPollHandle* handle)
+void CEventScanner::Activate(CEventPollHandle &handle)
 {
   {
-    CSingleLock lock(m_mutex);
-    m_activeHandles.insert(handle);
+    CSingleLock lock(m_handleMutex);
+    m_activeHandles.insert(&handle);
   }
 
   CLog::Log(LOGDEBUG, "PERIPHERALS: Event poll handle activated");
 }
 
-void CEventScanner::Deactivate(CEventPollHandle* handle)
+void CEventScanner::Deactivate(CEventPollHandle &handle)
 {
   {
-    CSingleLock lock(m_mutex);
-    m_activeHandles.erase(handle);
+    CSingleLock lock(m_handleMutex);
+    m_activeHandles.erase(&handle);
   }
 
   CLog::Log(LOGDEBUG, "PERIPHERALS: Event poll handle deactivated");
@@ -105,23 +92,51 @@ void CEventScanner::HandleEvents(bool bWait)
   }
 }
 
-void CEventScanner::Release(CEventPollHandle* handle)
+void CEventScanner::Release(CEventPollHandle &handle)
 {
   {
-    CSingleLock lock(m_mutex);
-    m_activeHandles.erase(handle);
+    CSingleLock lock(m_handleMutex);
+    m_activeHandles.erase(&handle);
   }
 
   CLog::Log(LOGDEBUG, "PERIPHERALS: Event poll handle released");
 }
 
-void CEventScanner::Process(void)
+EventLockHandlePtr CEventScanner::RegisterLock()
+{
+  EventLockHandlePtr handle(new CEventLockHandle(*this));
+
+  {
+    CSingleLock lock(m_lockMutex);
+    m_activeLocks.insert(handle.get());
+  }
+
+  CLog::Log(LOGDEBUG, "PERIPHERALS: Event lock handle registered");
+
+  return handle;
+}
+
+void CEventScanner::ReleaseLock(CEventLockHandle &handle)
+{
+  {
+    CSingleLock lock(m_lockMutex);
+    m_activeLocks.erase(&handle);
+  }
+
+  CLog::Log(LOGDEBUG, "PERIPHERALS: Event lock handle released");
+}
+
+void CEventScanner::Process()
 {
   double nextScanMs = static_cast<double>(SystemClockMillis());
 
   while (!m_bStop)
   {
-    m_callback->ProcessEvents();
+    {
+      CSingleLock lock(m_lockMutex);
+      if (m_activeLocks.empty())
+        m_callback.ProcessEvents();
+    }
 
     m_scanFinishedEvent.Set();
 
@@ -147,7 +162,7 @@ double CEventScanner::GetScanIntervalMs() const
   bool bHasActiveHandle;
 
   {
-    CSingleLock lock(m_mutex);
+    CSingleLock lock(m_handleMutex);
     bHasActiveHandle = !m_activeHandles.empty();
   }
 

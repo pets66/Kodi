@@ -1,26 +1,13 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PlayList.h"
 #include "PlayListFactory.h"
-#include "video/VideoInfoTag.h"
 #include "music/tags/MusicInfoTag.h"
 #include "filesystem/File.h"
 #include "utils/log.h"
@@ -29,6 +16,7 @@
 #include "utils/Variant.h"
 #include "utils/StringUtils.h"
 #include "interfaces/AnnouncementManager.h"
+#include "ServiceBroker.h"
 
 #include <algorithm>
 #include <cassert>
@@ -60,7 +48,7 @@ void CPlayList::AnnounceRemove(int pos)
   CVariant data;
   data["playlistid"] = m_id;
   data["position"] = pos;
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnRemove", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnRemove", data);
 }
 
 void CPlayList::AnnounceClear()
@@ -70,7 +58,7 @@ void CPlayList::AnnounceClear()
 
   CVariant data;
   data["playlistid"] = m_id;
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnClear", data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnClear", data);
 }
 
 void CPlayList::AnnounceAdd(const CFileItemPtr& item, int pos)
@@ -81,7 +69,7 @@ void CPlayList::AnnounceAdd(const CFileItemPtr& item, int pos)
   CVariant data;
   data["playlistid"] = m_id;
   data["position"] = pos;
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnAdd", item, data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Playlist, "xbmc", "OnAdd", item, data);
 }
 
 void CPlayList::Add(const CFileItemPtr &item, int iPosition, int iOrder)
@@ -125,13 +113,13 @@ void CPlayList::Add(const CFileItemPtr &item)
 
 void CPlayList::Add(const CPlayList& playlist)
 {
-  for (int i = 0; i < (int)playlist.size(); i++)
+  for (int i = 0; i < playlist.size(); i++)
     Add(playlist[i], -1, -1);
 }
 
 void CPlayList::Add(const CFileItemList& items)
 {
-  for (int i = 0; i < (int)items.Size(); i++)
+  for (int i = 0; i < items.Size(); i++)
     Add(items[i]);
 }
 
@@ -144,7 +132,7 @@ void CPlayList::Insert(const CPlayList& playlist, int iPosition /* = -1 */)
     Add(playlist);
     return;
   }
-  for (int i = 0; i < (int)playlist.size(); i++)
+  for (int i = 0; i < playlist.size(); i++)
   {
     int iPos = iPosition + i;
     Add(playlist[i], iPos, iPos);
@@ -160,7 +148,7 @@ void CPlayList::Insert(const CFileItemList& items, int iPosition /* = -1 */)
     Add(items);
     return;
   }
-  for (int i = 0; i < (int)items.Size(); i++)
+  for (int i = 0; i < items.Size(); i++)
   {
     Add(items[i], iPosition + i, iPosition + i);
   }
@@ -467,8 +455,6 @@ bool CPlayList::Expand(int position)
     return false;
 
   std::string path = item->GetDynPath();
-  if (path.empty())
-    path = item->GetPath();
 
   if (!playlist->Load(path))
     return false;
@@ -485,14 +471,10 @@ bool CPlayList::Expand(int position)
 
   // @todo
   // never change original path (id) of a file item
-  // playlist items should be created with dynPath instead
-  if (item->GetDynPath() != item->GetPath())
+  for (int i = 0;i<playlist->size();i++)
   {
-    for (int i = 0;i<playlist->size();i++)
-    {
-      (*playlist)[i]->SetDynPath((*playlist)[i]->GetPath());
-      (*playlist)[i]->SetPath(item->GetPath());
-    }
+    (*playlist)[i]->SetDynPath((*playlist)[i]->GetPath());
+    (*playlist)[i]->SetPath(item->GetPath());
   }
 
   if (playlist->size() <= 0)

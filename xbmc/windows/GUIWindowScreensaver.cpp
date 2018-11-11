@@ -1,35 +1,24 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowScreensaver.h"
-
+#include "GUIPassword.h"
 #include "Application.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
 #include "addons/ScreenSaver.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 
 CGUIWindowScreensaver::CGUIWindowScreensaver(void)
-  : CGUIWindow(WINDOW_SCREENSAVER, ""),
-    m_addon(nullptr)
+  : CGUIWindow(WINDOW_SCREENSAVER, "")
 {
 }
 
@@ -37,16 +26,16 @@ void CGUIWindowScreensaver::Process(unsigned int currentTime, CDirtyRegionList &
 {
   MarkDirtyRegion();
   CGUIWindow::Process(currentTime, regions);
-  m_renderRegion.SetRect(0, 0, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight());
+  m_renderRegion.SetRect(0, 0, (float)CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth(), (float)CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight());
 }
 
 void CGUIWindowScreensaver::Render()
 {
   if (m_addon)
   {
-    g_graphicsContext.CaptureStateBlock();
+    CServiceBroker::GetWinSystem()->GetGfxContext().CaptureStateBlock();
     m_addon->Render();
-    g_graphicsContext.ApplyStateBlock();
+    CServiceBroker::GetWinSystem()->GetGfxContext().ApplyStateBlock();
     return;
   }
 
@@ -56,7 +45,7 @@ void CGUIWindowScreensaver::Render()
 // called when the mouse is moved/clicked etc. etc.
 EVENT_RESULT CGUIWindowScreensaver::OnMouseEvent(const CPoint &point, const CMouseEvent &event)
 {
-  g_windowManager.PreviousWindow();
+  CServiceBroker::GetGUI()->GetWindowManager().PreviousWindow();
   return EVENT_RESULT_HANDLED;
 }
 
@@ -73,7 +62,7 @@ bool CGUIWindowScreensaver::OnMessage(CGUIMessage& message)
         m_addon = nullptr;
       }
 
-      g_graphicsContext.ApplyStateBlock();
+      CServiceBroker::GetWinSystem()->GetGfxContext().ApplyStateBlock();
     }
     break;
 
@@ -81,9 +70,9 @@ bool CGUIWindowScreensaver::OnMessage(CGUIMessage& message)
     {
       CGUIWindow::OnMessage(message);
 
-      g_graphicsContext.CaptureStateBlock();
+      CServiceBroker::GetWinSystem()->GetGfxContext().CaptureStateBlock();
 
-      const ADDON::BinaryAddonBasePtr addonBase = CServiceBroker::GetBinaryAddonManager().GetInstalledAddonInfo(CServiceBroker::GetSettings().GetString(CSettings::SETTING_SCREENSAVER_MODE), ADDON::ADDON_SCREENSAVER);
+      const ADDON::BinaryAddonBasePtr addonBase = CServiceBroker::GetBinaryAddonManager().GetInstalledAddonInfo(CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_SCREENSAVER_MODE), ADDON::ADDON_SCREENSAVER);
       if (!addonBase)
         return false;
       m_addon = new ADDON::CScreenSaver(addonBase);

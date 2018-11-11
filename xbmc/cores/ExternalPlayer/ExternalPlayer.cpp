@@ -1,29 +1,17 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "threads/SystemClock.h"
 #include "CompileInfo.h"
-#include "threads/SingleLock.h"
 #include "ExternalPlayer.h"
 #include "windowing/WinSystem.h"
 #include "dialogs/GUIDialogOK.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "Application.h"
 #include "filesystem/MusicDatabaseFile.h"
@@ -38,7 +26,6 @@
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
 #include "cores/DataCacheCore.h"
-#include "input/InputManager.h"
 #if defined(TARGET_WINDOWS)
   #include "utils/CharsetConverter.h"
   #include "Windows.h"
@@ -100,7 +87,7 @@ bool CExternalPlayer::OpenFile(const CFileItem& file, const CPlayerOptions &opti
     m_bIsPlaying = true;
     m_time = 0;
     m_playbackStartTime = XbmcThreads::SystemClockMillis();
-    m_launchFilename = file.GetPath();
+    m_launchFilename = file.GetDynPath();
     CLog::Log(LOGNOTICE, "%s: %s", __FUNCTION__, m_launchFilename.c_str());
     Create();
 
@@ -285,13 +272,13 @@ void CExternalPlayer::Process()
   if (m_hidexbmc && !m_islauncher)
   {
     CLog::Log(LOGNOTICE, "%s: Hiding %s window", __FUNCTION__, CCompileInfo::GetAppName());
-    CServiceBroker::GetWinSystem().Hide();
+    CServiceBroker::GetWinSystem()->Hide();
   }
 #if defined(TARGET_WINDOWS_DESKTOP)
   else if (currentStyle & WS_EX_TOPMOST)
   {
     CLog::Log(LOGNOTICE, "%s: Lowering %s window", __FUNCTION__, CCompileInfo::GetAppName());
-    SetWindowPos(g_hWnd,HWND_BOTTOM,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOREDRAW);
+    SetWindowPos(g_hWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOREDRAW | SWP_ASYNCWINDOWPOS);
   }
 
   CLog::Log(LOGDEBUG, "%s: Unlocking foreground window", __FUNCTION__);
@@ -302,10 +289,10 @@ void CExternalPlayer::Process()
 
   /* Suspend AE temporarily so exclusive or hog-mode sinks */
   /* don't block external player's access to audio device  */
-  CServiceBroker::GetActiveAE().Suspend();
+  CServiceBroker::GetActiveAE()->Suspend();
   // wait for AE has completed suspended
   XbmcThreads::EndTime timer(2000);
-  while (!timer.IsTimePast() && !CServiceBroker::GetActiveAE().IsSuspended())
+  while (!timer.IsTimePast() && !CServiceBroker::GetActiveAE()->IsSuspended())
   {
     Sleep(50);
   }
@@ -315,6 +302,7 @@ void CExternalPlayer::Process()
   }
 
   m_callback.OnPlayBackStarted(m_file);
+  m_callback.OnAVStarted(m_file);
 
   bool ret = true;
 #if defined(TARGET_WINDOWS_DESKTOP)
@@ -331,11 +319,11 @@ void CExternalPlayer::Process()
     if (m_hidexbmc)
     {
       CLog::Log(LOGNOTICE, "%s: %s cannot stay hidden for a launcher process", __FUNCTION__, CCompileInfo::GetAppName());
-      CServiceBroker::GetWinSystem().Show(false);
+      CServiceBroker::GetWinSystem()->Show(false);
     }
 
     {
-      m_dialog = g_windowManager.GetWindow<CGUIDialogOK>(WINDOW_DIALOG_OK);
+      m_dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogOK>(WINDOW_DIALOG_OK);
       m_dialog->SetHeading(CVariant{23100});
       m_dialog->SetLine(1, CVariant{23104});
       m_dialog->SetLine(2, CVariant{23105});
@@ -350,19 +338,19 @@ void CExternalPlayer::Process()
   CLog::Log(LOGNOTICE, "%s: Stop", __FUNCTION__);
 
 #if defined(TARGET_WINDOWS_DESKTOP)
-  CServiceBroker::GetWinSystem().Restore();
+  CServiceBroker::GetWinSystem()->Restore();
 
   if (currentStyle & WS_EX_TOPMOST)
   {
     CLog::Log(LOGNOTICE, "%s: Showing %s window TOPMOST", __FUNCTION__, CCompileInfo::GetAppName());
-    SetWindowPos(g_hWnd,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW);
+    SetWindowPos(g_hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
     SetForegroundWindow(g_hWnd);
   }
   else
 #endif
   {
     CLog::Log(LOGNOTICE, "%s: Showing %s window", __FUNCTION__, CCompileInfo::GetAppName());
-    CServiceBroker::GetWinSystem().Show();
+    CServiceBroker::GetWinSystem()->Show();
   }
 
 #if defined(TARGET_WINDOWS_DESKTOP)
@@ -381,7 +369,7 @@ void CExternalPlayer::Process()
 #endif
 
   /* Resume AE processing of XBMC native audio */
-  if (!CServiceBroker::GetActiveAE().Resume())
+  if (!CServiceBroker::GetActiveAE()->Resume())
   {
     CLog::Log(LOGFATAL, "%s: Failed to restart AudioEngine after return from external player",__FUNCTION__);
   }
@@ -448,7 +436,7 @@ bool CExternalPlayer::ExecuteAppW32(const char* strPath, const char* strSwitches
     CloseHandle(m_processInfo.hProcess);
     m_processInfo.hProcess = 0;
   }
-  return (ret == 0);
+  return (ret == TRUE);
 }
 #endif
 
@@ -457,14 +445,7 @@ bool CExternalPlayer::ExecuteAppLinux(const char* strSwitches)
 {
   CLog::Log(LOGNOTICE, "%s: %s", __FUNCTION__, strSwitches);
 
-  bool remoteUsed = CServiceBroker::GetInputManager().IsRemoteControlEnabled();
-  CServiceBroker::GetInputManager().DisableRemoteControl();
-
   int ret = system(strSwitches);
-
-  if (remoteUsed)
-    CServiceBroker::GetInputManager().EnableRemoteControl();
-
   if (ret != 0)
   {
     CLog::Log(LOGNOTICE, "%s: Failure: %d", __FUNCTION__, ret);

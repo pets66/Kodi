@@ -1,25 +1,10 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
-
-#ifndef WIN_SYSTEM_WIN32_DX_H
-#define WIN_SYSTEM_WIN32_DX_H
 
 #pragma once
 
@@ -61,7 +46,7 @@ public:
    \sa Unregister, ID3DResource
   */
   void Register(ID3DResource *resource) const
-  { 
+  {
     m_deviceResources->Register(resource);
   };
   /*!
@@ -70,7 +55,7 @@ public:
    \sa Register, ID3DResource
   */
   void Unregister(ID3DResource *resource) const
-  { 
+  {
     m_deviceResources->Unregister(resource);
   };
 
@@ -80,17 +65,15 @@ public:
   void FixRefreshRateIfNecessary(const D3D10DDIARG_CREATERESOURCE* pResource) const;
 
 protected:
-  void UpdateMonitor() const;
   void SetDeviceFullScreen(bool fullScreen, RESOLUTION_INFO& res) override;
   void ReleaseBackBuffer() override;
   void CreateBackBuffer() override;
   void ResizeDeviceBuffers() override;
   bool IsStereoEnabled() override;
-  void OnScreenChange(int screen) override;
+  void OnScreenChange(HMONITOR monitor) override;
   bool ChangeResolution(const RESOLUTION_INFO& res, bool forceChange = false) override;
 
   HMODULE m_hDriverModule;
   TRACED_HOOK_HANDLE m_hHook;
 };
 
-#endif // WIN_SYSTEM_WIN32_DX_H

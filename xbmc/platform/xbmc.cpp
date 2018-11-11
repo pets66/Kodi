@@ -1,25 +1,12 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Application.h"
-#include "settings/AdvancedSettings.h"
 
 #ifdef TARGET_RASPBERRY_PI
 #include "platform/linux/RBP.h"
@@ -43,11 +30,6 @@ extern "C" int XBMC_Run(bool renderGUI, const CAppParamParser &params)
 {
   int status = -1;
 
-  if (!g_advancedSettings.Initialized())
-  {
-    g_advancedSettings.Initialize();
-  }
-
   if (!g_application.Create(params))
   {
     CMessagePrinter::DisplayError("ERROR: Unable to create application. Exiting");
@@ -65,6 +47,8 @@ extern "C" int XBMC_Run(bool renderGUI, const CAppParamParser &params)
   if (renderGUI && !g_application.CreateGUI())
   {
     CMessagePrinter::DisplayError("ERROR: Unable to create GUI. Exiting");
+    g_application.Stop(EXITCODE_QUIT);
+    g_application.Cleanup();
     return status;
   }
   if (!g_application.Initialize())
@@ -85,23 +69,7 @@ extern "C" int XBMC_Run(bool renderGUI, const CAppParamParser &params)
   }
 #endif
 
-  try
-  {
-    status = g_application.Run(params);
-  }
-#ifdef TARGET_WINDOWS
-  catch (const XbmcCommons::UncheckedException &e)
-  {
-    e.LogThrowMessage("CApplication::Create()");
-    CMessagePrinter::DisplayError("ERROR: Exception caught on main loop. Exiting");
-    status = -1;
-  }
-#endif
-  catch(...)
-  {
-    CMessagePrinter::DisplayError("ERROR: Exception caught on main loop. Exiting");
-    status = -1;
-  }
+  status = g_application.Run(params);
 
 #ifdef TARGET_WINDOWS_DESKTOP
   // the end

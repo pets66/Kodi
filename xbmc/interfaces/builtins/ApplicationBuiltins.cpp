@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ApplicationBuiltins.h"
@@ -24,11 +12,11 @@
 #include "ServiceBroker.h"
 #include "filesystem/ZipManager.h"
 #include "messaging/ApplicationMessenger.h"
-#include "input/Key.h"
 #include "interfaces/AnnouncementManager.h"
 #include "network/Network.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/FileOperationJob.h"
 #include "utils/JSONVariantParser.h"
 #include "utils/log.h"
@@ -92,7 +80,7 @@ static int NotifyAll(const std::vector<std::string>& params)
     }
   }
 
-  ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Other, params[0].c_str(), params[1].c_str(), data);
+  CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::Other, params[0].c_str(), params[1].c_str(), data);
 
   return 0;
 }
@@ -124,9 +112,9 @@ static int SetVolume(const std::vector<std::string>& params)
  */
 static int ToggleDebug(const std::vector<std::string>& params)
 {
-  bool debug = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_DEBUG_SHOWLOGINFO);
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_DEBUG_SHOWLOGINFO, !debug);
-  g_advancedSettings.SetDebugMode(!debug);
+  bool debug = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_DEBUG_SHOWLOGINFO);
+  CServiceBroker::GetSettingsComponent()->GetSettings()->SetBool(CSettings::SETTING_DEBUG_SHOWLOGINFO, !debug);
+  CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->SetDebugMode(!debug);
 
   return 0;
 }
@@ -193,9 +181,9 @@ static int WakeOnLAN(const std::vector<std::string>& params)
 ///     @param[in] showvolumebar         Add "showVolumeBar" to show volume bar (optional).
 ///   }
 ///   \table_row2_l{
-///     <b>`Skin.ToggleDebug`</b>
+///     <b>`ToggleDebug`</b>
 ///     ,
-///     Toggles skin debug info on/off
+///     Toggles debug mode on/off
 ///   }
 ///   \table_row2_l{
 ///     <b>`ToggleDPMS`</b>

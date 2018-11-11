@@ -1,21 +1,10 @@
 /*
- *      Copyright (C) 2013 Arne Morten Kvarving
+ *  Copyright (C) 2013 Arne Morten Kvarving
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
 #include "addons/binary-addons/AddonDll.h"
@@ -98,7 +87,7 @@ namespace ADDON
     void ClearOutIdle();
     void DisconnectAll();
 
-    bool ContainsFiles(const CURL& path, CFileItemList& items);
+    bool ContainsFiles(const CURL& url, CFileItemList& items);
 
     const std::string& GetProtocols() const { return m_protocols; }
     const std::string& GetExtensions() const { return m_extensions; }
@@ -219,19 +208,19 @@ namespace ADDON
     //! \param[in] url URL to file to list.
     //! \param items List of items in file.
     //! \return True if listing succeeded, false otherwise.
-    bool GetDirectory(const CURL& strPath, CFileItemList& items) override;
+    bool GetDirectory(const CURL& url, CFileItemList& items) override;
 
     //! \brief Check if directory exists.
     //! \param[in] url URL to check.
-    bool Exists(const CURL& strPath) override;
+    bool Exists(const CURL& url) override;
 
     //! \brief Delete directory.
     //! \param[in] url URL to delete.
-    bool Remove(const CURL& strPath) override;
+    bool Remove(const CURL& url) override;
 
     //! \brief Create directory.
     //! \param[in] url URL to delete.
-    bool Create(const CURL& strPath) override;
+    bool Create(const CURL& url) override;
 
     //! \brief Static helper for doing a keyboard callback.
     static bool DoGetKeyboardInput(void* context, const char* heading,
@@ -273,7 +262,7 @@ namespace ADDON
     ~CVFSEntryIFileDirectoryWrapper() override = default;
 
     //! \brief Check if the given file should be treated as a directory.
-    //! \param[in] URL URL for file to probe.
+    //! \param[in] url URL for file to probe.
     bool ContainsFiles(const CURL& url) override
     {
       return m_addon->ContainsFiles(url, m_items);

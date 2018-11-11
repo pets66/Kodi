@@ -1,25 +1,13 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RPRendererGuiTexture.h"
-#include "cores/RetroPlayer/process/RenderBufferGuiTexture.h"
+#include "cores/RetroPlayer/buffers/video/RenderBufferGuiTexture.h"
 #include "cores/RetroPlayer/rendering/RenderContext.h"
 #include "cores/RetroPlayer/rendering/RenderVideoSettings.h"
 
@@ -50,15 +38,15 @@ RenderBufferPoolVector CRendererFactoryGuiTexture::CreateBufferPools(CRenderCont
 {
   return {
 #if !defined(HAS_DX)
-    std::make_shared<CRenderBufferPoolGuiTexture>(VS_SCALINGMETHOD_NEAREST),
+    std::make_shared<CRenderBufferPoolGuiTexture>(SCALINGMETHOD::NEAREST),
 #endif
-    std::make_shared<CRenderBufferPoolGuiTexture>(VS_SCALINGMETHOD_LINEAR),
+    std::make_shared<CRenderBufferPoolGuiTexture>(SCALINGMETHOD::LINEAR),
   };
 }
 
 // --- CRenderBufferPoolGuiTexture -----------------------------------------------
 
-CRenderBufferPoolGuiTexture::CRenderBufferPoolGuiTexture(ESCALINGMETHOD scalingMethod) :
+CRenderBufferPoolGuiTexture::CRenderBufferPoolGuiTexture(SCALINGMETHOD scalingMethod) :
   m_scalingMethod(scalingMethod)
 {
 }
@@ -83,12 +71,12 @@ CRPRendererGuiTexture::CRPRendererGuiTexture(const CRenderSettings &renderSettin
 {
 }
 
-bool CRPRendererGuiTexture::Supports(ERENDERFEATURE feature) const
+bool CRPRendererGuiTexture::Supports(RENDERFEATURE feature) const
 {
-  if (feature == RENDERFEATURE_STRETCH         ||
-      feature == RENDERFEATURE_ZOOM            ||
-      feature == RENDERFEATURE_PIXEL_RATIO     ||
-      feature == RENDERFEATURE_ROTATION)
+  if (feature == RENDERFEATURE::STRETCH         ||
+      feature == RENDERFEATURE::ZOOM            ||
+      feature == RENDERFEATURE::PIXEL_RATIO     ||
+      feature == RENDERFEATURE::ROTATION)
   {
     return true;
   }
@@ -102,10 +90,10 @@ void CRPRendererGuiTexture::RenderInternal(bool clear, uint8_t alpha)
 
   CRect rect = m_sourceRect;
 
-  rect.x1 /= m_sourceWidth;
-  rect.x2 /= m_sourceWidth;
-  rect.y1 /= m_sourceHeight;
-  rect.y2 /= m_sourceHeight;
+  rect.x1 /= renderBuffer->GetWidth();
+  rect.x2 /= renderBuffer->GetWidth();
+  rect.y1 /= renderBuffer->GetHeight();
+  rect.y2 /= renderBuffer->GetHeight();
 
   float u1 = rect.x1;
   float u2 = rect.x2;
@@ -210,9 +198,9 @@ void CRPRendererGuiTexture::RenderInternal(bool clear, uint8_t alpha)
 
   if (m_context.UseLimitedColor())
   {
-    colour[0] = (235 - 16) * colour[0] / 255;
-    colour[1] = (235 - 16) * colour[1] / 255;
-    colour[2] = (235 - 16) * colour[2] / 255;
+    colour[0] = (235 - 16) * colour[0] / 255 + 16;
+    colour[1] = (235 - 16) * colour[1] / 255 + 16;
+    colour[2] = (235 - 16) * colour[2] / 255 + 16;
   }
 
   glUniform4f(uniColLoc, (colour[0] / 255.0f), (colour[1] / 255.0f),

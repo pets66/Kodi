@@ -1,30 +1,19 @@
 /*
- *      Copyright (c) 2007 d4rk
- *      Copyright (C) 2007-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (c) 2007 d4rk
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "../RenderFlags.h"
 #include "YUV2RGBShaderGL.h"
-#include "YUVMatrix.h"
 #include "ConversionMatrix.h"
 #include "ConvolutionKernels.h"
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/GLUtils.h"
 
@@ -62,7 +51,7 @@ BaseYUV2RGBGLSLShader::BaseYUV2RGBGLSLShader(bool rect, EShaderFormat format, bo
   else
     m_defines += "#define XBMC_texture_rectangle 0\n";
 
-  if (g_advancedSettings.m_GLRectangleHack)
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_GLRectangleHack)
     m_defines += "#define XBMC_texture_rectangle_hack 1\n";
   else
     m_defines += "#define XBMC_texture_rectangle_hack 0\n";
@@ -170,11 +159,17 @@ bool BaseYUV2RGBGLSLShader::OnEnabled()
 
   if (m_toneMapping)
   {
-    float param = 0.5;
+    float param = 0.7;
     if (m_hasLightMetadata)
       param = log10(100) / log10(m_lightMetadata.MaxCLL);
     else if (m_hasDisplayMetadata && m_displayMetadata.has_luminance)
       param = log10(100) / log10(m_displayMetadata.max_luminance.num/m_displayMetadata.max_luminance.den);
+
+    // Sanity check
+    if (param < 0.1f || param > 5.0f)
+      param = 0.7f;
+
+    param *= m_toneMappingParam;
 
     float coefs[3];
     CConvertMatrix::GetRGBYuvCoefs(AVColorSpace::AVCOL_SPC_BT709, coefs);

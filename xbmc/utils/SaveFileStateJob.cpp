@@ -1,25 +1,12 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "SaveFileStateJob.h"
-#include "settings/MediaSettings.h"
 #include "network/upnp/UPnP.h"
 #include "StringUtils.h"
 #include "utils/Variant.h"
@@ -29,12 +16,16 @@
 #include "video/VideoDatabase.h"
 #include "interfaces/AnnouncementManager.h"
 #include "Util.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIMessage.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "music/MusicDatabase.h"
 #include "xbmc/music/tags/MusicInfoTag.h"
 #include "Application.h"
+#include "ServiceBroker.h"
+#include "FileItem.h"
+#include "video/Bookmark.h"
 
 void CSaveFileState::DoWork(CFileItem& item,
                             CBookmark& bookmark,
@@ -74,6 +65,19 @@ void CSaveFileState::DoWork(CFileItem& item,
       }
       else
       {
+        if (URIUtils::IsPlugin(progressTrackingFile) && !(item.HasVideoInfoTag() && item.GetVideoInfoTag()->m_iDbId >= 0))
+        {
+          // FileItem from plugin can lack information, make sure all needed fields are set
+          CVideoInfoTag *tag = item.GetVideoInfoTag();
+          CStreamDetails streams = tag->m_streamDetails;
+          if (videodatabase.LoadVideoInfo(progressTrackingFile, *tag))
+          {
+            item.SetPath(progressTrackingFile);
+            item.ClearProperty("original_listitem_url");
+            tag->m_streamDetails = streams;
+          }
+        }
+
         bool updateListing = false;
         // No resume & watched status for livetv
         if (!item.IsLiveTV())
@@ -97,7 +101,7 @@ void CSaveFileState::DoWork(CFileItem& item,
                 CVariant data;
                 data["id"] = item.GetVideoInfoTag()->m_iDbId;
                 data["type"] = item.GetVideoInfoTag()->m_type;
-                ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
+                CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
               }
             }
           }
@@ -121,7 +125,7 @@ void CSaveFileState::DoWork(CFileItem& item,
               CVariant data;
               data["id"] = item.GetVideoInfoTag()->m_iDbId;
               data["type"] = item.GetVideoInfoTag()->m_type;
-              ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
+              CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", data);
             }
 
             updateListing = true;
@@ -155,8 +159,8 @@ void CSaveFileState::DoWork(CFileItem& item,
           CFileItemPtr msgItem(new CFileItem(item));
           if (item.HasProperty("original_listitem_url"))
             msgItem->SetPath(item.GetProperty("original_listitem_url").asString());
-          CGUIMessage message(GUI_MSG_NOTIFY_ALL, g_windowManager.GetActiveWindow(), 0, GUI_MSG_UPDATE_ITEM, 1, msgItem); // 1 to update the listing as well
-          g_windowManager.SendThreadMessage(message);
+          CGUIMessage message(GUI_MSG_NOTIFY_ALL, CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow(), 0, GUI_MSG_UPDATE_ITEM, 0, msgItem);
+          CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message);
         }
       }
     }
@@ -188,7 +192,7 @@ void CSaveFileState::DoWork(CFileItem& item,
             CVariant data;
             data["id"] = item.GetMusicInfoTag()->GetDatabaseId();
             data["type"] = item.GetMusicInfoTag()->GetType();
-            ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::AudioLibrary, "xbmc", "OnUpdate", data);
+            CServiceBroker::GetAnnouncementManager()->Announce(ANNOUNCEMENT::AudioLibrary, "xbmc", "OnUpdate", data);
           }
         }
       }

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ZeroconfBrowserMDNS.h"
@@ -23,10 +11,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIMessage.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "network/DNSNameCache.h"
+#include "ServiceBroker.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 
@@ -92,7 +82,7 @@ void DNSSD_API CZeroconfBrowserMDNS::BrowserCallback(DNSServiceRef browser,
     {
       CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
       message.SetStringParam("zeroconf://");
-      g_windowManager.SendThreadMessage(message);
+      CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message);
       CLog::Log(LOGDEBUG, "ZeroconfBrowserMDNS::BrowserCallback sent gui update for path zeroconf://");
     }
   }
@@ -149,7 +139,7 @@ void DNSSD_API CZeroconfBrowserMDNS::ResolveCallback(DNSServiceRef              
   }
 
   DNSServiceErrorType err;
-  CZeroconfBrowser::ZeroconfService::tTxtRecordMap recordMap; 
+  CZeroconfBrowser::ZeroconfService::tTxtRecordMap recordMap;
   std::string strIP;
   CZeroconfBrowserMDNS* p_instance = static_cast<CZeroconfBrowserMDNS*> ( context );
 
@@ -323,7 +313,7 @@ bool CZeroconfBrowserMDNS::doResolveService(CZeroconfBrowser::ZeroconfService& f
 {
   DNSServiceErrorType err;
   DNSServiceRef sdRef = NULL;
-  
+
   //start resolving
   m_resolving_service = fr_service;
   m_resolved_event.Reset();
@@ -347,7 +337,7 @@ bool CZeroconfBrowserMDNS::doResolveService(CZeroconfBrowser::ZeroconfService& f
 #if defined(HAS_MDNS_EMBEDDED)
   // when using the embedded mdns service the call to DNSServiceProcessResult
   // above will not block until the resolving was finished - instead we have to
-  // wait for resolve to return or timeout  
+  // wait for resolve to return or timeout
   m_resolved_event.WaitMSec(f_timeout * 1000);
 #endif //HAS_MDNS_EMBEDDED
   fr_service = m_resolving_service;

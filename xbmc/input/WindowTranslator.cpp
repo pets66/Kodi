@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WindowTranslator.h"
@@ -66,7 +54,6 @@ const CWindowTranslator::WindowMapByName CWindowTranslator::WindowMappingByName 
     { "pvrosdguide"              , WINDOW_DIALOG_PVR_CHANNEL_GUIDE }, // backward compatibility to v17
     { "pvrosdteletext"           , WINDOW_DIALOG_OSD_TELETEXT },
     { "systeminfo"               , WINDOW_SYSTEM_INFORMATION },
-    { "testpattern"              , WINDOW_TEST_PATTERN },
     { "screencalibration"        , WINDOW_SCREEN_CALIBRATION },
     { "systemsettings"           , WINDOW_SETTINGS_SYSTEM },
     { "servicesettings"          , WINDOW_SETTINGS_SERVICE },
@@ -102,8 +89,6 @@ const CWindowTranslator::WindowMapByName CWindowTranslator::WindowMappingByName 
     { "osdvideosettings"         , WINDOW_DIALOG_VIDEO_OSD_SETTINGS },
     { "osdaudiosettings"         , WINDOW_DIALOG_AUDIO_OSD_SETTINGS },
     { "osdsubtitlesettings"      , WINDOW_DIALOG_SUBTITLE_OSD_SETTINGS },
-    { "audiodspmanager"          , WINDOW_DIALOG_AUDIO_DSP_MANAGER },
-    { "osdaudiodspsettings"      , WINDOW_DIALOG_AUDIO_DSP_OSD_SETTINGS },
     { "videobookmarks"           , WINDOW_DIALOG_VIDEO_BOOKMARKS },
     { "filebrowser"              , WINDOW_DIALOG_FILE_BROWSER },
     { "networksetup"             , WINDOW_DIALOG_NETWORK_SETUP },
@@ -116,6 +101,7 @@ const CWindowTranslator::WindowMapByName CWindowTranslator::WindowMappingByName 
     { "smartplaylisteditor"      , WINDOW_DIALOG_SMART_PLAYLIST_EDITOR },
     { "smartplaylistrule"        , WINDOW_DIALOG_SMART_PLAYLIST_RULE },
     { "busydialog"               , WINDOW_DIALOG_BUSY },
+    { "busydialognocancel"       , WINDOW_DIALOG_BUSY_NOCANCEL },
     { "pictureinfo"              , WINDOW_DIALOG_PICTURE_INFO },
     { "accesspoints"             , WINDOW_DIALOG_ACCESS_POINTS },
     { "fullscreeninfo"           , WINDOW_DIALOG_FULLSCREEN_INFO },
@@ -158,8 +144,10 @@ const CWindowTranslator::WindowMapByName CWindowTranslator::WindowMappingByName 
     { "radiotimerrules"          , WINDOW_RADIO_TIMER_RULES},
     { "gameosd"                  , WINDOW_DIALOG_GAME_OSD },
     { "gamevideofilter"          , WINDOW_DIALOG_GAME_VIDEO_FILTER },
-    { "gameviewmode"             , WINDOW_DIALOG_GAME_VIEW_MODE },
+    { "gamestretchmode"          , WINDOW_DIALOG_GAME_STRETCH_MODE },
     { "gamevolume"               , WINDOW_DIALOG_GAME_VOLUME },
+    { "gameadvancedsettings"     , WINDOW_DIALOG_GAME_ADVANCED_SETTINGS },
+    { "gamevideorotation"        , WINDOW_DIALOG_GAME_VIDEO_ROTATION },
 };
 
 namespace

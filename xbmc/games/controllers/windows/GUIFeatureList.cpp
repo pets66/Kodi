@@ -1,26 +1,16 @@
 /*
- *      Copyright (C) 2014-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIFeatureList.h"
 #include "GUIConfigurationWizard.h"
 #include "GUIControllerDefines.h"
+#include "games/addons/input/GameClientInput.h"
+#include "games/addons/GameClient.h"
 #include "games/controllers/guicontrols/GUIFeatureControls.h"
 #include "games/controllers/guicontrols/GUIFeatureButton.h"
 #include "games/controllers/guicontrols/GUIFeatureFactory.h"
@@ -31,20 +21,19 @@
 #include "guilib/GUIControlGroupList.h"
 #include "guilib/GUIImage.h"
 #include "guilib/GUILabelControl.h"
-#include "guilib/GUIMessage.h"
 #include "guilib/GUIWindow.h"
 #include "guilib/LocalizeStrings.h"
-#include "messaging/ApplicationMessenger.h"
 
 using namespace KODI;
 using namespace GAME;
 
-CGUIFeatureList::CGUIFeatureList(CGUIWindow* window) :
+CGUIFeatureList::CGUIFeatureList(CGUIWindow* window, GameClientPtr gameClient) :
   m_window(window),
   m_guiList(nullptr),
   m_guiButtonTemplate(nullptr),
   m_guiGroupTitle(nullptr),
   m_guiFeatureSeparator(nullptr),
+  m_gameClient(std::move(gameClient)),
   m_wizard(new CGUIConfigurationWizard)
 {
 }
@@ -121,32 +110,29 @@ void CGUIFeatureList::Load(const ControllerPtr& controller)
       buttons = GetButtons(itGroup->features, m_buttonCount);
     }
 
-    if (!buttons.empty())
+    // Just in case
+    if (m_buttonCount + buttons.size() >= MAX_FEATURE_COUNT)
+      break;
+
+    // Add a separator if the group list isn't empty
+    if (m_guiFeatureSeparator && m_guiList->GetTotalSize() > 0)
     {
-      // Just in case
-      if (m_buttonCount + buttons.size() >= MAX_FEATURE_COUNT)
-        break;
-
-      // Add a separator if the group list isn't empty
-      if (m_guiFeatureSeparator && m_guiList->GetTotalSize() > 0)
-      {
-        CGUIFeatureSeparator* pSeparator = new CGUIFeatureSeparator(*m_guiFeatureSeparator, m_buttonCount);
-        m_guiList->AddControl(pSeparator);
-      }
-
-      // Add the group title
-      if (m_guiGroupTitle && !groupName.empty())
-      {
-        CGUIFeatureGroupTitle* pGroupTitle = new CGUIFeatureGroupTitle(*m_guiGroupTitle, groupName, m_buttonCount);
-        m_guiList->AddControl(pGroupTitle);
-      }
-
-      // Add the buttons
-      for (CGUIButtonControl* pButton : buttons)
-        m_guiList->AddControl(pButton);
-
-      m_buttonCount += buttons.size();
+      CGUIFeatureSeparator* pSeparator = new CGUIFeatureSeparator(*m_guiFeatureSeparator, m_buttonCount);
+      m_guiList->AddControl(pSeparator);
     }
+
+    // Add the group title
+    if (m_guiGroupTitle && !groupName.empty())
+    {
+      CGUIFeatureGroupTitle* pGroupTitle = new CGUIFeatureGroupTitle(*m_guiGroupTitle, groupName, m_buttonCount);
+      m_guiList->AddControl(pGroupTitle);
+    }
+
+    // Add the buttons
+    for (CGUIButtonControl* pButton : buttons)
+      m_guiList->AddControl(pButton);
+
+    m_buttonCount += static_cast<unsigned int>(buttons.size());
   }
 }
 
@@ -192,7 +178,7 @@ void CGUIFeatureList::CleanupButtons(void)
     m_guiList->ClearAll();
 }
 
-std::vector<CGUIFeatureList::FeatureGroup> CGUIFeatureList::GetFeatureGroups(const std::vector<CControllerFeature>& features)
+std::vector<CGUIFeatureList::FeatureGroup> CGUIFeatureList::GetFeatureGroups(const std::vector<CControllerFeature>& features) const
 {
   std::vector<FeatureGroup> groups;
 
@@ -200,6 +186,13 @@ std::vector<CGUIFeatureList::FeatureGroup> CGUIFeatureList::GetFeatureGroups(con
   std::vector<std::string> groupNames;
   for (const CControllerFeature& feature : features)
   {
+    // Skip features not supported by the game client
+    if (m_gameClient)
+    {
+      if (!m_gameClient->Input().HasFeature(m_controller->ID(), feature.Name()))
+        continue;
+    }
+
     bool bAdded = false;
 
     if (!groups.empty())
@@ -240,6 +233,14 @@ std::vector<CGUIFeatureList::FeatureGroup> CGUIFeatureList::GetFeatureGroups(con
       group.features.emplace_back(feature);
       groups.emplace_back(std::move(group));
     }
+  }
+
+  // If there are no features, add an empty group
+  if (groups.empty())
+  {
+    FeatureGroup group;
+    group.groupName = g_localizeStrings.Get(35022); // "Nothing to map"
+    groups.emplace_back(std::move(group));
   }
 
   return groups;

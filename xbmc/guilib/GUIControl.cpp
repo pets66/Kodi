@@ -1,27 +1,18 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIControl.h"
+#include "GUIMessage.h"
+#include "GUIAction.h"
 
 #include "GUIInfoManager.h"
 #include "utils/log.h"
+#include "GUIComponent.h"
 #include "GUIWindowManager.h"
 #include "GUIControlProfiler.h"
 #include "GUITexture.h"
@@ -30,9 +21,9 @@
 #include "input/Key.h"
 #include "ServiceBroker.h"
 
-CGUIControl::CGUIControl() :
-  m_hitColor(0xffffffff),
-  m_diffuseColor(0xffffffff)
+using namespace KODI::GUILIB;
+
+CGUIControl::CGUIControl()
 {
   m_hasProcessed = false;
   m_bHasFocus = false;
@@ -60,7 +51,6 @@ CGUIControl::CGUIControl() :
 
 CGUIControl::CGUIControl(int parentID, int controlID, float posX, float posY, float width, float height)
 : m_hitRect(posX, posY, posX + width, posY + height),
-  m_hitColor(0xffffffff),
   m_diffuseColor(0xffffffff)
 {
   m_posX = posX;
@@ -87,6 +77,7 @@ CGUIControl::CGUIControl(int parentID, int controlID, float posX, float posY, fl
   m_controlStats = nullptr;
 }
 
+CGUIControl::CGUIControl(const CGUIControl &) = default;
 
 CGUIControl::~CGUIControl(void) = default;
 
@@ -136,9 +127,9 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
 
   if (IsVisible())
   {
-    m_cachedTransform = g_graphicsContext.AddTransform(m_transform);
+    m_cachedTransform = CServiceBroker::GetWinSystem()->GetGfxContext().AddTransform(m_transform);
     if (m_hasCamera)
-      g_graphicsContext.SetCameraPosition(m_camera);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetCameraPosition(m_camera);
 
     Process(currentTime, dirtyregions);
     m_bInvalidated = false;
@@ -150,8 +141,8 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
     }
 
     if (m_hasCamera)
-      g_graphicsContext.RestoreCameraPosition();
-    g_graphicsContext.RemoveTransform();
+      CServiceBroker::GetWinSystem()->GetGfxContext().RestoreCameraPosition();
+    CServiceBroker::GetWinSystem()->GetGfxContext().RemoveTransform();
   }
 
   UpdateControlStats();
@@ -160,14 +151,14 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
 
   if (changed)
   {
-    dirtyregions.push_back(CDirtyRegion(dirtyRegion));
+    dirtyregions.emplace_back(dirtyRegion);
   }
 }
 
 void CGUIControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
   // update our render region
-  m_renderRegion = g_graphicsContext.GenerateAABB(CalcRenderRegion());
+  m_renderRegion = CServiceBroker::GetWinSystem()->GetGfxContext().GenerateAABB(CalcRenderRegion());
   m_hasProcessed = true;
 }
 
@@ -180,21 +171,21 @@ void CGUIControl::DoRender()
   if (IsVisible())
   {
     bool hasStereo = m_stereo != 0.0
-                  && g_graphicsContext.GetStereoMode() != RENDER_STEREO_MODE_MONO
-                  && g_graphicsContext.GetStereoMode() != RENDER_STEREO_MODE_OFF;
+                  && CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() != RENDER_STEREO_MODE_MONO
+                  && CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() != RENDER_STEREO_MODE_OFF;
 
-    g_graphicsContext.SetTransform(m_cachedTransform);
+    CServiceBroker::GetWinSystem()->GetGfxContext().SetTransform(m_cachedTransform);
     if (m_hasCamera)
-      g_graphicsContext.SetCameraPosition(m_camera);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetCameraPosition(m_camera);
     if (hasStereo)
-      g_graphicsContext.SetStereoFactor(m_stereo);
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetStereoFactor(m_stereo);
 
     GUIPROFILER_RENDER_BEGIN(this);
 
     if (m_hitColor != 0xffffffff)
     {
-      color_t color = g_graphicsContext.MergeAlpha(m_hitColor);
-      CGUITexture::DrawQuad(g_graphicsContext.GenerateAABB(m_hitRect), color);
+      UTILS::Color color = CServiceBroker::GetWinSystem()->GetGfxContext().MergeAlpha(m_hitColor);
+      CGUITexture::DrawQuad(CServiceBroker::GetWinSystem()->GetGfxContext().GenerateAABB(m_hitRect), color);
     }
 
     Render();
@@ -202,10 +193,10 @@ void CGUIControl::DoRender()
     GUIPROFILER_RENDER_END(this);
 
     if (hasStereo)
-      g_graphicsContext.RestoreStereoFactor();
+      CServiceBroker::GetWinSystem()->GetGfxContext().RestoreStereoFactor();
     if (m_hasCamera)
-      g_graphicsContext.RestoreCameraPosition();
-    g_graphicsContext.RemoveTransform();
+      CServiceBroker::GetWinSystem()->GetGfxContext().RestoreCameraPosition();
+    CServiceBroker::GetWinSystem()->GetGfxContext().RemoveTransform();
   }
 }
 
@@ -305,10 +296,10 @@ void CGUIControl::OnPrevControl()
 
 bool CGUIControl::SendWindowMessage(CGUIMessage &message) const
 {
-  CGUIWindow *pWindow = g_windowManager.GetWindow(GetParentID());
+  CGUIWindow *pWindow = CServiceBroker::GetGUI()->GetWindowManager().GetWindow(GetParentID());
   if (pWindow)
     return pWindow->OnMessage(message);
-  return g_windowManager.SendMessage(message);
+  return CServiceBroker::GetGUI()->GetWindowManager().SendMessage(message);
 }
 
 int CGUIControl::GetID(void) const
@@ -432,7 +423,7 @@ void CGUIControl::SetEnableCondition(const std::string &expression)
   else if (expression == "false")
     m_enabled = false;
   else
-    m_enableCondition = g_infoManager.Register(expression, GetParentID());
+    m_enableCondition = CServiceBroker::GetGUI()->GetInfoManager().Register(expression, GetParentID());
 }
 
 void CGUIControl::SetPosition(float posX, float posY)
@@ -449,7 +440,7 @@ void CGUIControl::SetPosition(float posX, float posY)
   }
 }
 
-bool CGUIControl::SetColorDiffuse(const CGUIInfoColor &color)
+bool CGUIControl::SetColorDiffuse(const GUIINFO::CGUIInfoColor &color)
 {
   bool changed = m_diffuseColor != color;
   m_diffuseColor = color;
@@ -673,7 +664,7 @@ void CGUIControl::SetVisibleCondition(const std::string &expression, const std::
   else if (expression == "false")
     m_visible = HIDDEN;
   else  // register with the infomanager for updates
-    m_visibleCondition = g_infoManager.Register(expression, GetParentID());
+    m_visibleCondition = CServiceBroker::GetGUI()->GetInfoManager().Register(expression, GetParentID());
   m_allowHiddenFocus.Parse(allowHiddenFocus, GetParentID());
 }
 
@@ -943,7 +934,7 @@ void CGUIControl::UpdateControlStats()
   }
 }
 
-void CGUIControl::SetHitRect(const CRect &rect, const color_t &color)
+void CGUIControl::SetHitRect(const CRect &rect, const UTILS::Color &color)
 {
   m_hitRect = rect;
   m_hitColor = color;

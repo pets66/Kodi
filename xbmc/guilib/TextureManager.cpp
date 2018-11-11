@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "TextureManager.h"
@@ -25,7 +13,7 @@
 #include "addons/Skin.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
-#include "GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "Texture.h"
 #include "threads/SingleLock.h"
 #include "threads/SystemClock.h"
@@ -107,7 +95,7 @@ void CTextureArray::Set(CBaseTexture *texture, int width, int height)
 
 void CTextureArray::Free()
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
   for (unsigned int i = 0; i < m_textures.size(); i++)
   {
     delete m_textures[i];
@@ -197,7 +185,7 @@ void CTextureMap::FreeTexture()
 
 void CTextureMap::SetHeight(int height)
 {
-  m_texture.m_height = (int) height;
+  m_texture.m_height = height;
 }
 
 void CTextureMap::SetWidth(int height)
@@ -333,7 +321,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     return emptyTexture;
 
   //Lock here, we will do stuff that could break rendering
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
 
 #ifdef _DEBUG_TEXTURES
   int64_t start;
@@ -415,7 +403,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
       if (pMap->GetMemoryUsage() <= maxMemoryUsage)
       {
         frame = anim.ReadFrame();
-      } 
+      }
       else
       {
         CLog::Log(LOGDEBUG, "Memory limit (%" PRIu64 " bytes) exceeded, %i frames extracted from file : %s", (maxMemoryUsage/11)*12,pMap->GetTexture().size(), CURL::GetRedacted(strPath).c_str());
@@ -472,7 +460,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
 
 void CGUITextureManager::ReleaseTexture(const std::string& strTextureName, bool immediately /*= false */)
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
 
   ivecTextures i;
   i = m_vecTextures.begin();
@@ -498,7 +486,7 @@ void CGUITextureManager::ReleaseTexture(const std::string& strTextureName, bool 
 void CGUITextureManager::FreeUnusedTextures(unsigned int timeDelay)
 {
   unsigned int currFrameTime = XbmcThreads::SystemClockMillis();
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
   for (ilistUnused i = m_unusedTextures.begin(); i != m_unusedTextures.end();)
   {
     if (currFrameTime - i->second >= timeDelay)
@@ -517,8 +505,8 @@ void CGUITextureManager::FreeUnusedTextures(unsigned int timeDelay)
   // when XBMC is backgrounded (e.x. for backgrounded music playback)
   // sanity check before delete in that case.
 #if defined(TARGET_DARWIN_IOS)
-    CWinSystemIOS& winSystem = dynamic_cast<CWinSystemIOS&>(CServiceBroker::GetWinSystem());
-    if (!winSystem.IsBackgrounded() || glIsTexture(m_unusedHwTextures[i]))
+    CWinSystemIOS* winSystem = dynamic_cast<CWinSystemIOS*>(CServiceBroker::GetWinSystem());
+    if (!winSystem->IsBackgrounded() || glIsTexture(m_unusedHwTextures[i]))
 #endif
       glDeleteTextures(1, (GLuint*) &m_unusedHwTextures[i]);
   }
@@ -528,13 +516,13 @@ void CGUITextureManager::FreeUnusedTextures(unsigned int timeDelay)
 
 void CGUITextureManager::ReleaseHwTexture(unsigned int texture)
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
   m_unusedHwTextures.push_back(texture);
 }
 
 void CGUITextureManager::Cleanup()
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
 
   ivecTextures i;
   i = m_vecTextures.begin();
@@ -565,7 +553,7 @@ void CGUITextureManager::Dump() const
 
 void CGUITextureManager::Flush()
 {
-  CSingleLock lock(g_graphicsContext);
+  CSingleLock lock(CServiceBroker::GetWinSystem()->GetGfxContext());
 
   ivecTextures i;
   i = m_vecTextures.begin();

@@ -1,31 +1,20 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIAudioManager.h"
 #include "ServiceBroker.h"
-#include "input/ActionIDs.h"
-#include "input/ActionTranslator.h"
+#include "input/actions/ActionIDs.h"
+#include "input/actions/ActionTranslator.h"
 #include "input/Key.h"
 #include "input/WindowTranslator.h"
 #include "settings/lib/Setting.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/URIUtils.h"
 #include "utils/XBMCTinyXML.h"
@@ -35,14 +24,21 @@
 #include "cores/AudioEngine/Interfaces/AE.h"
 #include "utils/log.h"
 
-CGUIAudioManager g_audioManager;
-
 CGUIAudioManager::CGUIAudioManager()
 {
+  m_settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+
   m_bEnabled = false;
+
+  m_settings->RegisterCallback(this, {
+    CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN,
+  });
 }
 
-CGUIAudioManager::~CGUIAudioManager() = default;
+CGUIAudioManager::~CGUIAudioManager()
+{
+  m_settings->UnregisterCallback(this);
+}
 
 void CGUIAudioManager::OnSettingChanged(std::shared_ptr<const CSetting> setting)
 {
@@ -222,7 +218,7 @@ void CGUIAudioManager::UnLoad()
 
 std::string GetSoundSkinPath()
 {
-  auto setting = std::static_pointer_cast<CSettingString>(CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN));
+  auto setting = std::static_pointer_cast<CSettingString>(CServiceBroker::GetSettingsComponent()->GetSettings()->GetSetting(CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN));
   auto value = setting->GetValue();
   if (value.empty())
     return "";
@@ -343,9 +339,13 @@ IAESound* CGUIAudioManager::LoadSound(const std::string &filename)
     return it->second.sound;
   }
 
-  IAESound *sound = CServiceBroker::GetActiveAE().MakeSound(filename);
+  IAE *ae = CServiceBroker::GetActiveAE();
+  if (!ae)
+    return nullptr;
+
+  IAESound *sound = ae->MakeSound(filename);
   if (!sound)
-    return NULL;
+    return nullptr;
 
   CSoundInfo info;
   info.usage = 1;
@@ -358,10 +358,15 @@ IAESound* CGUIAudioManager::LoadSound(const std::string &filename)
 void CGUIAudioManager::FreeSound(IAESound *sound)
 {
   CSingleLock lock(m_cs);
-  for(soundCache::iterator it = m_soundCache.begin(); it != m_soundCache.end(); ++it) {
-    if (it->second.sound == sound) {
-      if (--it->second.usage == 0) {     
-        CServiceBroker::GetActiveAE().FreeSound(sound);
+  IAE *ae = CServiceBroker::GetActiveAE();
+  for(soundCache::iterator it = m_soundCache.begin(); it != m_soundCache.end(); ++it)
+  {
+    if (it->second.sound == sound)
+    {
+      if (--it->second.usage == 0)
+      {
+        if (ae)
+          ae->FreeSound(sound);
         m_soundCache.erase(it);
       }
       return;
@@ -372,9 +377,13 @@ void CGUIAudioManager::FreeSound(IAESound *sound)
 void CGUIAudioManager::FreeSoundAllUsage(IAESound *sound)
 {
   CSingleLock lock(m_cs);
-  for(soundCache::iterator it = m_soundCache.begin(); it != m_soundCache.end(); ++it) {
-    if (it->second.sound == sound) {   
-      CServiceBroker::GetActiveAE().FreeSound(sound);
+  IAE *ae = CServiceBroker::GetActiveAE();
+  for(soundCache::iterator it = m_soundCache.begin(); it != m_soundCache.end(); ++it)
+  {
+    if (it->second.sound == sound)
+    {
+      if (ae)
+       ae->FreeSound(sound);
       m_soundCache.erase(it);
       return;
     }
@@ -398,7 +407,7 @@ IAESound* CGUIAudioManager::LoadWindowSound(TiXmlNode* pWindowNode, const std::s
 void CGUIAudioManager::Enable(bool bEnable)
 {
   // always deinit audio when we don't want gui sounds
-  if (CServiceBroker::GetSettings().GetString(CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN).empty())
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN).empty())
     bEnable = false;
 
   CSingleLock lock(m_cs);

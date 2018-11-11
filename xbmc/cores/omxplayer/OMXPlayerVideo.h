@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <deque>
 #include <sys/types.h>
@@ -59,7 +47,6 @@ protected:
   std::atomic_bool          m_bAbortOutput;
   double                    m_iSubtitleDelay;
   bool                      m_bRenderSubs;
-  bool                      m_bAllowFullscreen;
 
   float                     m_fForcedAspectRatio;
 
@@ -114,10 +101,8 @@ public:
   void SetSubtitleDelay(double delay)               override { m_iSubtitleDelay = delay; }
   void EnableSubtitle(bool bEnable)                 override { m_bRenderSubs = bEnable; }
   bool IsSubtitleEnabled()                          override { return m_bRenderSubs; }
-  void EnableFullscreen(bool bEnable)               override { m_bAllowFullscreen = bEnable; }
   float GetAspectRatio()                                     { return m_renderManager.GetAspectRatio(); }
   void  SetVideoRect(const CRect &SrcRect, const CRect &DestRect);
   void ResolutionUpdateCallBack(uint32_t width, uint32_t height, float framerate, float pixel_aspect);
   static void ResolutionUpdateCallBack(void *ctx, uint32_t width, uint32_t height, float framerate, float pixel_aspect);
 };
-

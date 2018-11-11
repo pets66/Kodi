@@ -1,33 +1,24 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDInputStreamFile.h"
+#include "ServiceBroker.h"
 #include "filesystem/File.h"
 #include "filesystem/IFile.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
 
 using namespace XFILE;
 
-CDVDInputStreamFile::CDVDInputStreamFile(const CFileItem& fileitem) : CDVDInputStream(DVDSTREAM_TYPE_FILE, fileitem)
+CDVDInputStreamFile::CDVDInputStreamFile(const CFileItem& fileitem, unsigned int flags)
+  : CDVDInputStream(DVDSTREAM_TYPE_FILE, fileitem), m_flags(flags)
 {
   m_pFile = NULL;
   m_eof = true;
@@ -52,8 +43,8 @@ bool CDVDInputStreamFile::Open()
   if (!m_pFile)
     return false;
 
-  unsigned int flags = READ_TRUNCATED | READ_BITRATE | READ_CHUNKED;
-  
+  unsigned int flags = m_flags;
+
   // If this file is audio and/or video (= not a subtitle) flag to caller
   if (!m_item.IsSubtitle())
     flags |= READ_AUDIO_VIDEO;
@@ -68,10 +59,11 @@ bool CDVDInputStreamFile::Open()
    */
   if (!URIUtils::IsOnDVD(m_item.GetDynPath()) && !URIUtils::IsBluray(m_item.GetDynPath())) // Never cache these
   {
-    if ((g_advancedSettings.m_cacheBufferMode == CACHE_BUFFER_MODE_INTERNET && URIUtils::IsInternetStream(m_item.GetDynPath(), true))
-     || (g_advancedSettings.m_cacheBufferMode == CACHE_BUFFER_MODE_TRUE_INTERNET && URIUtils::IsInternetStream(m_item.GetDynPath(), false))
-     || (g_advancedSettings.m_cacheBufferMode == CACHE_BUFFER_MODE_REMOTE && URIUtils::IsRemote(m_item.GetDynPath()))
-     || (g_advancedSettings.m_cacheBufferMode == CACHE_BUFFER_MODE_ALL))
+    unsigned int iCacheBufferMode = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cacheBufferMode;
+    if ((iCacheBufferMode == CACHE_BUFFER_MODE_INTERNET && URIUtils::IsInternetStream(m_item.GetDynPath(), true))
+     || (iCacheBufferMode == CACHE_BUFFER_MODE_TRUE_INTERNET && URIUtils::IsInternetStream(m_item.GetDynPath(), false))
+     || (iCacheBufferMode == CACHE_BUFFER_MODE_REMOTE && URIUtils::IsRemote(m_item.GetDynPath()))
+     || (iCacheBufferMode == CACHE_BUFFER_MODE_ALL))
     {
       flags |= READ_CACHED;
     }
@@ -128,7 +120,7 @@ int CDVDInputStreamFile::Read(uint8_t* buf, int buf_size)
     return -1; // player will retry read in case of error until playback is stopped
 
   /* we currently don't support non completing reads */
-  if (ret == 0) 
+  if (ret == 0)
     m_eof = true;
 
   return (int)ret;

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <cstdlib>
@@ -228,7 +216,7 @@ int CDateTimeSpan::GetSecondsTotal() const
 {
   ULARGE_INTEGER time;
   ToULargeInt(time);
-  
+
   return (int)(time.QuadPart/SECONDS_TO_FILETIME);
 }
 
@@ -619,7 +607,7 @@ void CDateTime::Archive(CArchive& ar)
   {
     Reset();
     int state;
-    ar >> (int &)state;
+    ar >> state;
     m_state = CDateTime::STATE(state);
     if (m_state==valid)
     {
@@ -1473,6 +1461,46 @@ std::string CDateTime::GetAsLocalizedDate(const std::string &strFormat) const
 std::string CDateTime::GetAsLocalizedDateTime(bool longDate/*=false*/, bool withSeconds/*=true*/) const
 {
   return GetAsLocalizedDate(longDate) + ' ' + GetAsLocalizedTime("", withSeconds);
+}
+
+std::string CDateTime::GetAsLocalizedTime(TIME_FORMAT format, bool withSeconds /* = false */) const
+{
+  const std::string timeFormat = g_langInfo.GetTimeFormat();
+  bool use12hourclock = timeFormat.find('h') != std::string::npos;
+  switch (format)
+  {
+    case TIME_FORMAT_GUESS:
+      return GetAsLocalizedTime("", withSeconds);
+    case TIME_FORMAT_SS:
+      return GetAsLocalizedTime("ss", true);
+    case TIME_FORMAT_MM:
+      return GetAsLocalizedTime("mm", true);
+    case TIME_FORMAT_MM_SS:
+      return GetAsLocalizedTime("mm:ss", true);
+    case TIME_FORMAT_HH:  // this forces it to a 12 hour clock
+      return GetAsLocalizedTime(use12hourclock ? "h" : "HH", false);
+    case TIME_FORMAT_HH_MM:
+      return GetAsLocalizedTime(use12hourclock ? "h:mm" : "HH:mm", false);
+    case TIME_FORMAT_HH_MM_XX:
+      return GetAsLocalizedTime(use12hourclock ? "h:mm xx" : "HH:mm", false);
+    case TIME_FORMAT_HH_MM_SS:
+      return GetAsLocalizedTime(use12hourclock ? "hh:mm:ss" : "HH:mm:ss", true);
+    case TIME_FORMAT_HH_MM_SS_XX:
+      return GetAsLocalizedTime(use12hourclock ? "hh:mm:ss xx" : "HH:mm:ss", true);
+    case TIME_FORMAT_H:
+      return GetAsLocalizedTime("h", false);
+    case TIME_FORMAT_M:
+      return GetAsLocalizedTime("m", false);
+    case TIME_FORMAT_H_MM_SS:
+      return GetAsLocalizedTime("h:mm:ss", true);
+    case TIME_FORMAT_H_MM_SS_XX:
+      return GetAsLocalizedTime("h:mm:ss xx", true);
+    case TIME_FORMAT_XX:
+      return use12hourclock ? GetAsLocalizedTime("xx", false) : "";
+    default:
+      break;
+  }
+  return GetAsLocalizedTime("", false);
 }
 
 CDateTime CDateTime::GetAsUTCDateTime() const

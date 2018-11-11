@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2014 Team XBMC
- *      http://www.xbmc.org
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <set>
 #include <vector>
@@ -105,10 +94,10 @@ protected:
   virtual std::shared_ptr<CSetting> GetSetting(const std::string &settingId) = 0;
   virtual unsigned int GetDelayMs() const { return 1500; }
   virtual std::string GetLocalizedString(uint32_t labelId) const;
-  
+
   virtual void OnOkay() { m_confirmed = true; }
   virtual void OnCancel() { }
-  
+
   virtual void SetupView();
   virtual std::set<std::string> CreateSettings();
   virtual void UpdateSettings();
@@ -127,7 +116,7 @@ protected:
 
   virtual CGUIControl* AddSetting(std::shared_ptr<CSetting> pSetting, float width, int &iControlID);
   virtual CGUIControl* AddSettingControl(CGUIControl *pControl, BaseSettingControlPtr pSettingControl, float width, int &iControlID);
-  
+
   virtual void SetupControls(bool createSettings = true);
   virtual void FreeControls();
   virtual void DeleteControls();
@@ -137,7 +126,7 @@ protected:
   virtual void SetDescription(const CVariant &label);
 
   virtual void OnResetSettings();
-  
+
   /*!
     \brief A setting control has been interacted with by the user
 
@@ -157,18 +146,18 @@ protected:
 
   BaseSettingControlPtr GetSettingControl(const std::string &setting);
   BaseSettingControlPtr GetSettingControl(int controlId);
-  
+
   CGUIControl* AddSeparator(float width, int &iControlID);
   CGUIControl* AddGroupLabel(std::shared_ptr<CSettingGroup> group, float width, int &iControlID);
 
   std::vector<std::shared_ptr<CSettingCategory>> m_categories;
   std::vector<BaseSettingControlPtr> m_settingControls;
-  
+
   int m_iSetting;
   int m_iCategory;
   std::shared_ptr<CSettingAction> m_resetSetting;
   std::shared_ptr<CSettingCategory> m_dummyCategory;
-  
+
   CGUISpinControlEx *m_pOriginalSpin;
   CGUISettingsSliderControl *m_pOriginalSlider;
   CGUIRadioButtonControl *m_pOriginalRadioButton;
@@ -178,7 +167,7 @@ protected:
   CGUIImage *m_pOriginalImage;
   CGUILabelControl *m_pOriginalGroupTitle;
   bool m_newOriginalEdit;
-  
+
   BaseSettingControlPtr m_delayedSetting; ///< Current delayed setting \sa CBaseSettingControl::SetDelayed()
   CTimer m_delayedTimer;                  ///< Delayed setting timer
 

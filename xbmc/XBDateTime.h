@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "utils/IArchivable.h"
 #include "PlatformDefs.h"
@@ -45,7 +33,8 @@ enum TIME_FORMAT { TIME_FORMAT_GUESS       =  0,
                    TIME_FORMAT_H_MM_SS_XX  = 27,
                    TIME_FORMAT_SECS        = 32,
                    TIME_FORMAT_MINS        = 64,
-                   TIME_FORMAT_HOURS       = 128 };
+                   TIME_FORMAT_HOURS       = 128,
+                   TIME_FORMAT_M           = 256 };
 
 class CDateTime;
 
@@ -90,7 +79,7 @@ private:
 };
 
 /// \brief DateTime class, which uses FILETIME as it's base.
-class CDateTime : public IArchivable
+class CDateTime final : public IArchivable
 {
 public:
   CDateTime();
@@ -100,7 +89,6 @@ public:
   explicit CDateTime(const time_t& time);
   explicit CDateTime(const tm& time);
   CDateTime(int year, int month, int day, int hour, int minute, int second);
-  ~CDateTime() override = default;
 
   static CDateTime GetCurrentDateTime();
   static CDateTime GetUTCDateTime();
@@ -211,6 +199,7 @@ public:
   std::string GetAsLocalizedDate(const std::string &strFormat) const;
   std::string GetAsLocalizedTime(const std::string &format, bool withSeconds=true) const;
   std::string GetAsLocalizedDateTime(bool longDate=false, bool withSeconds=true) const;
+  std::string GetAsLocalizedTime(TIME_FORMAT format, bool withSeconds = false) const;
   std::string GetAsRFC1123DateTime() const;
   std::string GetAsW3CDate() const;
   std::string GetAsW3CDateTime(bool asUtc = false) const;

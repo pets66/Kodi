@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Settings.h"
@@ -25,17 +13,15 @@
 #include "Util.h"
 #include "addons/AddonSystemSettings.h"
 #include "addons/Skin.h"
-#include "cores/playercorefactory/PlayerCoreFactory.h"
 #include "cores/VideoPlayer/VideoRenderers/BaseRenderer.h"
 #include "filesystem/File.h"
-#include "guilib/GUIAudioManager.h"
 #include "guilib/GUIFontManager.h"
 #include "guilib/StereoscopicsManager.h"
+#include "GUIPassword.h"
 #include "input/KeyboardLayoutManager.h"
 #if defined(TARGET_POSIX)
 #include "platform/linux/LinuxTimezone.h"
 #endif // defined(TARGET_POSIX)
-#include "network/NetworkServices.h"
 #include "network/upnp/UPnPSettings.h"
 #include "network/WakeOnAccess.h"
 #if defined(TARGET_DARWIN_OSX)
@@ -53,16 +39,14 @@
 #if defined(HAS_LIBAMCODEC)
 #include "utils/AMLUtils.h"
 #endif // defined(HAS_LIBAMCODEC)
-#include "powermanagement/PowerManager.h"
-#include "profiles/ProfilesManager.h"
-#include "pvr/PVRSettings.h"
-#include "pvr/windows/GUIWindowPVRGuide.h"
-#include "settings/AdvancedSettings.h"
+#include "powermanagement/PowerTypes.h"
+#include "profiles/ProfileManager.h"
+#include "ServiceBroker.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/MediaSourceSettings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/SettingConditions.h"
-#include "settings/SettingUtils.h"
 #include "settings/SkinSettings.h"
 #include "settings/lib/SettingsManager.h"
 #include "threads/SingleLock.h"
@@ -75,7 +59,6 @@
 #include "SeekHandler.h"
 #include "utils/Variant.h"
 #include "view/ViewStateSettings.h"
-#include "ServiceBroker.h"
 #include "DiscSettings.h"
 
 #define SETTINGS_XML_FOLDER "special://xbmc/system/settings/"
@@ -163,11 +146,6 @@ const std::string CSettings::SETTING_VIDEOPLAYER_USEVDPAUMIXER = "videoplayer.us
 const std::string CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG2 = "videoplayer.usevdpaumpeg2";
 const std::string CSettings::SETTING_VIDEOPLAYER_USEVDPAUMPEG4 = "videoplayer.usevdpaumpeg4";
 const std::string CSettings::SETTING_VIDEOPLAYER_USEVDPAUVC1 = "videoplayer.usevdpauvc1";
-const std::string CSettings::SETTING_VIDEOPLAYER_USEVAAPI = "videoplayer.usevaapi";
-const std::string CSettings::SETTING_VIDEOPLAYER_USEVAAPIMPEG2 = "videoplayer.usevaapimpeg2";
-const std::string CSettings::SETTING_VIDEOPLAYER_USEVAAPIMPEG4 = "videoplayer.usevaapimpeg4";
-const std::string CSettings::SETTING_VIDEOPLAYER_USEVAAPIVC1 = "videoplayer.usevaapivc1";
-const std::string CSettings::SETTING_VIDEOPLAYER_PREFERVAAPIRENDER = "videoplayer.prefervaapirender";
 const std::string CSettings::SETTING_VIDEOPLAYER_USEDXVA2 = "videoplayer.usedxva2";
 const std::string CSettings::SETTING_VIDEOPLAYER_USEOMXPLAYER = "videoplayer.useomxplayer";
 const std::string CSettings::SETTING_VIDEOPLAYER_USEVTB = "videoplayer.usevtb";
@@ -191,6 +169,8 @@ const std::string CSettings::SETTING_SUBTITLES_FONT = "subtitles.font";
 const std::string CSettings::SETTING_SUBTITLES_HEIGHT = "subtitles.height";
 const std::string CSettings::SETTING_SUBTITLES_STYLE = "subtitles.style";
 const std::string CSettings::SETTING_SUBTITLES_COLOR = "subtitles.color";
+const std::string CSettings::SETTING_SUBTITLES_BGCOLOR = "subtitles.bgcolor";
+const std::string CSettings::SETTING_SUBTITLES_BGOPACITY = "subtitles.bgopacity";
 const std::string CSettings::SETTING_SUBTITLES_CHARSET = "subtitles.charset";
 const std::string CSettings::SETTING_SUBTITLES_OVERRIDEASSFONTS = "subtitles.overrideassfonts";
 const std::string CSettings::SETTING_SUBTITLES_LANGUAGES = "subtitles.languages";
@@ -235,6 +215,7 @@ const std::string CSettings::SETTING_PVRPLAYBACK_SWITCHTOFULLSCREEN = "pvrplayba
 const std::string CSettings::SETTING_PVRPLAYBACK_SIGNALQUALITY = "pvrplayback.signalquality";
 const std::string CSettings::SETTING_PVRPLAYBACK_CONFIRMCHANNELSWITCH = "pvrplayback.confirmchannelswitch";
 const std::string CSettings::SETTING_PVRPLAYBACK_CHANNELENTRYTIMEOUT = "pvrplayback.channelentrytimeout";
+const std::string CSettings::SETTING_PVRPLAYBACK_DELAYMARKLASTWATCHED = "pvrplayback.delaymarklastwatched";
 const std::string CSettings::SETTING_PVRPLAYBACK_FPS = "pvrplayback.fps";
 const std::string CSettings::SETTING_PVRRECORD_INSTANTRECORDACTION = "pvrrecord.instantrecordaction";
 const std::string CSettings::SETTING_PVRRECORD_INSTANTRECORDTIME = "pvrrecord.instantrecordtime";
@@ -254,8 +235,10 @@ const std::string CSettings::SETTING_PVRPARENTAL_DURATION = "pvrparental.duratio
 const std::string CSettings::SETTING_PVRCLIENT_MENUHOOK = "pvrclient.menuhook";
 const std::string CSettings::SETTING_PVRTIMERS_HIDEDISABLEDTIMERS = "pvrtimers.hidedisabledtimers";
 const std::string CSettings::SETTING_MUSICLIBRARY_SHOWCOMPILATIONARTISTS = "musiclibrary.showcompilationartists";
+const std::string CSettings::SETTING_MUSICLIBRARY_USEARTISTSORTNAME = "musiclibrary.useartistsortname";
 const std::string CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO = "musiclibrary.downloadinfo";
 const std::string CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER = "musiclibrary.artistsfolder";
+const std::string CSettings::SETTING_MUSICLIBRARY_PREFERONLINEALBUMART = "musiclibrary.preferonlinealbumart";
 const std::string CSettings::SETTING_MUSICLIBRARY_ALBUMSSCRAPER = "musiclibrary.albumsscraper";
 const std::string CSettings::SETTING_MUSICLIBRARY_ARTISTSSCRAPER = "musiclibrary.artistsscraper";
 const std::string CSettings::SETTING_MUSICLIBRARY_OVERRIDETAGS = "musiclibrary.overridetags";
@@ -309,6 +292,7 @@ const std::string CSettings::SETTING_WEATHER_CURRENTLOCATION = "weather.currentl
 const std::string CSettings::SETTING_WEATHER_ADDON = "weather.addon";
 const std::string CSettings::SETTING_WEATHER_ADDONSETTINGS = "weather.addonsettings";
 const std::string CSettings::SETTING_SERVICES_DEVICENAME = "services.devicename";
+const std::string CSettings::SETTING_SERVICES_DEVICEUUID = "services.deviceuuid";
 const std::string CSettings::SETTING_SERVICES_UPNP = "services.upnp";
 const std::string CSettings::SETTING_SERVICES_UPNPSERVER = "services.upnpserver";
 const std::string CSettings::SETTING_SERVICES_UPNPANNOUNCE = "services.upnpannounce";
@@ -341,6 +325,7 @@ const std::string CSettings::SETTING_SMB_MAXPROTOCOL = "smb.maxprotocol";
 const std::string CSettings::SETTING_SMB_LEGACYSECURITY = "smb.legacysecurity";
 const std::string CSettings::SETTING_VIDEOSCREEN_MONITOR = "videoscreen.monitor";
 const std::string CSettings::SETTING_VIDEOSCREEN_SCREEN = "videoscreen.screen";
+const std::string CSettings::SETTING_VIDEOSCREEN_WHITELIST = "videoscreen.whitelist";
 const std::string CSettings::SETTING_VIDEOSCREEN_RESOLUTION = "videoscreen.resolution";
 const std::string CSettings::SETTING_VIDEOSCREEN_SCREENMODE = "videoscreen.screenmode";
 const std::string CSettings::SETTING_VIDEOSCREEN_FAKEFULLSCREEN = "videoscreen.fakefullscreen";
@@ -364,9 +349,6 @@ const std::string CSettings::SETTING_AUDIOOUTPUT_PROCESSQUALITY = "audiooutput.p
 const std::string CSettings::SETTING_AUDIOOUTPUT_ATEMPOTHRESHOLD = "audiooutput.atempothreshold";
 const std::string CSettings::SETTING_AUDIOOUTPUT_STREAMSILENCE = "audiooutput.streamsilence";
 const std::string CSettings::SETTING_AUDIOOUTPUT_STREAMNOISE = "audiooutput.streamnoise";
-const std::string CSettings::SETTING_AUDIOOUTPUT_DSPADDONSENABLED = "audiooutput.dspaddonsenabled";
-const std::string CSettings::SETTING_AUDIOOUTPUT_DSPSETTINGS = "audiooutput.dspsettings";
-const std::string CSettings::SETTING_AUDIOOUTPUT_DSPRESETDB = "audiooutput.dspresetdb";
 const std::string CSettings::SETTING_AUDIOOUTPUT_GUISOUNDMODE = "audiooutput.guisoundmode";
 const std::string CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH = "audiooutput.passthrough";
 const std::string CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGHDEVICE = "audiooutput.passthroughdevice";
@@ -431,9 +413,6 @@ const std::string CSettings::SETTING_GENERAL_ADDONBROKENFILTER = "general.addonb
 const std::string CSettings::SETTING_SOURCE_VIDEOS = "source.videos";
 const std::string CSettings::SETTING_SOURCE_MUSIC = "source.music";
 const std::string CSettings::SETTING_SOURCE_PICTURES = "source.pictures";
-const std::string CSettings::SETTING_GAMES_ENABLE = "gamesgeneral.enable";
-const std::string CSettings::SETTING_GAMES_ENABLEREWIND = "gamesgeneral.enablerewind";
-const std::string CSettings::SETTING_GAMES_REWINDTIME = "gamesgeneral.rewindtime";
 
 bool CSettings::Initialize()
 {
@@ -468,9 +447,9 @@ bool CSettings::Initialize()
 
 bool CSettings::Load()
 {
-  const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
+  const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
-  return Load(profileManager.GetSettingsFile());
+  return Load(profileManager->GetSettingsFile());
 }
 
 bool CSettings::Load(const std::string &file)
@@ -496,9 +475,9 @@ bool CSettings::Load(const std::string &file)
 
 bool CSettings::Save()
 {
-  const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
+  const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
-  return Save(profileManager.GetSettingsFile());
+  return Save(profileManager->GetSettingsFile());
 }
 
 bool CSettings::Save(const std::string &file)
@@ -664,6 +643,14 @@ void CSettings::InitializeDefaults()
 
   if (g_application.IsStandAlone())
     std::static_pointer_cast<CSettingInt>(GetSettingsManager()->GetSetting(CSettings::SETTING_POWERMANAGEMENT_SHUTDOWNSTATE))->SetDefault(POWERSTATE_SHUTDOWN);
+
+  // Initialize deviceUUID if not already set, used in zeroconf advertisements.
+  std::shared_ptr<CSettingString> deviceUUID = std::static_pointer_cast<CSettingString>(GetSettingsManager()->GetSetting(CSettings::SETTING_SERVICES_DEVICEUUID));
+  if (deviceUUID->GetValue().empty())
+  {
+    const std::string& uuid = StringUtils::CreateUUID();
+    std::static_pointer_cast<CSettingString>(GetSettingsManager()->GetSetting(CSettings::SETTING_SERVICES_DEVICEUUID))->SetValue(uuid);
+  }
 }
 
 void CSettings::InitializeOptionFillers()
@@ -685,8 +672,9 @@ void CSettings::InitializeOptionFillers()
   GetSettingsManager()->RegisterSettingOptionsFiller("speedunits", CLangInfo::SettingOptionsSpeedUnitsFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("temperatureunits", CLangInfo::SettingOptionsTemperatureUnitsFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("rendermethods", CBaseRenderer::SettingOptionsRenderMethodsFiller);
+  GetSettingsManager()->RegisterSettingOptionsFiller("modes", CDisplaySettings::SettingOptionsModesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("resolutions", CDisplaySettings::SettingOptionsResolutionsFiller);
-  GetSettingsManager()->RegisterSettingOptionsFiller("screens", CDisplaySettings::SettingOptionsScreensFiller);
+  GetSettingsManager()->RegisterSettingOptionsFiller("screens", CDisplaySettings::SettingOptionsDispModeFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("stereoscopicmodes", CDisplaySettings::SettingOptionsStereoscopicModesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("preferedstereoscopicviewmodes", CDisplaySettings::SettingOptionsPreferredStereoscopicViewModesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("monitors", CDisplaySettings::SettingOptionsMonitorsFiller);
@@ -695,7 +683,6 @@ void CSettings::InitializeOptionFillers()
   GetSettingsManager()->RegisterSettingOptionsFiller("cmsprimaries", CDisplaySettings::SettingOptionsCmsPrimariesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("cmsgammamodes", CDisplaySettings::SettingOptionsCmsGammaModesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("videoseeksteps", CSeekHandler::SettingOptionsSeekStepsFiller);
-  GetSettingsManager()->RegisterSettingOptionsFiller("shutdownstates", CPowerManager::SettingOptionsShutdownStatesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("startupwindows", ADDON::CSkinInfo::SettingOptionsStartupWindowsFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("audiostreamlanguages", CLangInfo::SettingOptionsAudioStreamLanguagesFiller);
   GetSettingsManager()->RegisterSettingOptionsFiller("subtitlestreamlanguages", CLangInfo::SettingOptionsSubtitleStreamLanguagesFiller);
@@ -709,8 +696,6 @@ void CSettings::InitializeOptionFillers()
   GetSettingsManager()->RegisterSettingOptionsFiller("timezones", CLinuxTimezone::SettingOptionsTimezonesFiller);
 #endif
   GetSettingsManager()->RegisterSettingOptionsFiller("keyboardlayouts", CKeyboardLayoutManager::SettingOptionsKeyboardLayoutsFiller);
-  GetSettingsManager()->RegisterSettingOptionsFiller("loggingcomponents", CAdvancedSettings::SettingOptionsLoggingComponentsFiller);
-  GetSettingsManager()->RegisterSettingOptionsFiller("pvrrecordmargins", PVR::CPVRSettings::MarginTimeFiller);
 }
 
 void CSettings::UninitializeOptionFillers()
@@ -756,14 +741,11 @@ void CSettings::UninitializeOptionFillers()
 #endif // defined(TARGET_LINUX)
   GetSettingsManager()->UnregisterSettingOptionsFiller("verticalsyncs");
   GetSettingsManager()->UnregisterSettingOptionsFiller("keyboardlayouts");
-  GetSettingsManager()->UnregisterSettingOptionsFiller("pvrrecordmargins");
 }
 
 void CSettings::InitializeConditions()
 {
-  const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
-
-  CSettingConditions::Initialize(profileManager);
+  CSettingConditions::Initialize();
 
   // add basic conditions
   const std::set<std::string> &simpleConditions = CSettingConditions::GetSimpleConditions();
@@ -773,7 +755,7 @@ void CSettings::InitializeConditions()
   // add more complex conditions
   const std::map<std::string, SettingConditionCheck> &complexConditions = CSettingConditions::GetComplexConditions();
   for (std::map<std::string, SettingConditionCheck>::const_iterator itCondition = complexConditions.begin(); itCondition != complexConditions.end(); ++itCondition)
-    GetSettingsManager()->AddCondition(itCondition->first, itCondition->second);
+    GetSettingsManager()->AddDynamicCondition(itCondition->first, itCondition->second);
 }
 
 void CSettings::UninitializeConditions()
@@ -785,7 +767,6 @@ void CSettings::InitializeISettingsHandlers()
 {
   // register ISettingsHandler implementations
   // The order of these matters! Handlers are processed in the order they were registered.
-  GetSettingsManager()->RegisterSettingsHandler(&g_advancedSettings);
   GetSettingsManager()->RegisterSettingsHandler(&CMediaSourceSettings::GetInstance());
 #ifdef HAS_UPNP
   GetSettingsManager()->RegisterSettingsHandler(&CUPnPSettings::GetInstance());
@@ -802,26 +783,19 @@ void CSettings::InitializeISettingsHandlers()
 
 void CSettings::UninitializeISettingsHandlers()
 {
-  // unregister ISettingCallback implementations
-  GetSettingsManager()->UnregisterCallback(&g_advancedSettings);
-  GetSettingsManager()->UnregisterCallback(&CMediaSettings::GetInstance());
-  GetSettingsManager()->UnregisterCallback(&CDisplaySettings::GetInstance());
-  GetSettingsManager()->UnregisterCallback(&g_application.GetAppPlayer().GetSeekHandler());
-  GetSettingsManager()->UnregisterCallback(&CStereoscopicsManager::GetInstance());
-  GetSettingsManager()->UnregisterCallback(&g_application);
-  GetSettingsManager()->UnregisterCallback(&g_audioManager);
-  GetSettingsManager()->UnregisterCallback(&g_charsetConverter);
-  GetSettingsManager()->UnregisterCallback(&g_langInfo);
-  GetSettingsManager()->UnregisterCallback(&CNetworkServices::GetInstance());
-  GetSettingsManager()->UnregisterCallback(&g_passwordManager);
-  GetSettingsManager()->UnregisterCallback(&CRssManager::GetInstance());
+  // unregister ISettingsHandler implementations
+  GetSettingsManager()->UnregisterSettingsHandler(&CMediaSettings::GetInstance());
 #if defined(TARGET_LINUX)
-  GetSettingsManager()->UnregisterCallback(&g_timezone);
+  GetSettingsManager()->UnregisterSettingsHandler(&g_timezone);
 #endif // defined(TARGET_LINUX)
-#if defined(TARGET_DARWIN_OSX)
-  GetSettingsManager()->UnregisterCallback(&XBMCHelper::GetInstance());
+  GetSettingsManager()->UnregisterSettingsHandler(&g_application);
+  GetSettingsManager()->UnregisterSettingsHandler(&g_langInfo);
+  GetSettingsManager()->UnregisterSettingsHandler(&CRssManager::GetInstance());
+  GetSettingsManager()->UnregisterSettingsHandler(&CWakeOnAccess::GetInstance());
+#ifdef HAS_UPNP
+  GetSettingsManager()->UnregisterSettingsHandler(&CUPnPSettings::GetInstance());
 #endif
-  GetSettingsManager()->UnregisterCallback(&CWakeOnAccess::GetInstance());
+  GetSettingsManager()->UnregisterSettingsHandler(&CMediaSourceSettings::GetInstance());
 }
 
 void CSettings::InitializeISubSettings()
@@ -850,12 +824,6 @@ void CSettings::InitializeISettingCallbacks()
 {
   // register any ISettingCallback implementations
   std::set<std::string> settingSet;
-  settingSet.insert(CSettings::SETTING_DEBUG_SHOWLOGINFO);
-  settingSet.insert(CSettings::SETTING_DEBUG_EXTRALOGGING);
-  settingSet.insert(CSettings::SETTING_DEBUG_SETEXTRALOGLEVEL);
-  GetSettingsManager()->RegisterCallback(&g_advancedSettings, settingSet);
-
-  settingSet.clear();
   settingSet.insert(CSettings::SETTING_MUSICLIBRARY_CLEANUP);
   settingSet.insert(CSettings::SETTING_MUSICLIBRARY_EXPORT);
   settingSet.insert(CSettings::SETTING_MUSICLIBRARY_IMPORT);
@@ -883,10 +851,6 @@ void CSettings::InitializeISettingCallbacks()
   settingSet.insert(CSettings::SETTING_MUSICPLAYER_SEEKDELAY);
   settingSet.insert(CSettings::SETTING_MUSICPLAYER_SEEKSTEPS);
   GetSettingsManager()->RegisterCallback(&g_application.GetAppPlayer().GetSeekHandler(), settingSet);
-
-  settingSet.clear();
-  settingSet.insert(CSettings::SETTING_VIDEOSCREEN_STEREOSCOPICMODE);
-  GetSettingsManager()->RegisterCallback(&CStereoscopicsManager::GetInstance(), settingSet);
 
   settingSet.clear();
   settingSet.insert(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH);
@@ -918,10 +882,6 @@ void CSettings::InitializeISettingCallbacks()
   GetSettingsManager()->RegisterCallback(&g_application, settingSet);
 
   settingSet.clear();
-  settingSet.insert(CSettings::SETTING_LOOKANDFEEL_SOUNDSKIN);
-  GetSettingsManager()->RegisterCallback(&g_audioManager, settingSet);
-
-  settingSet.clear();
   settingSet.insert(CSettings::SETTING_SUBTITLES_CHARSET);
   settingSet.insert(CSettings::SETTING_LOCALE_CHARSET);
   GetSettingsManager()->RegisterCallback(&g_charsetConverter, settingSet);
@@ -938,34 +898,6 @@ void CSettings::InitializeISettingCallbacks()
   settingSet.insert(CSettings::SETTING_LOCALE_TEMPERATUREUNIT);
   settingSet.insert(CSettings::SETTING_LOCALE_SPEEDUNIT);
   GetSettingsManager()->RegisterCallback(&g_langInfo, settingSet);
-
-  settingSet.clear();
-  settingSet.insert(CSettings::SETTING_SERVICES_WEBSERVER);
-  settingSet.insert(CSettings::SETTING_SERVICES_WEBSERVERPORT);
-  settingSet.insert(CSettings::SETTING_SERVICES_WEBSERVERUSERNAME);
-  settingSet.insert(CSettings::SETTING_SERVICES_WEBSERVERPASSWORD);
-  settingSet.insert(CSettings::SETTING_SERVICES_WEBSERVERSSL);
-  settingSet.insert(CSettings::SETTING_SERVICES_ZEROCONF);
-  settingSet.insert(CSettings::SETTING_SERVICES_AIRPLAY);
-  settingSet.insert(CSettings::SETTING_SERVICES_AIRPLAYVOLUMECONTROL);
-  settingSet.insert(CSettings::SETTING_SERVICES_AIRPLAYVIDEOSUPPORT);
-  settingSet.insert(CSettings::SETTING_SERVICES_USEAIRPLAYPASSWORD);
-  settingSet.insert(CSettings::SETTING_SERVICES_AIRPLAYPASSWORD);
-  settingSet.insert(CSettings::SETTING_SERVICES_UPNP);
-  settingSet.insert(CSettings::SETTING_SERVICES_UPNPSERVER);
-  settingSet.insert(CSettings::SETTING_SERVICES_UPNPRENDERER);
-  settingSet.insert(CSettings::SETTING_SERVICES_UPNPCONTROLLER);
-  settingSet.insert(CSettings::SETTING_SERVICES_ESENABLED);
-  settingSet.insert(CSettings::SETTING_SERVICES_ESPORT);
-  settingSet.insert(CSettings::SETTING_SERVICES_ESALLINTERFACES);
-  settingSet.insert(CSettings::SETTING_SERVICES_ESINITIALDELAY);
-  settingSet.insert(CSettings::SETTING_SERVICES_ESCONTINUOUSDELAY);
-  settingSet.insert(CSettings::SETTING_SMB_WINSSERVER);
-  settingSet.insert(CSettings::SETTING_SMB_WORKGROUP);
-  settingSet.insert(CSettings::SETTING_SMB_MINPROTOCOL);
-  settingSet.insert(CSettings::SETTING_SMB_MAXPROTOCOL);
-  settingSet.insert(CSettings::SETTING_SMB_LEGACYSECURITY);
-  GetSettingsManager()->RegisterCallback(&CNetworkServices::GetInstance(), settingSet);
 
   settingSet.clear();
   settingSet.insert(CSettings::SETTING_MASTERLOCK_LOCKCODE);
@@ -1008,16 +940,12 @@ void CSettings::InitializeISettingCallbacks()
 
 void CSettings::UninitializeISettingCallbacks()
 {
-  GetSettingsManager()->UnregisterCallback(&g_advancedSettings);
   GetSettingsManager()->UnregisterCallback(&CMediaSettings::GetInstance());
   GetSettingsManager()->UnregisterCallback(&CDisplaySettings::GetInstance());
   GetSettingsManager()->UnregisterCallback(&g_application.GetAppPlayer().GetSeekHandler());
-  GetSettingsManager()->UnregisterCallback(&CStereoscopicsManager::GetInstance());
   GetSettingsManager()->UnregisterCallback(&g_application);
-  GetSettingsManager()->UnregisterCallback(&g_audioManager);
   GetSettingsManager()->UnregisterCallback(&g_charsetConverter);
   GetSettingsManager()->UnregisterCallback(&g_langInfo);
-  GetSettingsManager()->UnregisterCallback(&CNetworkServices::GetInstance());
   GetSettingsManager()->UnregisterCallback(&g_passwordManager);
   GetSettingsManager()->UnregisterCallback(&CRssManager::GetInstance());
 #if defined(TARGET_LINUX)
@@ -1034,9 +962,9 @@ void CSettings::UninitializeISettingCallbacks()
 
 bool CSettings::Reset()
 {
-  const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
+  const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
-  std::string settingsFile = profileManager.GetSettingsFile();
+  const std::string settingsFile = profileManager->GetSettingsFile();
 
   // try to delete the settings file
   if (XFILE::CFile::Exists(settingsFile, false) && !XFILE::CFile::Delete(settingsFile))

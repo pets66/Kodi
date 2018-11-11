@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 // python.h should always be included first before any other includes
@@ -24,7 +12,6 @@
 #include <algorithm>
 
 #include "cores/DllLoader/DllLoaderContainer.h"
-#include "GUIPassword.h"
 #include "XBPython.h"
 #include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
@@ -37,6 +24,7 @@
 #include "utils/SystemInfo.h"
 #endif
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 
 #include "threads/SystemClock.h"
 #include "interfaces/AnnouncementManager.h"
@@ -45,8 +33,7 @@
 #include "interfaces/legacy/AddonUtils.h"
 #include "interfaces/python/AddonPythonInvoker.h"
 #include "interfaces/python/PythonInvoker.h"
-
-using namespace ANNOUNCEMENT;
+#include "ServiceBroker.h"
 
 XBPython::XBPython()
 {
@@ -59,13 +46,13 @@ XBPython::XBPython()
   m_vecPlayerCallbackList.clear();
   m_vecMonitorCallbackList.clear();
 
-  CAnnouncementManager::GetInstance().AddAnnouncer(this);
+  CServiceBroker::GetAnnouncementManager()->AddAnnouncer(this);
 }
 
 XBPython::~XBPython()
 {
   XBMC_TRACE;
-  CAnnouncementManager::GetInstance().RemoveAnnouncer(this);
+  CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
 }
 
 #define LOCK_AND_COPY(type, dest, src) \
@@ -78,9 +65,9 @@ XBPython::~XBPython()
 #define CHECK_FOR_ENTRY(l,v) \
   (l.hadSomethingRemoved ? (std::find(l.begin(),l.end(),v) != l.end()) : true)
 
-void XBPython::Announce(AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
+void XBPython::Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data)
 {
-  if (flag & VideoLibrary)
+  if (flag & ANNOUNCEMENT::VideoLibrary)
   {
    if (strcmp(message, "OnScanFinished") == 0)
      OnScanFinished("video");
@@ -91,7 +78,7 @@ void XBPython::Announce(AnnouncementFlag flag, const char *sender, const char *m
    else if (strcmp(message, "OnCleanFinished") == 0)
      OnCleanFinished("video");
   }
-  else if (flag & AudioLibrary)
+  else if (flag & ANNOUNCEMENT::AudioLibrary)
   {
    if (strcmp(message, "OnScanFinished") == 0)
      OnScanFinished("music");
@@ -102,7 +89,7 @@ void XBPython::Announce(AnnouncementFlag flag, const char *sender, const char *m
    else if (strcmp(message, "OnCleanFinished") == 0)
      OnCleanFinished("music");
   }
-  else if (flag & GUI)
+  else if (flag & ANNOUNCEMENT::GUI)
   {
    if (strcmp(message, "OnScreensaverDeactivated") == 0)
      OnScreensaverDeactivated();
@@ -115,7 +102,7 @@ void XBPython::Announce(AnnouncementFlag flag, const char *sender, const char *m
   }
 
   std::string jsonData;
-  if (CJSONVariantWriter::Write(data, jsonData, g_advancedSettings.m_jsonOutputCompact))
+  if (CJSONVariantWriter::Write(data, jsonData, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_jsonOutputCompact))
     OnNotification(sender, std::string(ANNOUNCEMENT::AnnouncementFlagToString(flag)) + "." + std::string(message), jsonData);
 }
 
@@ -128,6 +115,30 @@ void XBPython::OnPlayBackStarted(const CFileItem &file)
   {
     if (CHECK_FOR_ENTRY(m_vecPlayerCallbackList,(*it)))
       ((IPlayerCallback*)(*it))->OnPlayBackStarted(file);
+  }
+}
+
+// message all registered callbacks that we changed stream
+void XBPython::OnAVStarted(const CFileItem &file)
+{
+  XBMC_TRACE;
+  LOCK_AND_COPY(std::vector<void*>, tmp, m_vecPlayerCallbackList);
+  for (PlayerCallbackList::iterator it = tmp.begin(); (it != tmp.end()); ++it)
+  {
+    if (CHECK_FOR_ENTRY(m_vecPlayerCallbackList, (*it)))
+      ((IPlayerCallback*)(*it))->OnAVStarted(file);
+  }
+}
+
+// message all registered callbacks that we changed stream
+void XBPython::OnAVChange()
+{
+  XBMC_TRACE;
+  LOCK_AND_COPY(std::vector<void*>, tmp, m_vecPlayerCallbackList);
+  for (PlayerCallbackList::iterator it = tmp.begin(); (it != tmp.end()); ++it)
+  {
+    if (CHECK_FOR_ENTRY(m_vecPlayerCallbackList, (*it)))
+      ((IPlayerCallback*)(*it))->OnAVChange();
   }
 }
 
@@ -500,7 +511,7 @@ void XBPython::Uninitialize()
   // don't handle any more announcements as most scripts are probably already
   // stopped and executing a callback on one of their already destroyed classes
   // would lead to a crash
-  CAnnouncementManager::GetInstance().RemoveAnnouncer(this);
+  CServiceBroker::GetAnnouncementManager()->RemoveAnnouncer(this);
 
   LOCK_AND_COPY(std::vector<PyElem>,tmpvec,m_vecPyList);
   m_vecPyList.clear();
@@ -621,8 +632,9 @@ bool XBPython::OnScriptInitialized(ILanguageInvoker *invoker)
     // lock already exists and we need to lock it as PyEval_InitThreads
     // would not do that in that case.
     PyEval_AcquireLock();
-    char* python_argv[1] = { (char*)"" };
-    PySys_SetArgv(1, python_argv);
+    const char* python_argv[1] = { "" };
+    //! @bug libpython isn't const correct
+    PySys_SetArgv(1, const_cast<char**>(python_argv));
 
     if (!(m_mainThreadState = PyThreadState_Get()))
       CLog::Log(LOGERROR, "Python threadstate is NULL.");
@@ -669,7 +681,7 @@ void XBPython::OnScriptAbortRequested(ILanguageInvoker *invoker)
   }
 }
 
-void XBPython::OnScriptEnded(ILanguageInvoker *invoker)
+void XBPython::OnExecutionEnded(ILanguageInvoker *invoker)
 {
   CSingleLock lock(m_vecPyList);
   PyList::iterator it = m_vecPyList.begin();
@@ -678,9 +690,9 @@ void XBPython::OnScriptEnded(ILanguageInvoker *invoker)
     if (it->id == invoker->GetId())
     {
       if (it->pyThread->IsStopping())
-        CLog::Log(LOGINFO, "Python script interrupted by user");
+        CLog::Log(LOGINFO, "Python interpreter interrupted by user");
       else
-        CLog::Log(LOGINFO, "Python script stopped");
+        CLog::Log(LOGINFO, "Python interpreter stopped");
       it->bDone = true;
     }
     ++it;

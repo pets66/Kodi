@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "cores/AudioEngine/Interfaces/AESink.h"
 #include "cores/AudioEngine/Utils/AEDeviceInfo.h"
@@ -53,20 +42,20 @@ public:
   static IAESink* Create(std::string &device, AEAudioFormat &desiredFormat);
 
 protected:
-  jni::CJNIAudioTrack *CreateAudioTrack(int stream, int sampleRate, int channelMask, int encoding, int bufferSize);
+  static jni::CJNIAudioTrack *CreateAudioTrack(int stream, int sampleRate, int channelMask, int encoding, int bufferSize);
   static bool IsSupported(int sampleRateInHz, int channelConfig, int audioFormat);
   static bool VerifySinkConfiguration(int sampleRate, int channelMask, int encoding);
   static bool HasAmlHD();
   static void UpdateAvailablePCMCapabilities();
   static void UpdateAvailablePassthroughCapabilities();
-  
+
   int AudioTrackWrite(char* audioData, int offsetInBytes, int sizeInBytes);
   int AudioTrackWrite(char* audioData, int sizeInBytes, int64_t timestamp);
 
 private:
   jni::CJNIAudioTrack  *m_at_jni;
   int     m_jniAudioFormat;
-  
+
   double                m_duration_written;
   unsigned int          m_min_buffer_size;
   int64_t               m_offset;
@@ -86,6 +75,7 @@ private:
   static CAEDeviceInfo m_info;
   static std::set<unsigned int>       m_sink_sampleRates;
   static bool m_sinkSupportsFloat;
+  static bool m_sinkSupportsMultiChannelFloat;
 
   AEAudioFormat      m_format;
   double             m_volume;

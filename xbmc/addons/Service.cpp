@@ -1,25 +1,12 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include "Service.h"
 #include "AddonManager.h"
-#include "ServiceBroker.h"
 #include "interfaces/generic/ScriptInvocationManager.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -30,16 +17,7 @@ namespace ADDON
 
 std::unique_ptr<CService> CService::FromExtension(CAddonInfo addonInfo, const cp_extension_t* ext)
 {
-  START_OPTION startOption(START_OPTION::LOGIN);
-  std::string start = CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "@start");
-  if (start == "startup")
-    startOption = START_OPTION::STARTUP;
-  return std::unique_ptr<CService>(new CService(std::move(addonInfo), startOption));
-}
-
-CService::CService(CAddonInfo addonInfo, START_OPTION startOption)
-  : CAddon(std::move(addonInfo)), m_startOption(startOption)
-{
+  return std::unique_ptr<CService>(new CService(std::move(addonInfo)));
 }
 
 CServiceAddonManager::CServiceAddonManager(CAddonMgr& addonMgr) :
@@ -67,22 +45,6 @@ void CServiceAddonManager::OnEvent(const ADDON::AddonEvent& event)
            typeid(event) == typeid(ADDON::AddonEvents::UnInstalled))
   {
     Stop(event.id);
-  }
-}
-
-void CServiceAddonManager::StartBeforeLogin()
-{
-  VECADDONS addons;
-  if (m_addonMgr.GetAddons(addons, ADDON_SERVICE))
-  {
-    for (const auto& addon : addons)
-    {
-      auto service = std::static_pointer_cast<CService>(addon);
-      if (service->GetStartOption() == START_OPTION::STARTUP)
-      {
-        Start(addon);
-      }
-    }
   }
 }
 
@@ -132,6 +94,7 @@ void CServiceAddonManager::Start(const AddonPtr& addon)
 
 void CServiceAddonManager::Stop()
 {
+  m_addonMgr.Events().Unsubscribe(this);
   CSingleLock lock(m_criticalSection);
   for (const auto& service : m_services)
   {

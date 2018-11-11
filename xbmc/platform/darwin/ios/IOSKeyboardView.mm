@@ -1,28 +1,15 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
-#define BOOL XBMC_BOOL
+
 #include "guilib/GUIKeyboardFactory.h"
 #include "threads/Event.h"
 #include "Application.h"
 #include "platform/darwin/DarwinUtils.h"
-#undef BOOL
 
 #import "IOSKeyboardView.h"
 #import "IOSScreenManager.h"
@@ -128,14 +115,10 @@ static CEvent keyboardFinishedEvent;
   CGFloat headingW = 0;
   if (_heading.text and _heading.text.length > 0)
   {
-    CGSize headingSize = [_heading.text sizeWithFont:[UIFont systemFontOfSize:[UIFont systemFontSize]]];
+    CGSize headingSize = [_heading.text sizeWithAttributes: @{NSFontAttributeName: [UIFont systemFontOfSize:[UIFont systemFontSize]]}];
     headingW = MIN(self.bounds.size.width/2, headingSize.width+30);
   }
-  CGFloat kbHeight = _kbRect.size.width;
-#if __IPHONE_8_0
-  if (CDarwinUtils::GetIOSVersion() >= 8.0)
-    kbHeight =_kbRect.size.height;
-#endif
+  CGFloat kbHeight = _kbRect.size.height;
 
   CGFloat y = kbHeight <= 0 ?
     _textField.frame.origin.y :
@@ -151,10 +134,6 @@ static CEvent keyboardFinishedEvent;
 -(void)keyboardWillShow:(NSNotification *) notification{
   NSDictionary* info = [notification userInfo];
   CGRect kbRect = [[info objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-#if !__IPHONE_8_0
-  if (CDarwinUtils::GetIOSVersion() >= 8.0)
-    kbRect = [self convertRect:kbRect fromView:nil];
-#endif
   LOG(@"keyboardWillShow: keyboard frame: %@", NSStringFromCGRect(kbRect));
   _kbRect = kbRect;
   [self setNeedsLayout];
@@ -197,30 +176,6 @@ static CEvent keyboardFinishedEvent;
 
 - (void)keyboardDidChangeFrame:(id)sender
 {
-#if __IPHONE_8_0
-  // when compiled against ios 8.x sdk and runtime is ios
-  // 5.1.1 (f.e. ipad1 which has 5.1.1 as latest available ios version)
-  // there is an incompatibility which somehow prevents us from getting
-  // notified about "keyboardDidHide". This makes the keyboard
-  // useless on those ios platforms.
-  // Instead we are called here with "DidChangeFrame" and
-  // and an invalid frame set (height, width == 0 and pos is inf).
-  // Lets detect this situation and treat this as "keyboard was hidden"
-  // message
-  if (CDarwinUtils::GetIOSVersion() < 6.0)
-  {
-    PRINT_SIGNATURE();
-
-    NSDictionary* info = [sender userInfo];
-    CGRect kbRect = [[info objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-//    LOG(@"keyboardWillShow: keyboard frame: %f %f %f %f", kbRect.origin.x, kbRect.origin.y, kbRect.size.width, kbRect.size.height);
-    if (kbRect.size.height == 0)
-    {
-      LOG(@"keyboardDidChangeFrame: working around missing keyboardDidHide Message on iOS 5.x");
-      [self keyboardDidHide:sender];
-    }
-  }
-#endif
 }
 
 - (void)keyboardDidHide:(id)sender

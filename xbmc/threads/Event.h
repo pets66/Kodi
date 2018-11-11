@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -47,13 +35,13 @@ class CEvent
 {
   bool manualReset;
   volatile bool signaled;
-  unsigned int numWaits;
+  unsigned int numWaits = 0;
 
   CCriticalSection groupListMutex; // lock for the groups list
   std::unique_ptr<std::vector<XbmcThreads::CEventGroup*>> groups;
 
   /**
-   * To satisfy the TightConditionVariable requirements and allow the 
+   * To satisfy the TightConditionVariable requirements and allow the
    *  predicate being monitored to include both the signaled and interrupted
    *  states.
    */
@@ -73,8 +61,8 @@ class CEvent
   CEvent& operator=(const CEvent&) = delete;
 
 public:
-  inline CEvent(bool manual = false, bool signaled_ = false) : 
-    manualReset(manual), signaled(signaled_), numWaits(0), condVar(actualCv,signaled) {}
+  inline CEvent(bool manual = false, bool signaled_ = false) :
+    manualReset(manual), signaled(signaled_), condVar(actualCv,signaled) {}
 
   inline void Reset() { CSingleLock lock(mutex); signaled = false; }
   void Set();
@@ -87,11 +75,11 @@ public:
    *  to be triggered. The method will return 'true' if the Event
    *  was triggered. Otherwise it will return false.
    */
-  inline bool WaitMSec(unsigned int milliSeconds) 
+  inline bool WaitMSec(unsigned int milliSeconds)
   { CSingleLock lock(mutex); numWaits++; condVar.wait(mutex,milliSeconds); numWaits--; return prepReturn(); }
 
   /**
-   * This will wait for the Event to be triggered. The method will return 
+   * This will wait for the Event to be triggered. The method will return
    * 'true' if the Event was triggered. If it was either interrupted
    * it will return false. Otherwise it will return false.
    */
@@ -99,7 +87,7 @@ public:
   { CSingleLock lock(mutex); numWaits++; condVar.wait(mutex); numWaits--; return prepReturn(); }
 
   /**
-   * This is mostly for testing. It allows a thread to make sure there are 
+   * This is mostly for testing. It allows a thread to make sure there are
    *  the right amount of other threads waiting.
    */
   inline int getNumWaits() { CSingleLock lock(mutex); return numWaits; }
@@ -141,7 +129,7 @@ namespace XbmcThreads
 
     /**
      * This will block until any one of the CEvents in the group are
-     * signaled at which point a pointer to that CEvents will be 
+     * signaled at which point a pointer to that CEvents will be
      * returned.
      */
     CEvent* wait();
@@ -155,7 +143,7 @@ namespace XbmcThreads
     CEvent* wait(unsigned int milliseconds);
 
     /**
-     * This is mostly for testing. It allows a thread to make sure there are 
+     * This is mostly for testing. It allows a thread to make sure there are
      *  the right amount of other threads waiting.
      */
     inline int getNumWaits() { CSingleLock lock(mutex); return numWaits; }

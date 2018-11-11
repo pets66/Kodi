@@ -1,27 +1,16 @@
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with KODI; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "General.h"
 
 #include "addons/kodi-addon-dev-kit/include/kodi/General.h"
 
+#include "LangInfo.h"
 #include "Application.h"
 #include "CompileInfo.h"
 #include "ServiceBroker.h"
@@ -36,16 +25,18 @@
 #include "platform/linux/XMemUtils.h"
 #endif
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/CharsetConverter.h"
+#include "utils/Digest.h"
 #include "utils/log.h"
 #include "utils/LangCodeExpander.h"
-#include "utils/md5.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 
 #include <string.h>
 
 using namespace kodi; // addon-dev-kit namespace
+using KODI::UTILITY::CDigest;
 
 namespace ADDON
 {
@@ -175,7 +166,7 @@ char* Interface_General::unknown_to_utf8(void* kodiBase, const char* source, boo
               __FUNCTION__, kodiBase, static_cast<const void*>(source), static_cast<void*>(ret));
     return nullptr;
   }
-   
+
   std::string string;
   *ret = g_charsetConverter.unknownToUTF8(source, string, failOnBadChar);
   char* buffer = strdup(string.c_str());
@@ -261,17 +252,17 @@ bool Interface_General::queue_notification(void* kodiBase, int type, const char*
     CGUIDialogKaiToast::eMessageType usedType;
     switch (qtype)
     {
-    case QUEUE_WARNING:
+    case QueueMsg::QUEUE_WARNING:
       usedType = CGUIDialogKaiToast::Warning;
       withSound = true;
       CLog::Log(LOGDEBUG, "Interface_General::%s - %s - Warning Message: '%s'", __FUNCTION__, addon->Name().c_str(), message);
       break;
-    case QUEUE_ERROR:
+    case QueueMsg::QUEUE_ERROR:
       usedType = CGUIDialogKaiToast::Error;
       withSound = true;
       CLog::Log(LOGDEBUG, "Interface_General::%s - %s - Error Message : '%s'", __FUNCTION__, addon->Name().c_str(), message);
       break;
-    case QUEUE_INFO:
+    case QueueMsg::QUEUE_INFO:
     default:
       usedType = CGUIDialogKaiToast::Info;
       withSound = false;
@@ -303,7 +294,7 @@ void Interface_General::get_md5(void* kodiBase, const char* text, char* md5)
     return;
   }
 
-  std::string md5Int = XBMC::XBMC_MD5::GetMD5(std::string(text));
+  std::string md5Int = CDigest::Calculate(CDigest::Type::MD5, std::string(text));
   strncpy(md5, md5Int.c_str(), 40);
 }
 
@@ -427,7 +418,7 @@ char* Interface_General::get_current_skin_id(void* kodiBase)
     return nullptr;
   }
 
-  return strdup(CServiceBroker::GetSettings().GetString(CSettings::SETTING_LOOKANDFEEL_SKIN).c_str());
+  return strdup(CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_LOOKANDFEEL_SKIN).c_str());
 }
 
 void Interface_General::kodi_version(void* kodiBase, char** compile_name, int* major, int* minor, char** revision, char** tag, char** tagversion)

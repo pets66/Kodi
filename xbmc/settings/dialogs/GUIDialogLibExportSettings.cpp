@@ -1,22 +1,10 @@
 /*
-*      Copyright (C) 2005-2014 Team XBMC
-*      http://kodi.tv
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
 
 #include <map>
 #include <memory>
@@ -28,6 +16,7 @@
 
 #include "GUIDialogLibExportSettings.h"
 #include "dialogs/GUIDialogFileBrowser.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/helpers/DialogHelper.h"
@@ -36,6 +25,7 @@
 #include "settings/SettingUtils.h"
 #include "settings/lib/Setting.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/windows/GUIControlSettings.h"
 #include "storage/MediaManager.h"
 #include "Util.h"
@@ -49,24 +39,24 @@ using namespace KODI::MESSAGING;
 using KODI::MESSAGING::HELPERS::DialogResponse;
 
 CGUIDialogLibExportSettings::CGUIDialogLibExportSettings()
-  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_LIBEXPORT_SETTINGS, "DialogSettings.xml"),
-  m_destinationChecked(false)
+  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_LIBEXPORT_SETTINGS, "DialogSettings.xml")
 { }
 
 bool CGUIDialogLibExportSettings::Show(CLibExportSettings& settings)
 {
-  CGUIDialogLibExportSettings *dialog = g_windowManager.GetWindow<CGUIDialogLibExportSettings>(WINDOW_DIALOG_LIBEXPORT_SETTINGS);
+  CGUIDialogLibExportSettings *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogLibExportSettings>(WINDOW_DIALOG_LIBEXPORT_SETTINGS);
   if (!dialog)
     return false;
 
   // Get current export settings from service broker
-  dialog->m_settings.SetExportType(CServiceBroker::GetSettings().GetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE));
-  dialog->m_settings.m_strPath = CServiceBroker::GetSettings().GetString(CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER);
-  dialog->m_settings.SetItemsToExport(CServiceBroker::GetSettings().GetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_ITEMS));
-  dialog->m_settings.m_unscraped = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED);
-  dialog->m_settings.m_artwork = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK);
-  dialog->m_settings.m_skipnfo = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO);
-  dialog->m_settings.m_overwrite = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE);
+  const std::shared_ptr<CSettings> pSettings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  dialog->m_settings.SetExportType(pSettings->GetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE));
+  dialog->m_settings.m_strPath = pSettings->GetString(CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER);
+  dialog->m_settings.SetItemsToExport(pSettings->GetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_ITEMS));
+  dialog->m_settings.m_unscraped = pSettings->GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED);
+  dialog->m_settings.m_artwork = pSettings->GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK);
+  dialog->m_settings.m_skipnfo = pSettings->GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO);
+  dialog->m_settings.m_overwrite = pSettings->GetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE);
 
   dialog->m_destinationChecked = false;
   dialog->Open();
@@ -189,7 +179,7 @@ void CGUIDialogLibExportSettings::OnOK()
   if (m_settings.IsToLibFolders())
   {
     // Check artist info folder setting
-    std::string path = CServiceBroker::GetSettings().GetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
+    std::string path = CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
     if (path.empty())
     {
       //"Unable to export to library folders as the system artist information folder setting is empty"
@@ -198,7 +188,7 @@ void CGUIDialogLibExportSettings::OnOK()
       {
         m_confirmed = false;
         Close();
-        g_windowManager.ActivateWindow(WINDOW_SETTINGS_MEDIA, CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
+        CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_SETTINGS_MEDIA, CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
       }
       return;
     }
@@ -221,14 +211,15 @@ void CGUIDialogLibExportSettings::OnOK()
 void CGUIDialogLibExportSettings::Save()
 {
   CLog::Log(LOGINFO, "CGUIDialogMusicExportSettings: Save() called");
-  CServiceBroker::GetSettings().SetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE, m_settings.GetExportType());
-  CServiceBroker::GetSettings().SetString(CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER, m_settings.m_strPath);
-  CServiceBroker::GetSettings().SetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_ITEMS, m_settings.GetItemsToExport());
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED, m_settings.m_unscraped);
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE, m_settings.m_overwrite);
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK, m_settings.m_artwork);
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO, m_settings.m_skipnfo);
-  CServiceBroker::GetSettings().Save();
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  settings->SetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE, m_settings.GetExportType());
+  settings->SetString(CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER, m_settings.m_strPath);
+  settings->SetInt(CSettings::SETTING_MUSICLIBRARY_EXPORT_ITEMS, m_settings.GetItemsToExport());
+  settings->SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED, m_settings.m_unscraped);
+  settings->SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE, m_settings.m_overwrite);
+  settings->SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK, m_settings.m_artwork);
+  settings->SetBool(CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO, m_settings.m_skipnfo);
+  settings->Save();
 }
 
 void CGUIDialogLibExportSettings::SetupView()
@@ -273,7 +264,7 @@ void CGUIDialogLibExportSettings::UpdateButtons()
   if (m_settings.IsSingleFile() ||
       m_settings.IsSeparateFiles())
     enableExport = !m_settings.m_strPath.empty();
- 
+
   CONTROL_ENABLE_ON_CONDITION(CONTROL_SETTINGS_OKAY_BUTTON, enableExport);
   if (!enableExport)
     SetFocus(CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER);
@@ -304,7 +295,7 @@ void CGUIDialogLibExportSettings::InitializeSettings()
   entries.push_back(std::make_pair(38303, ELIBEXPORT_TOLIBRARYFOLDER));
   AddList(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_FILETYPE, 38304, SettingLevel::Basic, m_settings.GetExportType(), entries, 38304); // "Choose kind of export output"
   AddButton(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_FOLDER, 38305, SettingLevel::Basic);
-  
+
   entries.clear();
   entries.push_back(std::make_pair(132, ELIBEXPORT_ALBUMS));  //ablums
   entries.push_back(std::make_pair(38043, ELIBEXPORT_ALBUMARTISTS)); //album artists
@@ -315,7 +306,7 @@ void CGUIDialogLibExportSettings::InitializeSettings()
   AddToggle(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_UNSCRAPED, 38308, SettingLevel::Basic, m_settings.m_unscraped);
   AddToggle(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_ARTWORK, 38307, SettingLevel::Basic, m_settings.m_artwork);
   AddToggle(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_SKIPNFO, 38309, SettingLevel::Basic, m_settings.m_skipnfo);
-  AddToggle(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE, 38310, SettingLevel::Basic, m_settings.m_overwrite); 
+  AddToggle(groupDetails, CSettings::SETTING_MUSICLIBRARY_EXPORT_OVERWRITE, 38310, SettingLevel::Basic, m_settings.m_overwrite);
 }
 
 void CGUIDialogLibExportSettings::SetLabel2(const std::string &settingid, const std::string &label)

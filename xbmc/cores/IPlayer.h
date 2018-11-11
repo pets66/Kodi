@@ -1,27 +1,16 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <vector>
 #include <string>
+#include <memory>
 
 #include "IPlayerCallback.h"
 #include "VideoSettings.h"
@@ -36,6 +25,7 @@ struct TextCacheStruct_t;
 class TiXmlElement;
 class CStreamDetails;
 class CAction;
+class IPlayerCallback;
 
 class CPlayerOptions
 {
@@ -45,13 +35,15 @@ public:
     starttime = 0LL;
     startpercent = 0LL;
     fullscreen = false;
-    video_only = false;
+    videoOnly = false;
+    preferStereo = false;
   }
-  double  starttime; /* start time in seconds */
-  double  startpercent; /* start time in percent */  
+  double starttime; /* start time in seconds */
+  double startpercent; /* start time in percent */
   std::string state;  /* potential playerstate to restore to */
-  bool    fullscreen; /* player is allowed to switch to fullscreen */
-  bool    video_only; /* player is not allowed to play audio streams, video streams only */
+  bool fullscreen; /* player is allowed to switch to fullscreen */
+  bool videoOnly; /* player is not allowed to play audio streams, video streams only */
+  bool preferStereo; /* prefer stereo streams when selecting initial audio stream*/
 };
 
 class CFileItem;
@@ -87,7 +79,8 @@ enum ERENDERFEATURE
   RENDERFEATURE_ZOOM,
   RENDERFEATURE_VERTICAL_SHIFT,
   RENDERFEATURE_PIXEL_RATIO,
-  RENDERFEATURE_POSTPROCESS
+  RENDERFEATURE_POSTPROCESS,
+  RENDERFEATURE_TONEMAP
 };
 
 class IPlayer
@@ -149,7 +142,7 @@ public:
   virtual void SetProgram(int progId) {}
   virtual int GetProgramsCount() { return 0; }
 
-  virtual TextCacheStruct_t* GetTeletextCache() { return NULL; };
+  virtual std::shared_ptr<TextCacheStruct_t> GetTeletextCache() { return NULL; };
   virtual void LoadPage(int p, int sp, unsigned char* buffer) {};
 
   virtual std::string GetRadioText(unsigned int line) { return ""; };
@@ -170,8 +163,8 @@ public:
   virtual bool SeekTimeRelative(int64_t iTime) { return false; }
 
   /*!
-   \brief Sets the current time. This 
-   can be used for injecting the current time. 
+   \brief Sets the current time. This
+   can be used for injecting the current time.
    This is not to be confused with a seek. It just
    can be used if endless streams contain multiple
    tracks in reality (like with airtunes)
@@ -203,7 +196,7 @@ public:
   //returns a state that is needed for resuming from a specific time
   virtual std::string GetPlayerState() { return ""; };
   virtual bool SetPlayerState(const std::string& state) { return false;};
-  
+
   virtual void GetAudioCapabilities(std::vector<int> &audioCaps) { audioCaps.assign(1,IPC_AUD_ALL); };
   /*!
    \brief define the subtitle capabilities of the player
@@ -233,6 +226,14 @@ public:
   // video and audio settings
   virtual CVideoSettings GetVideoSettings() { return CVideoSettings(); };
   virtual void SetVideoSettings(CVideoSettings& settings) {};
+
+  /*!
+   * \brief Check if any players are playing a game
+   *
+   * \return True if at least one player has an input device attached to the
+   * game, false otherwise
+   */
+  virtual bool HasGameAgent() { return false; }
 
   std::string m_name;
   std::string m_type;

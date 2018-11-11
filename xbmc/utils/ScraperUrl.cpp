@@ -1,26 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "XMLUtils.h"
 #include "ScraperUrl.h"
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "CharsetConverter.h"
 #include "utils/CharsetDetection.h"
 #include "utils/StringUtils.h"
@@ -32,6 +22,7 @@
 #include "utils/Mime.h"
 #include "utils/log.h"
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 
@@ -199,7 +190,7 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
 
   if (!scrURL.m_cache.empty())
   {
-    strCachePath = URIUtils::AddFileToFolder(g_advancedSettings.m_cachePath,
+    strCachePath = URIUtils::AddFileToFolder(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cachePath,
                               "scrapers", cacheContext, scrURL.m_cache);
     if (XFILE::CFile::Exists(strCachePath))
     {
@@ -264,7 +255,7 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
   {
     CXBMCTinyXML xmlDoc;
     xmlDoc.Parse(strHTML, reportedCharset);
-    
+
     std::string realXmlCharset(xmlDoc.GetUsedCharset());
     if (!realXmlCharset.empty())
     {
@@ -299,7 +290,7 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
 
   if (!scrURL.m_cache.empty())
   {
-    std::string strCachePath = URIUtils::AddFileToFolder(g_advancedSettings.m_cachePath,
+    std::string strCachePath = URIUtils::AddFileToFolder(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_cachePath,
                               "scrapers", cacheContext, scrURL.m_cache);
     XFILE::CFile file;
     if (!file.OpenForWrite(strCachePath, true) || file.Write(strHTML.data(), strHTML.size()) != static_cast<ssize_t>(strHTML.size()))
@@ -368,7 +359,7 @@ void CScraperUrl::AddElement(std::string url, std::string aspect, std::string re
   }
   else
     nUrl.m_type = URL_TYPE_GENERAL;
-  
+
   nUrl.m_aspect = aspect;
 
   m_url.push_back(nUrl);
@@ -378,11 +369,11 @@ std::string CScraperUrl::GetThumbURL(const CScraperUrl::SUrlEntry &entry)
 {
   if (entry.m_spoof.empty())
     return entry.m_url;
-  
+
   return entry.m_url + "|Referer=" + CURL::Encode(entry.m_spoof);
 }
 
-void CScraperUrl::GetThumbURLs(std::vector<std::string> &thumbs, const std::string &type, int season) const
+void CScraperUrl::GetThumbURLs(std::vector<std::string> &thumbs, const std::string &type, int season, bool unique) const
 {
   for (std::vector<SUrlEntry>::const_iterator iter = m_url.begin(); iter != m_url.end(); ++iter)
   {
@@ -391,7 +382,9 @@ void CScraperUrl::GetThumbURLs(std::vector<std::string> &thumbs, const std::stri
       if ((iter->m_type == CScraperUrl::URL_TYPE_GENERAL && season == -1)
        || (iter->m_type == CScraperUrl::URL_TYPE_SEASON && iter->m_season == season))
       {
-        thumbs.push_back(GetThumbURL(*iter));
+        std::string url = GetThumbURL(*iter);
+        if (!unique || std::find(thumbs.begin(), thumbs.end(), url) == thumbs.end())
+          thumbs.push_back(url);
       }
     }
   }

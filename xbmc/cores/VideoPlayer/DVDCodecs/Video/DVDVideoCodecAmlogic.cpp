@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <math.h>
@@ -30,8 +18,9 @@
 #include "utils/BitstreamConverter.h"
 #include "utils/log.h"
 #include "utils/SysfsUtils.h"
-#include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/Thread.h"
 
 #define __MODULE_NAME__ "DVDVideoCodecAmlogic"
@@ -107,7 +96,7 @@ std::atomic<bool> CDVDVideoCodecAmlogic::m_InstanceGuard(false);
 
 bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
-  if (!CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOPLAYER_USEAMCODEC))
+  if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOPLAYER_USEAMCODEC))
     return false;
   if (hints.stills || hints.width == 0)
     return false;
@@ -138,9 +127,8 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
       break;
     case AV_CODEC_ID_MPEG1VIDEO:
     case AV_CODEC_ID_MPEG2VIDEO:
-    case AV_CODEC_ID_MPEG2VIDEO_XVMC:
-      if (m_hints.width <= CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECMPEG2))
-        return false;
+      if (m_hints.width <= CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECMPEG2))
+        goto FAIL;
       m_mpeg2_sequence_pts = 0;
       m_mpeg2_sequence = new mpeg2_sequence;
       m_mpeg2_sequence->width  = m_hints.width;
@@ -151,9 +139,9 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
       m_pFormatName = "am-mpeg2";
       break;
     case AV_CODEC_ID_H264:
-      if (m_hints.width <= CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECH264))
+      if (m_hints.width <= CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECH264))
       {
-        CLog::Log(LOGDEBUG, "CDVDVideoCodecAmlogic::h264 size check failed %d",CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECH264));
+        CLog::Log(LOGDEBUG, "CDVDVideoCodecAmlogic::h264 size check failed %d",CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECH264));
         goto FAIL;
       }
       switch(hints.profile)
@@ -195,7 +183,7 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
     case AV_CODEC_ID_MPEG4:
     case AV_CODEC_ID_MSMPEG4V2:
     case AV_CODEC_ID_MSMPEG4V3:
-      if (m_hints.width <= CServiceBroker::GetSettings().GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECMPEG4))
+      if (m_hints.width <= CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_VIDEOPLAYER_USEAMCODECMPEG4))
         goto FAIL;
       m_pFormatName = "am-mpeg4";
       break;
@@ -226,7 +214,7 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
       break;
     case AV_CODEC_ID_VP9:
       if (!aml_support_vp9())
-        return false;
+        goto FAIL;
       m_pFormatName = "am-vp9";
       break;
     case AV_CODEC_ID_HEVC:

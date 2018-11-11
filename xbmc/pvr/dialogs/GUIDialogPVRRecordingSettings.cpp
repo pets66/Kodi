@@ -1,26 +1,16 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogPVRRecordingSettings.h"
 
 #include "ServiceBroker.h"
+#include "addons/PVRClient.h"
+#include "guilib/GUIMessage.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "settings/lib/Setting.h"
@@ -30,7 +20,6 @@
 #include "utils/log.h"
 
 #include "pvr/PVRManager.h"
-#include "pvr/addons/PVRClients.h"
 #include "pvr/recordings/PVRRecording.h"
 
 using namespace PVR;
@@ -41,9 +30,7 @@ using namespace KODI::MESSAGING::HELPERS;
 #define SETTING_RECORDING_LIFETIME "recording.lifetime"
 
 CGUIDialogPVRRecordingSettings::CGUIDialogPVRRecordingSettings() :
-  CGUIDialogSettingsManualBase(WINDOW_DIALOG_PVR_RECORDING_SETTING, "DialogSettings.xml"),
-  m_iPlayCount(0),
-  m_iLifetime(0)
+  CGUIDialogSettingsManualBase(WINDOW_DIALOG_PVR_RECORDING_SETTING, "DialogSettings.xml")
 {
   m_loadType = LOAD_EVERY_TIME;
 }
@@ -52,7 +39,7 @@ void CGUIDialogPVRRecordingSettings::SetRecording(const CPVRRecordingPtr &record
 {
   if (!recording)
   {
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::SetRecording - no recording given");
+    CLog::LogF(LOGERROR, "No recording given");
     return;
   }
 
@@ -80,29 +67,30 @@ void CGUIDialogPVRRecordingSettings::InitializeSettings()
   const std::shared_ptr<CSettingCategory> category = AddCategory("pvrrecordingsettings", -1);
   if (category == nullptr)
   {
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::InitializeSettings - Unable to add settings category");
+    CLog::LogF(LOGERROR, "Unable to add settings category");
     return;
   }
 
   const std::shared_ptr<CSettingGroup> group = AddGroup(category);
   if (group == nullptr)
   {
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::InitializeSettings - Unable to add settings group");
+    CLog::LogF(LOGERROR, "Unable to add settings group");
     return;
   }
 
   std::shared_ptr<CSetting> setting = nullptr;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_recording->ClientID());
 
   // Name
   setting = AddEdit(group, SETTING_RECORDING_NAME, 19075, SettingLevel::Basic, m_strTitle);
-  setting->SetEnabled(CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_recording->ClientID()).SupportsRecordingsRename());
+  setting->SetEnabled(client && client->GetClientCapabilities().SupportsRecordingsRename());
 
   // Play count
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_recording->ClientID()).SupportsRecordingsPlayCount())
+  if (client && client->GetClientCapabilities().SupportsRecordingsPlayCount())
     setting = AddEdit(group, SETTING_RECORDING_PLAYCOUNT, 567, SettingLevel::Basic, m_recording->GetLocalPlayCount());
 
   // Lifetime
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_recording->ClientID()).SupportsRecordingsLifetimeChange())
+  if (client && client->GetClientCapabilities().SupportsRecordingsLifetimeChange())
     setting = AddList(group, SETTING_RECORDING_LIFETIME, 19083, SettingLevel::Basic, m_iLifetime, LifetimesFiller, 19083);
 }
 
@@ -110,7 +98,7 @@ bool CGUIDialogPVRRecordingSettings::OnSettingChanging(std::shared_ptr<const CSe
 {
   if (setting == nullptr)
   {
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::OnSettingChanging - No setting");
+    CLog::LogF(LOGERROR, "No setting");
     return false;
   }
 
@@ -135,7 +123,7 @@ void CGUIDialogPVRRecordingSettings::OnSettingChanged(std::shared_ptr<const CSet
 {
   if (setting == nullptr)
   {
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::OnSettingChanged - No setting");
+    CLog::LogF(LOGERROR, "No setting");
     return;
   }
 
@@ -176,7 +164,11 @@ void CGUIDialogPVRRecordingSettings::LifetimesFiller(
   if (pThis)
   {
     list.clear();
-    CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(pThis->m_recording->ClientID()).GetRecordingsLifetimeValues(list);
+
+    const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(pThis->m_recording->ClientID());
+    if (client)
+      client->GetClientCapabilities().GetRecordingsLifetimeValues(list);
+
     current = pThis->m_iLifetime;
 
     auto it = list.begin();
@@ -195,5 +187,5 @@ void CGUIDialogPVRRecordingSettings::LifetimesFiller(
     }
   }
   else
-    CLog::Log(LOGERROR, "CGUIDialogPVRRecordingSettings::LifetimesFiller - No dialog");
+    CLog::LogF(LOGERROR, "No dialog");
 }

@@ -1,29 +1,16 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
 
 #include "RenderSystemTypes.h"
+#include "utils/Color.h"
 #include "utils/Geometry.h"
-#include "guilib/TransformMatrix.h"
-#include "guilib/DirtyRegion.h"
 #include <memory>
 #include <string>
 
@@ -49,7 +36,7 @@ public:
   virtual bool BeginRender() = 0;
   virtual bool EndRender() = 0;
   virtual void PresentRender(bool rendered, bool videoLayer) = 0;
-  virtual bool ClearBuffers(color_t color) = 0;
+  virtual bool ClearBuffers(UTILS::Color color) = 0;
   virtual bool IsExtSupported(const char* extension) const = 0;
 
   virtual void SetViewPort(const CRect& viewPort) = 0;
@@ -65,15 +52,11 @@ public:
   virtual void ApplyStateBlock() = 0;
 
   virtual void SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight, float stereoFactor = 0.f) = 0;
-  virtual void ApplyHardwareTransform(const TransformMatrix &matrix) = 0;
-  virtual void RestoreHardwareTransform() = 0;
   virtual void SetStereoMode(RENDER_STEREO_MODE mode, RENDER_STEREO_VIEW view)
   {
     m_stereoMode = mode;
     m_stereoView = view;
   }
-
-  virtual bool TestRender() = 0;
 
   /**
    * Project (x,y,z) 3d scene coordinates to (x,y) 2d screen coordinates
@@ -104,8 +87,9 @@ protected:
   std::string   m_RenderVersion;
   int          m_RenderVersionMinor;
   int          m_RenderVersionMajor;
-  RENDER_STEREO_VIEW m_stereoView;
-  RENDER_STEREO_MODE m_stereoMode;
+  RENDER_STEREO_VIEW m_stereoView = RENDER_STEREO_VIEW_OFF;
+  RENDER_STEREO_MODE m_stereoMode = RENDER_STEREO_MODE_OFF;
+  bool m_limitedColorRange = false;
 
   std::unique_ptr<CGUIImage> m_splashImage;
   std::unique_ptr<CGUITextLayout> m_splashMessageLayout;

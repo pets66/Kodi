@@ -1,36 +1,25 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <vector>
 
 #include <interface/mmal/mmal.h>
 
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "../RenderFlags.h"
 #include "../BaseRenderer.h"
 #include "../RenderCapture.h"
 #include "cores/VideoSettings.h"
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 #include "threads/Thread.h"
+#include "threads/IRunnable.h"
 #include "utils/Geometry.h"
 
 // worst case number of buffers. 12 for decoder. 8 for multi-threading in ffmpeg. NUM_BUFFERS for renderer.
@@ -69,7 +58,7 @@ public:
   static uint32_t TranslateFormat(AVPixelFormat pixfmt);
   virtual int Width() { return m_width; }
   virtual int Height() { return m_height; }
-  virtual int AlignedWidth() { return m_mmal_format == MMAL_ENCODING_YUVUV128 || m_mmal_format == MMAL_ENCODING_YUVUV64_16 ? 0 : m_geo.getStrideY() / m_geo.getBytesPerPixel(); }
+  virtual int AlignedWidth() { return m_mmal_format == MMAL_ENCODING_YUVUV128 || m_mmal_format == MMAL_ENCODING_YUVUV64_16 || m_geo.getBytesPerPixel() == 0 ? 0 : m_geo.getStrideY() / m_geo.getBytesPerPixel(); }
   virtual int AlignedHeight() { return m_mmal_format == MMAL_ENCODING_YUVUV128 || m_mmal_format == MMAL_ENCODING_YUVUV64_16 ? 0 : m_geo.getHeightY(); }
   virtual int BitsPerPixel() { return m_geo.getBitsPerPixel(); }
   virtual uint32_t &Encoding() { return m_mmal_format; }
@@ -153,9 +142,9 @@ public:
   virtual bool         Configure(const VideoPicture &picture, float fps, unsigned int orientation) override;
   virtual void         ReleaseBuffer(int idx) override;
   virtual void         UnInit();
-  virtual void         Flush() override;
+  virtual bool         Flush(bool saveBuffers) override;
   virtual bool         IsConfigured() override { return m_bConfigured; }
-  virtual void         AddVideoPicture(const VideoPicture& pic, int index, double currentClock) override;
+  virtual void         AddVideoPicture(const VideoPicture& pic, int index) override;
   virtual bool         IsPictureHW(const VideoPicture &picture) override { return false; };
   virtual CRenderInfo GetRenderInfo() override;
 

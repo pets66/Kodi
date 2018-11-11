@@ -1,27 +1,15 @@
 /*
-*      Copyright (C) 2005-2012 Team XBMC
-*      http://www.xbmc.org
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, write to
-*  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
-*  http://www.gnu.org/copyleft/gpl.html
-*
-*/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
 
 #include "xbmc/windowing/WinEvents.h"
 #include "WinEventsX11.h"
 #include "Application.h"
+#include "AppInboundProtocol.h"
 #include "messaging/ApplicationMessenger.h"
 #include <X11/Xlib.h>
 #include <X11/extensions/Xrandr.h>
@@ -30,10 +18,12 @@
 #include "X11/XF86keysym.h"
 #include "utils/log.h"
 #include "utils/CharsetConverter.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/mouse/MouseStat.h"
 #include "input/InputManager.h"
 #include "ServiceBroker.h"
+#include "cores/AudioEngine/Interfaces/AE.h"
 
 using namespace KODI::MESSAGING;
 
@@ -226,9 +216,9 @@ bool CWinEventsX11::Init(Display *dpy, Window win)
     CLog::Log(LOGWARNING,"CWinEventsX11::Init - no input method found");
 
   // build Keysym lookup table
-  for (unsigned int i = 0; i < sizeof(SymMappingsX11)/(2*sizeof(uint32_t)); ++i)
+  for (const auto& symMapping : SymMappingsX11)
   {
-    m_symLookupTable[SymMappingsX11[i][0]] = SymMappingsX11[i][1];
+    m_symLookupTable[symMapping[0]] = symMapping[1];
   }
 
   // register for xrandr events
@@ -293,6 +283,7 @@ bool CWinEventsX11::MessagePump()
   bool ret = false;
   XEvent xevent;
   unsigned long serial = 0;
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
 
   while (m_display && XPending(m_display))
   {
@@ -301,19 +292,36 @@ bool CWinEventsX11::MessagePump()
 
     if (m_display && (xevent.type == m_RREventBase + RRScreenChangeNotify))
     {
-      XRRUpdateConfiguration(&xevent);
-      if (xevent.xgeneric.serial != serial)
+      if (xevent.xgeneric.serial == serial)
+        continue;
+
+      if (m_xrrEventPending)
+      {
         m_winSystem.NotifyXRREvent();
-      m_xrrEventPending = false;
-      serial = xevent.xgeneric.serial;
+        m_xrrEventPending = false;
+        serial = xevent.xgeneric.serial;
+      }
+
       continue;
     }
     else if (m_display && (xevent.type == m_RREventBase + RRNotify))
     {
-      if (xevent.xgeneric.serial != serial)
-        m_winSystem.NotifyXRREvent();
-      m_xrrEventPending = false;
-      serial = xevent.xgeneric.serial;
+      if (xevent.xgeneric.serial == serial)
+        continue;
+
+      XRRNotifyEvent* rrEvent = reinterpret_cast<XRRNotifyEvent*>(&xevent);
+      if (rrEvent->subtype == RRNotify_OutputChange)
+      {
+        XRROutputChangeNotifyEvent* changeEvent = reinterpret_cast<XRROutputChangeNotifyEvent*>(&xevent);
+        if (changeEvent->connection == RR_Connected ||
+            changeEvent->connection == RR_Disconnected)
+        {
+          m_winSystem.NotifyXRREvent();
+          CServiceBroker::GetActiveAE()->DeviceChange();
+          serial = xevent.xgeneric.serial;
+        }
+      }
+
       continue;
     }
 
@@ -324,13 +332,15 @@ bool CWinEventsX11::MessagePump()
     {
       case MapNotify:
       {
-        g_application.SetRenderGUI(true);
+        if (appPort)
+          appPort->SetRenderGUI(true);
         break;
       }
 
       case UnmapNotify:
       {
-        g_application.SetRenderGUI(false);
+        if (appPort)
+          appPort->SetRenderGUI(false);
         break;
       }
 
@@ -358,7 +368,7 @@ bool CWinEventsX11::MessagePump()
 
       case Expose:
       {
-        g_windowManager.MarkDirty();
+        CServiceBroker::GetGUI()->GetWindowManager().MarkDirty();
         break;
       }
 
@@ -373,8 +383,9 @@ bool CWinEventsX11::MessagePump()
         newEvent.type = XBMC_VIDEORESIZE;
         newEvent.resize.w = xevent.xconfigure.width;
         newEvent.resize.h = xevent.xconfigure.height;
-        ret |= g_application.OnEvent(newEvent);
-        g_windowManager.MarkDirty();
+        if (appPort)
+          ret |= appPort->OnEvent(newEvent);
+        CServiceBroker::GetGUI()->GetWindowManager().MarkDirty();
         break;
       }
 
@@ -513,7 +524,8 @@ bool CWinEventsX11::MessagePump()
         newEvent.type = XBMC_MOUSEMOTION;
         newEvent.motion.x = (int16_t)xevent.xmotion.x;
         newEvent.motion.y = (int16_t)xevent.xmotion.y;
-        ret |= g_application.OnEvent(newEvent);
+        if (appPort)
+          ret |= appPort->OnEvent(newEvent);
         break;
       }
 
@@ -525,7 +537,8 @@ bool CWinEventsX11::MessagePump()
         newEvent.button.button = (unsigned char)xevent.xbutton.button;
         newEvent.button.x = (int16_t)xevent.xbutton.x;
         newEvent.button.y = (int16_t)xevent.xbutton.y;
-        ret |= g_application.OnEvent(newEvent);
+        if (appPort)
+          ret |= appPort->OnEvent(newEvent);
         break;
       }
 
@@ -537,7 +550,8 @@ bool CWinEventsX11::MessagePump()
         newEvent.button.button = (unsigned char)xevent.xbutton.button;
         newEvent.button.x = (int16_t)xevent.xbutton.x;
         newEvent.button.y = (int16_t)xevent.xbutton.y;
-        ret |= g_application.OnEvent(newEvent);
+        if (appPort)
+          ret |= appPort->OnEvent(newEvent);
         break;
       }
 
@@ -634,7 +648,10 @@ bool CWinEventsX11::ProcessKey(XBMC_Event &event)
     event.key.keysym.mod = (XBMCMod)m_keymodState;
   }
 
-  return g_application.OnEvent(event);
+  std::shared_ptr<CAppInboundProtocol> appPort = CServiceBroker::GetAppPort();
+  if (appPort)
+    appPort->OnEvent(event);
+  return true;
 }
 
 XBMCKey CWinEventsX11::LookupXbmcKeySym(KeySym keysym)

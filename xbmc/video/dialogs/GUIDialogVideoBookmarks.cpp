@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogVideoBookmarks.h"
@@ -25,10 +13,11 @@
 #include "pictures/Picture.h"
 #include "dialogs/GUIDialogContextMenu.h"
 #include "view/ViewState.h"
-#include "profiles/ProfilesManager.h"
+#include "profiles/ProfileManager.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "settings/AdvancedSettings.h"
 #include "FileItem.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "utils/Crc32.h"
 #include "input/Key.h"
@@ -44,12 +33,13 @@
 #include "TextureCache.h"
 #include "messaging/ApplicationMessenger.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include <string>
 #include <vector>
 
 using namespace KODI::MESSAGING;
 
-#define BOOKMARK_THUMB_WIDTH g_advancedSettings.m_imageRes
+#define BOOKMARK_THUMB_WIDTH CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_imageRes
 
 #define CONTROL_ADD_BOOKMARK           2
 #define CONTROL_CLEAR_BOOKMARKS        3
@@ -174,18 +164,18 @@ void CGUIDialogVideoBookmarks::OnPopupMenu(int item)
 {
   if (item < 0 || item >= (int) m_bookmarks.size())
     return;
-  
+
   // highlight the item
   (*m_vecItems)[item]->Select(true);
-  
+
   CContextButtons choices;
   choices.Add(1, (m_bookmarks[item].type == CBookmark::EPISODE ? 20405 : 20404)); // "Remove episode bookmark" or "Remove bookmark"
-  
+
   int button = CGUIDialogContextMenu::ShowAndGetChoice(choices);
-  
+
   // unhighlight the item
   (*m_vecItems)[item]->Select(false);
-  
+
   if (button == 1)
     Delete(item);
 }
@@ -212,7 +202,7 @@ void CGUIDialogVideoBookmarks::UpdateItem(unsigned int chapterIdx)
   CSingleLock lock(m_refreshSection);
 
   int itemPos = 0;
-  for (auto& item : m_vecItems->GetList())
+  for (const auto& item : *m_vecItems)
   {
     if (chapterIdx == item->GetProperty("chapter").asInteger())
       break;
@@ -234,10 +224,10 @@ void CGUIDialogVideoBookmarks::OnRefreshList()
 {
   m_bookmarks.clear();
   std::vector<CFileItemPtr> items;
-  
+
   // open the d/b and retrieve the bookmarks for the current movie
   m_filePath = g_application.CurrentFile();
-  if (g_application.CurrentFileItem().HasProperty("original_listitem_url") && 
+  if (g_application.CurrentFileItem().HasProperty("original_listitem_url") &&
      !URIUtils::IsVideoDb(g_application.CurrentFileItem().GetProperty("original_listitem_url").asString()))
      m_filePath = g_application.CurrentFileItem().GetProperty("original_listitem_url").asString();
 
@@ -252,7 +242,7 @@ void CGUIDialogVideoBookmarks::OnRefreshList()
 
   // cycle through each stored bookmark and add it to our list control
   for (unsigned int i = 0; i < m_bookmarks.size(); ++i)
-  {   
+  {
     std::string bookmarkTime;
     if (m_bookmarks[i].type == CBookmark::EPISODE)
       bookmarkTime = StringUtils::Format("%s %li %s %li", g_localizeStrings.Get(20373).c_str(), m_bookmarks[i].seasonNumber, g_localizeStrings.Get(20359).c_str(), m_bookmarks[i].episodeNumber);
@@ -289,7 +279,7 @@ void CGUIDialogVideoBookmarks::OnRefreshList()
     std::string cachefile = CTextureCache::GetInstance().GetCachedPath(CTextureCache::GetInstance().GetCacheFile(chapterPath)+".jpg");
     if (XFILE::CFile::Exists(cachefile))
       item->SetArt("thumb", cachefile);
-    else if (i > m_jobsStarted && CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MYVIDEOS_EXTRACTCHAPTERTHUMBS))
+    else if (i > m_jobsStarted && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_MYVIDEOS_EXTRACTCHAPTERTHUMBS))
     {
       CFileItem item(m_filePath, false);
       CJob* job = new CThumbExtractor(item, m_filePath, true, chapterPath, pos * 1000, false);
@@ -386,7 +376,7 @@ void CGUIDialogVideoBookmarks::ClearBookmarks()
   CVideoDatabase videoDatabase;
   videoDatabase.Open();
   std::string path = g_application.CurrentFile();
-  if (g_application.CurrentFileItem().HasProperty("original_listitem_url") && 
+  if (g_application.CurrentFileItem().HasProperty("original_listitem_url") &&
      !URIUtils::IsVideoDb(g_application.CurrentFileItem().GetProperty("original_listitem_url").asString()))
     path = g_application.CurrentFileItem().GetProperty("original_listitem_url").asString();
   videoDatabase.ClearBookMarksOfFile(path, CBookmark::STANDARD);
@@ -429,11 +419,11 @@ bool CGUIDialogVideoBookmarks::AddBookmark(CVideoInfoTag* tag)
 
   if (hasImage)
   {
-    const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
+    const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
     auto crc = Crc32::ComputeFromLowerCase(g_application.CurrentFile());
     bookmark.thumbNailImage = StringUtils::Format("%08x_%i.jpg", crc, (int)bookmark.timeInSeconds);
-    bookmark.thumbNailImage = URIUtils::AddFileToFolder(profileManager.GetBookmarksThumbFolder(), bookmark.thumbNailImage);
+    bookmark.thumbNailImage = URIUtils::AddFileToFolder(profileManager->GetBookmarksThumbFolder(), bookmark.thumbNailImage);
 
     if (!CPicture::CreateThumbnailFromSurface(pixels, width, height, width * 4,
                                                          bookmark.thumbNailImage))
@@ -456,7 +446,7 @@ bool CGUIDialogVideoBookmarks::AddBookmark(CVideoInfoTag* tag)
   else
   {
     std::string path = g_application.CurrentFile();
-    if (g_application.CurrentFileItem().HasProperty("original_listitem_url") && 
+    if (g_application.CurrentFileItem().HasProperty("original_listitem_url") &&
        !URIUtils::IsVideoDb(g_application.CurrentFileItem().GetProperty("original_listitem_url").asString()))
       path = g_application.CurrentFileItem().GetProperty("original_listitem_url").asString();
     videoDatabase.AddBookMarkToFile(path, bookmark, CBookmark::STANDARD);
@@ -527,10 +517,10 @@ bool CGUIDialogVideoBookmarks::OnAddBookmark()
 {
   if (!g_application.CurrentFileItem().IsVideo())
     return false;
-  
-  if (CGUIDialogVideoBookmarks::AddBookmark()) 
+
+  if (CGUIDialogVideoBookmarks::AddBookmark())
   {
-    g_windowManager.SendMessage(GUI_MSG_REFRESH_LIST, 0, WINDOW_DIALOG_VIDEO_BOOKMARKS);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(GUI_MSG_REFRESH_LIST, 0, WINDOW_DIALOG_VIDEO_BOOKMARKS);
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
                                           g_localizeStrings.Get(298),   // "Bookmarks"
                                           g_localizeStrings.Get(21362));// "Bookmark created"
@@ -553,11 +543,11 @@ bool CGUIDialogVideoBookmarks::OnAddEpisodeBookmark()
       bReturn = CGUIDialogVideoBookmarks::AddEpisodeBookmark();
       if(bReturn)
       {
-        g_windowManager.SendMessage(GUI_MSG_REFRESH_LIST, 0, WINDOW_DIALOG_VIDEO_BOOKMARKS);
-        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, 
+        CServiceBroker::GetGUI()->GetWindowManager().SendMessage(GUI_MSG_REFRESH_LIST, 0, WINDOW_DIALOG_VIDEO_BOOKMARKS);
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
                                               g_localizeStrings.Get(298),   // "Bookmarks"
                                               g_localizeStrings.Get(21363));// "Episode Bookmark created"
- 
+
       }
     }
     videoDatabase.Close();

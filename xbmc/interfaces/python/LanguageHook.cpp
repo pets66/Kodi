@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 
@@ -80,14 +68,14 @@ namespace XBMCAddon
     // we're going to assume we're not in control of the interpreter. This (apparently)
     // can be the case. E.g. Libspotify manages to call into a script using a ctypes
     // extension but under the control of an Interpreter we know nothing about. In
-    // cases like this we're going to use a global interpreter 
+    // cases like this we're going to use a global interpreter
     AddonClass::Ref<PythonLanguageHook> PythonLanguageHook::GetIfExists(PyInterpreterState* interp)
     {
       XBMC_TRACE;
       CSingleLock lock(hooksMutex);
       std::map<PyInterpreterState*,AddonClass::Ref<PythonLanguageHook> >::iterator iter = hooks.find(interp);
       if (iter != hooks.end())
-        return AddonClass::Ref<PythonLanguageHook>(iter->second);
+        return iter->second;
 
       // if we got here then we need to use the global one.
       if (g_languageHook.isNull())
@@ -120,7 +108,7 @@ namespace XBMCAddon
      * See PythonCallbackHandler::PythonCallbackHandler for more details
      */
     XBMCAddon::CallbackHandler* PythonLanguageHook::GetCallbackHandler()
-    { 
+    {
       XBMC_TRACE;
       return new PythonCallbackHandler();
     }
@@ -131,7 +119,7 @@ namespace XBMCAddon
 
       // Get a reference to the main module
       // and global dictionary
-      PyObject* main_module = PyImport_AddModule((char*)"__main__");
+      PyObject* main_module = PyImport_AddModule("__main__");
       PyObject* global_dict = PyModule_GetDict(main_module);
       // Extract a reference to the function "func_name"
       // from the global dictionary
@@ -146,7 +134,7 @@ namespace XBMCAddon
       XBMC_TRACE;
       // Get a reference to the main module
       // and global dictionary
-      PyObject* main_module = PyImport_AddModule((char*)"__main__");
+      PyObject* main_module = PyImport_AddModule("__main__");
       PyObject* global_dict = PyModule_GetDict(main_module);
       // Extract a reference to the function "func_name"
       // from the global dictionary
@@ -162,7 +150,7 @@ namespace XBMCAddon
 
       // Get a reference to the main module
       // and global dictionary
-      PyObject* main_module = PyImport_AddModule((char*)"__main__");
+      PyObject* main_module = PyImport_AddModule("__main__");
       PyObject* global_dict = PyModule_GetDict(main_module);
       // Extract a reference to the function "func_name"
       // from the global dictionary
@@ -179,7 +167,7 @@ namespace XBMCAddon
     void PythonLanguageHook::UnregisterMonitorCallback(XBMCAddon::xbmc::Monitor* monitor) { XBMC_TRACE; g_pythonParser.UnregisterPythonMonitorCallBack(monitor); }
 
     bool PythonLanguageHook::WaitForEvent(CEvent& hEvent, unsigned int milliseconds)
-    { 
+    {
       XBMC_TRACE;
       return g_pythonParser.WaitForEvent(hEvent,milliseconds);
     }

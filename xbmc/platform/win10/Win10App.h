@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "utils/CharsetConverter.h" // Required to initialize converters before usage
 #include "rendering/dx/DeviceResources.h"
@@ -30,33 +19,28 @@ namespace KODI
   {
     namespace WINDOWS10
     {
-ref class ViewProvider sealed : Windows::ApplicationModel::Core::IFrameworkViewSource
-{
-public:
-  virtual Windows::ApplicationModel::Core::IFrameworkView^ CreateView();
-};
-
 // Main entry point for our app. Connects the app with the Windows shell and handles application lifecycle events.
-ref class App sealed : public Windows::ApplicationModel::Core::IFrameworkView
+struct App : winrt::implements<App, winrt::Windows::ApplicationModel::Core::IFrameworkViewSource, winrt::Windows::ApplicationModel::Core::IFrameworkView>
 {
-public:
   App();
-
+  winrt::Windows::ApplicationModel::Core::IFrameworkView CreateView()
+  {
+    return *this;
+  }
   // IFrameworkView implementation.
-  virtual void Initialize(Windows::ApplicationModel::Core::CoreApplicationView^ applicationView);
-  virtual void SetWindow(Windows::UI::Core::CoreWindow^ window);
-  virtual void Load(Platform::String^ entryPoint);
-  virtual void Run();
-  virtual void Uninitialize();
+  void Initialize(const winrt::Windows::ApplicationModel::Core::CoreApplicationView&);
+  void SetWindow(const winrt::Windows::UI::Core::CoreWindow&);
+  void Load(const winrt::hstring& entryPoint);
+  void Run();
+  void Uninitialize();
 
 protected:
   // Application lifecycle event handlers.
-  void OnActivated(Windows::ApplicationModel::Core::CoreApplicationView^ applicationView, Windows::ApplicationModel::Activation::IActivatedEventArgs^ args);
-  void OnSuspending(Platform::Object^ sender, Windows::ApplicationModel::SuspendingEventArgs^ args);
-  void OnResuming(Platform::Object^ sender, Platform::Object^ args);
+  void OnActivated(const winrt::Windows::ApplicationModel::Core::CoreApplicationView&, const winrt::Windows::ApplicationModel::Activation::IActivatedEventArgs&);
+  void OnSuspending(const winrt::Windows::Foundation::IInspectable&, const winrt::Windows::ApplicationModel::SuspendingEventArgs&);
+  void OnResuming(const winrt::Windows::Foundation::IInspectable&, const winrt::Windows::Foundation::IInspectable&);
 
 private:
-  Windows::Foundation::IAsyncAction^ m_renderLoopWorker;
   std::vector<char*> m_argv;
 };
     } // namespace WINDOWS10

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Application.h"
@@ -41,10 +29,6 @@
 
 #import "AutoPool.h"
 #import "DarwinUtils.h"
-
-#ifndef NSAppKitVersionNumber10_9
-#define NSAppKitVersionNumber10_9 1265
-#endif
 
 
 enum iosPlatform
@@ -231,24 +215,6 @@ enum iosPlatform getIosPlatform()
   return eDev;
 }
 
-bool CDarwinUtils::IsMavericksOrHigher(void)
-{
-  static int isMavericks = -1;
-#if defined(TARGET_DARWIN_OSX)
-  // there is no NSAppKitVersionNumber10_9 out there anywhere
-  // so we detect mavericks by one of these newly added app nap
-  // methods - and fix the ugly mouse rect problem which was hitting
-  // us when mavericks came out
-  if (isMavericks == -1)
-  {
-    isMavericks = [NSProcessInfo instancesRespondToSelector:@selector(beginActivityWithOptions:reason:)] == TRUE ? 1 : 0;
-    if (isMavericks == 1)
-      CLog::Log(LOGDEBUG, "Detected Mavericks or higher ...");
-  }
-#endif
-  return isMavericks == 1;
-}
-
 bool CDarwinUtils::DeviceHasRetina(double &scale)
 {
   static enum iosPlatform platform = iDeviceUnknown;
@@ -417,22 +383,6 @@ int  CDarwinUtils::GetExecutablePath(char* path, size_t *pathsize)
   return 0;
 }
 
-const char* CDarwinUtils::GetUserHomeDirectory(void)
-{
-  static std::string appHomeFolder;
-  if (appHomeFolder.empty())
-  {
-#if defined(TARGET_DARWIN_IOS)
-    appHomeFolder = URIUtils::AddFileToFolder(CDarwinUtils::GetAppRootFolder(), CCompileInfo::GetAppName());
-#else
-    appHomeFolder = URIUtils::AddFileToFolder(getenv("HOME"), "Library/Application Support");
-    appHomeFolder = URIUtils::AddFileToFolder(appHomeFolder, CCompileInfo::GetAppName());
-#endif
-  }
-
-  return appHomeFolder.c_str();
-}
-
 const char* CDarwinUtils::GetAppRootFolder(void)
 {
   static std::string rootFolder = "";
@@ -539,7 +489,7 @@ void CDarwinUtils::ResetSystemIdleTimer()
 
 }
 
-void CDarwinUtils::SetScheduling(int message)
+void CDarwinUtils::SetScheduling(bool realtime)
 {
   int policy;
   struct sched_param param;
@@ -550,7 +500,7 @@ void CDarwinUtils::SetScheduling(int message)
   policy = SCHED_OTHER;
   thread_extended_policy_data_t theFixedPolicy={true};
 
-  if (message == GUI_MSG_PLAYBACK_STARTED && g_application.GetAppPlayer().IsPlayingVideo())
+  if (realtime)
   {
     policy = SCHED_RR;
     theFixedPolicy.timeshare = false;

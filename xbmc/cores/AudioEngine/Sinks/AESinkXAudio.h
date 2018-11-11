@@ -1,23 +1,12 @@
-#pragma once
 /*
-*      Copyright (C) 2010-2013 Team XBMC
-*      http://kodi.tv
-*
-*  This Program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-*
-*  This Program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with XBMC; see the file COPYING.  If not, see
-*  <http://www.gnu.org/licenses/>.
-*
-*/
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
 
 #include <stdint.h>
 #include <mmdeviceapi.h>
@@ -48,7 +37,7 @@ public:
 
     void GetDelay(AEDelayStatus& status) override;
     double GetCacheTotal() override;
-    double GetLatency() override; 
+    double GetLatency() override;
     unsigned int AddPackets(uint8_t **data, unsigned int frames, unsigned int offset) override;
     void Drain() override;
 
@@ -85,7 +74,7 @@ private:
       STDMETHOD_(void, OnVoiceProcessingPassEnd)() override {}
       STDMETHOD_(void, OnStreamEnd)() override {}
       STDMETHOD_(void, OnBufferStart)(void*) override {}
-      STDMETHOD_(void, OnBufferEnd)(void* context) override 
+      STDMETHOD_(void, OnBufferEnd)(void* context) override
       {
         SetEvent(mBufferEnd.get());
         struct buffer_ctx *ctx = static_cast<struct buffer_ctx*>(context);
@@ -95,14 +84,14 @@ private:
       STDMETHOD_(void, OnLoopEnd)(void*) override {}
       STDMETHOD_(void, OnVoiceError)(void*, HRESULT) override {}
 
-      struct handle_closer 
-      { 
-        void operator()(HANDLE h) 
-        { 
-          assert(h != INVALID_HANDLE_VALUE); 
-          if (h) 
-            CloseHandle(h); 
-        } 
+      struct handle_closer
+      {
+        void operator()(HANDLE h)
+        {
+          assert(h != INVALID_HANDLE_VALUE);
+          if (h)
+            CloseHandle(h);
+        }
       };
       std::unique_ptr<void, handle_closer> mBufferEnd;
     };

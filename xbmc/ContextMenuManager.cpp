@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ContextMenuManager.h"
@@ -33,6 +21,7 @@
 
 #include <iterator>
 #include "ContextMenus.h"
+#include "dialogs/GUIDialogContextMenu.h"
 
 using namespace ADDON;
 using namespace PVR;
@@ -51,18 +40,15 @@ CContextMenuManager::~CContextMenuManager()
 
 void CContextMenuManager::Deinit()
 {
+  CPVRContextMenuManager::GetInstance().Events().Unsubscribe(this);
   m_addonMgr.Events().Unsubscribe(this);
   m_items.clear();
-}
-
-CContextMenuManager& CContextMenuManager::GetInstance()
-{
-  return CServiceBroker::GetContextMenuManager();
 }
 
 void CContextMenuManager::Init()
 {
   m_addonMgr.Events().Subscribe(this, &CContextMenuManager::OnEvent);
+  CPVRContextMenuManager::GetInstance().Events().Subscribe(this, &CContextMenuManager::OnPVREvent);
 
   CSingleLock lock(m_criticalSection);
   m_items = {
@@ -152,6 +138,30 @@ void CContextMenuManager::OnEvent(const ADDON::AddonEvent& event)
   }
 }
 
+void CContextMenuManager::OnPVREvent(const PVRContextMenuEvent& event)
+{
+  switch (event.action)
+  {
+    case PVRContextMenuEventAction::ADD_ITEM:
+    {
+      CSingleLock lock(m_criticalSection);
+      m_items.emplace_back(event.item);
+      break;
+    }
+    case PVRContextMenuEventAction::REMOVE_ITEM:
+    {
+      CSingleLock lock(m_criticalSection);
+      auto it = std::find(m_items.begin(), m_items.end(), event.item);
+      if (it != m_items.end())
+        m_items.erase(it);
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
 bool CContextMenuManager::IsVisible(
   const CContextMenuItem& menuItem, const CContextMenuItem& root, const CFileItem& fileItem) const
 {
@@ -191,7 +201,7 @@ ContextMenuView CContextMenuManager::GetAddonItems(const CFileItem& fileItem, co
         result.emplace_back(new CContextMenuItem(menu));
   }
 
-  if (&root == &MAIN || &root == &MANAGE)
+  if (&root == &MANAGE)
   {
     std::sort(result.begin(), result.end(),
         [&](const ContextMenuView::value_type& lhs, const ContextMenuView::value_type& rhs)
@@ -208,14 +218,17 @@ bool CONTEXTMENU::ShowFor(const CFileItemPtr& fileItem, const CContextMenuItem& 
   if (!fileItem)
     return false;
 
-  auto menuItems = CContextMenuManager::GetInstance().GetItems(*fileItem, root);
-  for (auto&& item : CContextMenuManager::GetInstance().GetAddonItems(*fileItem, root))
+  const CContextMenuManager &contextMenuManager = CServiceBroker::GetContextMenuManager();
+
+  auto menuItems = contextMenuManager.GetItems(*fileItem, root);
+  for (auto&& item : contextMenuManager.GetAddonItems(*fileItem, root))
     menuItems.emplace_back(std::move(item));
 
   if (menuItems.empty())
     return true;
 
   CContextButtons buttons;
+  buttons.reserve(menuItems.size());
   for (size_t i = 0; i < menuItems.size(); ++i)
     buttons.Add(i, menuItems[i]->GetLabel(*fileItem));
 

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDClock.h"
@@ -38,7 +26,7 @@ CDVDClock::CDVDClock()
   m_paused = false;
   m_speedAfterPause = DVD_PLAYSPEED_PAUSE;
   m_iDisc = 0;
-  m_maxspeedadjust = 0.0;
+  m_maxspeedadjust = 5.0;
   m_systemAdjust = 0;
   m_speedAdjust = 0;
   m_startClock = 0;
@@ -254,7 +242,7 @@ int CDVDClock::UpdateFramerate(double fps, double* interval /*= NULL*/)
 
   CSingleLock lock(m_speedsection);
 
-  double weight = MathUtils::round_int(rate) / (double)MathUtils::round_int(fps);
+  double weight = rate / fps;
 
   //set the speed of the videoreferenceclock based on fps, refreshrate and maximum speed adjust set by user
   if (m_maxspeedadjust > 0.05)
@@ -302,7 +290,7 @@ double CDVDClock::SystemToPlaying(int64_t system)
     m_vSyncAdjust = 0;
     m_bReset = false;
   }
-  
+
   if (m_pauseClock)
     current = m_pauseClock;
   else

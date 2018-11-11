@@ -1,32 +1,17 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
+
 /*!
 \file GUIMessage.h
 \brief
 */
-
-#ifndef GUILIB_MESSAGE_H
-#define GUILIB_MESSAGE_H
-
-#pragma once
-
-/*
- *      Copyright (C) 2005-2013 Team Kodi
- *      http://kodi.tv
- *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
- */
 
 #define GUI_MSG_WINDOW_INIT     1   // initialize window
 #define GUI_MSG_WINDOW_DEINIT   2   // deinit window
@@ -69,8 +54,6 @@
                                  // been asked to move.  dwParam1 contains direction.
 
 #define GUI_MSG_LABEL_BIND     24   // bind label control (for controls supporting more then 1 label)
-
-#define GUI_MSG_SELCHANGED  25  // selection within the control has changed
 
 #define GUI_MSG_FOCUSED     26  // a control has become focused
 
@@ -171,6 +154,11 @@
  */
 #define GUI_MSG_STATE_CHANGED  51
 
+/*!
+ \brief Called when a subtitle download has finished
+ */
+#define GUI_MSG_SUBTITLE_DOWNLOADED  52
+
 
 #define GUI_MSG_USER         1000
 
@@ -264,7 +252,7 @@ do { \
  if(g_application.IsCurrentThread()) \
    OnMessage(msg); \
  else \
-   g_windowManager.SendThreadMessage(msg, GetID()); \
+   CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(msg, GetID()); \
 }
 
 /*!
@@ -358,14 +346,14 @@ class CFileItemList;
  \ingroup winmsg
  \brief
  */
-class CGUIMessage
+class CGUIMessage final
 {
 public:
   CGUIMessage(int dwMsg, int senderID, int controlID, int param1 = 0, int param2 = 0);
   CGUIMessage(int msg, int senderID, int controlID, int param1, int param2, CFileItemList* item);
   CGUIMessage(int msg, int senderID, int controlID, int param1, int param2, const CGUIListItemPtr &item);
   CGUIMessage(const CGUIMessage& msg);
-  virtual ~CGUIMessage(void);
+  ~CGUIMessage(void);
   CGUIMessage& operator = (const CGUIMessage& msg);
 
   int GetControlId() const ;
@@ -399,4 +387,4 @@ private:
 
   static std::string empty_string;
 };
-#endif
+

@@ -1,32 +1,16 @@
-#pragma once
+/*
+ *  Copyright (C) 2002, Leo Seib, Hannover
+ *
+ *  Project:Dataset C++ Dynamic Library
+ *  Module: Dataset abstraction layer header file
+ *  Author: Leo Seib      E-Mail: leoseib@web.de
+ *  Begin: 5/04/2002
+ *
+ *  SPDX-License-Identifier: MIT
+ *  See LICENSES/README.md for more information.
+ */
 
-/**********************************************************************
- * Copyright (c) 2002, Leo Seib, Hannover
- *
- * Project:Dataset C++ Dynamic Library
- * Module: Dataset abstraction layer header file
- * Author: Leo Seib      E-Mail: leoseib@web.de
- * Begin: 5/04/2002
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- **********************************************************************/
+#pragma once
 
 #include <cstdio>
 #include <list>
@@ -121,11 +105,11 @@ public:
   virtual int status(void) { return DB_CONNECTION_NONE; }
   virtual int setErr(int err_code, const char *qry)=0;
   virtual const char *getErrorMsg(void) { return error.c_str(); }
-	
+
   virtual int connect(bool create) { return DB_COMMAND_OK; }
   virtual int connectFull( const char *newDb, const char *newHost=NULL,
                       const char *newLogin=NULL, const char *newPasswd=NULL,const char *newPort=NULL,
-                      const char *newKey=NULL, const char *newCert=NULL, const char *newCA=NULL, 
+                      const char *newKey=NULL, const char *newCert=NULL, const char *newCA=NULL,
                       const char *newCApath=NULL, const char *newCiphers=NULL, bool newCompression = false);
   virtual void disconnect(void) { active = false; }
   virtual int reset(void) { return DB_COMMAND_OK; }
@@ -196,7 +180,7 @@ protected:
   Database *db;		// info about db connection
   dsStates ds_state;	        // current state
   Fields *fields_object, *edit_object;
-      
+
   /* query results*/
   result_set result;
   result_set exec_res;
@@ -365,7 +349,7 @@ public:
 
 /* func. retrieves a number of fields */
 /* Number of fields in a record */
-  virtual int field_count();       					
+  virtual int field_count();
   virtual int fieldCount();
 /* func. retrieves a field name with 'n' index */
   virtual const char *fieldName(int n);
@@ -459,7 +443,7 @@ public:
 /* Get the column index from a string field_value request */
   bool get_index_map_entry(const char *f_name);
 
-  void set_ds_state(dsStates new_state) {ds_state = new_state;};	
+  void set_ds_state(dsStates new_state) {ds_state = new_state;};
  public:
 /* return ds_state value */
   dsStates get_state() {return ds_state;};

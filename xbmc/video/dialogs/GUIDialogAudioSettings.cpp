@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogAudioSettings.h"
@@ -28,40 +16,34 @@
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "cores/IPlayer.h"
-#include "dialogs/GUIDialogFileBrowser.h"
 #include "dialogs/GUIDialogYesNo.h"
-#include "FileItem.h"
-#include "filesystem/File.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "GUIPassword.h"
-#include "profiles/ProfilesManager.h"
+#include "profiles/ProfileManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/lib/Setting.h"
 #include "settings/lib/SettingsManager.h"
 #include "settings/MediaSettings.h"
-#include "settings/MediaSourceSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "URL.h"
 #include "utils/LangCodeExpander.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "video/VideoDatabase.h"
 
 #define SETTING_AUDIO_VOLUME                   "audio.volume"
 #define SETTING_AUDIO_VOLUME_AMPLIFICATION     "audio.volumeamplification"
+#define SETTING_AUDIO_CENTERMIXLEVEL           "audio.centermixlevel"
 #define SETTING_AUDIO_DELAY                    "audio.delay"
 #define SETTING_AUDIO_STREAM                   "audio.stream"
 #define SETTING_AUDIO_PASSTHROUGH              "audio.digitalanalog"
-#define SETTING_AUDIO_DSP                      "audio.dsp"
 #define SETTING_AUDIO_MAKE_DEFAULT             "audio.makedefault"
 
 CGUIDialogAudioSettings::CGUIDialogAudioSettings()
-  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_AUDIO_OSD_SETTINGS, "DialogSettings.xml"),
-    m_passthrough(false),
-    m_dspEnabled(false)
+  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_AUDIO_OSD_SETTINGS, "DialogSettings.xml")
 { }
 
 CGUIDialogAudioSettings::~CGUIDialogAudioSettings() = default;
@@ -76,11 +58,11 @@ void CGUIDialogAudioSettings::FrameMove()
   if (g_application.GetAppPlayer().HasPlayer())
   {
     const CVideoSettings videoSettings = g_application.GetAppPlayer().GetVideoSettings();
-    
+
     // these settings can change on the fly
     //! @todo (needs special handling): m_settingsManager->SetInt(SETTING_AUDIO_STREAM, g_application.GetAppPlayer().GetAudioStream());
     GetSettingsManager()->SetNumber(SETTING_AUDIO_DELAY, videoSettings.m_AudioDelay);
-    GetSettingsManager()->SetBool(SETTING_AUDIO_PASSTHROUGH, CServiceBroker::GetSettings().GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH));
+    GetSettingsManager()->SetBool(SETTING_AUDIO_PASSTHROUGH, CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH));
   }
 
   CGUIDialogSettingsManualBase::FrameMove();
@@ -112,7 +94,7 @@ void CGUIDialogAudioSettings::OnSettingChanged(std::shared_ptr<const CSetting> s
     return;
 
   CGUIDialogSettingsManualBase::OnSettingChanged(setting);
-  
+
   const std::string &settingId = setting->GetId();
   if (settingId == SETTING_AUDIO_VOLUME)
   {
@@ -123,6 +105,12 @@ void CGUIDialogAudioSettings::OnSettingChanged(std::shared_ptr<const CSetting> s
   {
     float value = static_cast<float>(std::static_pointer_cast<const CSettingNumber>(setting)->GetValue());
     g_application.GetAppPlayer().SetDynamicRangeCompression((long)(value * 100));
+  }
+  else if (settingId == SETTING_AUDIO_CENTERMIXLEVEL)
+  {
+    CVideoSettings vs = g_application.GetAppPlayer().GetVideoSettings();
+    vs.m_CenterMixLevel = std::static_pointer_cast<const CSettingInt>(setting)->GetValue();
+    g_application.GetAppPlayer().SetVideoSettings(vs);
   }
   else if (settingId == SETTING_AUDIO_DELAY)
   {
@@ -141,7 +129,7 @@ void CGUIDialogAudioSettings::OnSettingChanged(std::shared_ptr<const CSetting> s
   else if (settingId == SETTING_AUDIO_PASSTHROUGH)
   {
     m_passthrough = std::static_pointer_cast<const CSettingBool>(setting)->GetValue();
-    CServiceBroker::GetSettings().SetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH, m_passthrough);
+    CServiceBroker::GetSettingsComponent()->GetSettings()->SetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH, m_passthrough);
   }
 }
 
@@ -151,22 +139,18 @@ void CGUIDialogAudioSettings::OnSettingAction(std::shared_ptr<const CSetting> se
     return;
 
   CGUIDialogSettingsManualBase::OnSettingAction(setting);
-  
+
   const std::string &settingId = setting->GetId();
-  if (settingId == SETTING_AUDIO_DSP)
-  {
-    g_windowManager.ActivateWindow(WINDOW_DIALOG_AUDIO_DSP_OSD_SETTINGS);
-  }
-  else if (settingId == SETTING_AUDIO_MAKE_DEFAULT)
+  if (settingId == SETTING_AUDIO_MAKE_DEFAULT)
     Save();
 }
 
 void CGUIDialogAudioSettings::Save()
 {
-  const CProfilesManager &profileManager = CServiceBroker::GetProfileManager();
+  const std::shared_ptr<CProfileManager> profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
 
   if (!g_passwordManager.CheckSettingLevelLock(SettingLevel::Expert) &&
-      profileManager.GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE)
+      profileManager->GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE)
     return;
 
   // prompt user if they are sure
@@ -178,12 +162,12 @@ void CGUIDialogAudioSettings::Save()
   if (!db.Open())
     return;
 
-  db.EraseVideoSettings();
+  db.EraseAllVideoSettings();
   db.Close();
 
   CMediaSettings::GetInstance().GetDefaultVideoSettings() = g_application.GetAppPlayer().GetVideoSettings();
   CMediaSettings::GetInstance().GetDefaultVideoSettings().m_AudioStream = -1;
-  CServiceBroker::GetSettings().Save();
+  CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
 }
 
 void CGUIDialogAudioSettings::SetupView()
@@ -230,14 +214,14 @@ void CGUIDialogAudioSettings::InitializeSettings()
   bool usePopup = g_SkinInfo->HasSkinFile("DialogSlider.xml");
 
   const CVideoSettings videoSettings = g_application.GetAppPlayer().GetVideoSettings();
-  
+
   if (g_application.GetAppPlayer().HasPlayer())
   {
     g_application.GetAppPlayer().GetAudioCapabilities(m_audioCaps);
   }
 
   // register IsPlayingPassthrough condition
-  GetSettingsManager()->AddCondition("IsPlayingPassthrough", IsPlayingPassthrough);
+  GetSettingsManager()->AddDynamicCondition("IsPlayingPassthrough", IsPlayingPassthrough);
 
   CSettingDependency dependencyAudioOutputPassthroughDisabled(SettingDependencyType::Enable, GetSettingsManager());
   dependencyAudioOutputPassthroughDisabled.Or()
@@ -246,8 +230,6 @@ void CGUIDialogAudioSettings::InitializeSettings()
   SettingDependencies depsAudioOutputPassthroughDisabled;
   depsAudioOutputPassthroughDisabled.push_back(dependencyAudioOutputPassthroughDisabled);
 
-  m_dspEnabled = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_AUDIOOUTPUT_DSPADDONSENABLED);
-
   // audio settings
   // audio volume setting
   m_volume = g_application.GetVolume(false);
@@ -255,23 +237,27 @@ void CGUIDialogAudioSettings::InitializeSettings()
   settingAudioVolume->SetDependencies(depsAudioOutputPassthroughDisabled);
   std::static_pointer_cast<CSettingControlSlider>(settingAudioVolume->GetControl())->SetFormatter(SettingFormatterPercentAsDecibel);
 
-  if (m_dspEnabled)
-    AddButton(groupAudio, SETTING_AUDIO_DSP, 24136, SettingLevel::Basic);
-
   // audio volume amplification setting
-  if (SupportsAudioFeature(IPC_AUD_AMP) && !m_dspEnabled)
+  if (SupportsAudioFeature(IPC_AUD_AMP))
   {
     std::shared_ptr<CSettingNumber> settingAudioVolumeAmplification = AddSlider(groupAudio, SETTING_AUDIO_VOLUME_AMPLIFICATION, 660, SettingLevel::Basic, videoSettings.m_VolumeAmplification, 14054, VOLUME_DRC_MINIMUM * 0.01f, (VOLUME_DRC_MAXIMUM - VOLUME_DRC_MINIMUM) / 6000.0f, VOLUME_DRC_MAXIMUM * 0.01f);
     settingAudioVolumeAmplification->SetDependencies(depsAudioOutputPassthroughDisabled);
   }
 
-  // audio delay setting
-  if (SupportsAudioFeature(IPC_AUD_OFFSET) && !m_dspEnabled)
+  // downmix: center mix level
   {
-    std::shared_ptr<CSettingNumber> settingAudioDelay = AddSlider(groupAudio, SETTING_AUDIO_DELAY, 297, SettingLevel::Basic, videoSettings.m_AudioDelay, 0, -g_advancedSettings.m_videoAudioDelayRange, 0.025f, g_advancedSettings.m_videoAudioDelayRange, 297, usePopup);
+    AddSlider(groupAudio, SETTING_AUDIO_CENTERMIXLEVEL, 39112, SettingLevel::Basic,
+              videoSettings.m_CenterMixLevel, 14050, -10, 1, 30,
+              -1, false, false, true, 39113);
+  }
+
+  // audio delay setting
+  if (SupportsAudioFeature(IPC_AUD_OFFSET))
+  {
+    std::shared_ptr<CSettingNumber> settingAudioDelay = AddSlider(groupAudio, SETTING_AUDIO_DELAY, 297, SettingLevel::Basic, videoSettings.m_AudioDelay, 0, -CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoAudioDelayRange, 0.025f, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoAudioDelayRange, 297, usePopup);
     std::static_pointer_cast<CSettingControlSlider>(settingAudioDelay->GetControl())->SetFormatter(SettingFormatterDelay);
   }
-  
+
   // audio stream setting
   if (SupportsAudioFeature(IPC_AUD_SELECT_STREAM))
     AddAudioStreams(groupAudio, SETTING_AUDIO_STREAM);
@@ -279,7 +265,7 @@ void CGUIDialogAudioSettings::InitializeSettings()
   // audio digital/analog setting
   if (SupportsAudioFeature(IPC_AUD_SELECT_OUTPUT))
   {
-    m_passthrough = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH);
+    m_passthrough = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_AUDIOOUTPUT_PASSTHROUGH);
     AddToggle(groupAudio, SETTING_AUDIO_PASSTHROUGH, 348, SettingLevel::Basic, m_passthrough);
   }
 
@@ -319,6 +305,9 @@ void CGUIDialogAudioSettings::AudioStreamsOptionFiller(SettingConstPtr setting, 
 {
   int audioStreamCount = g_application.GetAppPlayer().GetAudioStreamCount();
 
+  std::string strFormat = "%s - %s - %d " + g_localizeStrings.Get(10127);
+  std::string strUnknown = "[" + g_localizeStrings.Get(13205) + "]";
+
   // cycle through each audio stream and add it to our list control
   for (int i = 0; i < audioStreamCount; ++i)
   {
@@ -329,12 +318,12 @@ void CGUIDialogAudioSettings::AudioStreamsOptionFiller(SettingConstPtr setting, 
     g_application.GetAppPlayer().GetAudioStreamInfo(i, info);
 
     if (!g_LangCodeExpander.Lookup(info.language, strLanguage))
-      strLanguage = g_localizeStrings.Get(13205); // Unknown
+      strLanguage = strUnknown;
 
     if (info.name.length() == 0)
-      strItem = strLanguage;
-    else
-      strItem = StringUtils::Format("%s - %s", strLanguage.c_str(), info.name.c_str());
+      info.name = strUnknown;
+
+    strItem = StringUtils::Format(strFormat, strLanguage.c_str(), info.name.c_str(), info.channels);
 
     strItem += FormatFlags(info.flags);
     strItem += StringUtils::Format(" (%i/%i)", i + 1, audioStreamCount);
@@ -387,6 +376,8 @@ std::string CGUIDialogAudioSettings::FormatFlags(StreamFlags flags)
     localizedFlags.emplace_back(g_localizeStrings.Get(39107));
   if (flags &  StreamFlags::FLAG_VISUAL_IMPAIRED)
     localizedFlags.emplace_back(g_localizeStrings.Get(39108));
+  if (flags & StreamFlags::FLAG_ORIGINAL)
+    localizedFlags.emplace_back(g_localizeStrings.Get(39111));
 
   std::string formated = StringUtils::Join(localizedFlags, ", ");
 

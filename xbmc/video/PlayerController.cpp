@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PlayerController.h"
@@ -23,10 +11,13 @@
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogSlider.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "cores/IPlayer.h"
 #include "input/Key.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/GUISliderControl.h"
 #include "guilib/GUIWindowManager.h"
@@ -37,11 +28,6 @@
 #include "utils/LangCodeExpander.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
-
-CPlayerController::CPlayerController()
-  : m_sliderAction(0)
-{
-}
 
 CPlayerController::~CPlayerController() = default;
 
@@ -67,11 +53,12 @@ bool CPlayerController::OnAction(const CAction &action)
 
         bool subsOn = !g_application.GetAppPlayer().GetSubtitleVisible();
         g_application.GetAppPlayer().SetSubtitleVisible(subsOn);
-        std::string sub, lang;
+        std::string sub;
         if (subsOn)
         {
+          std::string lang;
           SubtitleStreamInfo info;
-          g_application.GetAppPlayer().GetSubtitleStreamInfo(g_application.GetAppPlayer().GetSubtitle(), info);
+          g_application.GetAppPlayer().GetSubtitleStreamInfo(CURRENT_STREAM, info);
           if (!g_LangCodeExpander.Lookup(info.language, lang))
             lang = g_localizeStrings.Get(13205); // Unknown
 
@@ -135,73 +122,73 @@ bool CPlayerController::OnAction(const CAction &action)
 
       case ACTION_SUBTITLE_DELAY_MIN:
       {
+        float videoSubsDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoSubsDelayRange;
         CVideoSettings vs = g_application.GetAppPlayer().GetVideoSettings();
         vs.m_SubtitleDelay -= 0.1f;
-        if (vs.m_SubtitleDelay < -g_advancedSettings.m_videoSubsDelayRange)
-          vs.m_SubtitleDelay = -g_advancedSettings.m_videoSubsDelayRange;
+        if (vs.m_SubtitleDelay < -videoSubsDelayRange)
+          vs.m_SubtitleDelay = -videoSubsDelayRange;
         g_application.GetAppPlayer().SetSubTitleDelay(vs.m_SubtitleDelay);
 
         ShowSlider(action.GetID(), 22006, g_application.GetAppPlayer().GetVideoSettings().m_SubtitleDelay,
-                                          -g_advancedSettings.m_videoSubsDelayRange, 0.1f,
-                                           g_advancedSettings.m_videoSubsDelayRange);
+                   -videoSubsDelayRange, 0.1f, videoSubsDelayRange);
         return true;
       }
 
       case ACTION_SUBTITLE_DELAY_PLUS:
       {
+        float videoSubsDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoSubsDelayRange;
         CVideoSettings vs = g_application.GetAppPlayer().GetVideoSettings();
         vs.m_SubtitleDelay += 0.1f;
-        if (vs.m_SubtitleDelay > g_advancedSettings.m_videoSubsDelayRange)
-          vs.m_SubtitleDelay = g_advancedSettings.m_videoSubsDelayRange;
+        if (vs.m_SubtitleDelay > videoSubsDelayRange)
+          vs.m_SubtitleDelay = videoSubsDelayRange;
         g_application.GetAppPlayer().SetSubTitleDelay(vs.m_SubtitleDelay);
 
         ShowSlider(action.GetID(), 22006, g_application.GetAppPlayer().GetVideoSettings().m_SubtitleDelay,
-                                          -g_advancedSettings.m_videoSubsDelayRange, 0.1f,
-                                           g_advancedSettings.m_videoSubsDelayRange);
+                   -videoSubsDelayRange, 0.1f, videoSubsDelayRange);
         return true;
       }
 
       case ACTION_SUBTITLE_DELAY:
       {
+        float videoSubsDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoSubsDelayRange;
         ShowSlider(action.GetID(), 22006, g_application.GetAppPlayer().GetVideoSettings().m_SubtitleDelay,
-                                          -g_advancedSettings.m_videoSubsDelayRange, 0.1f,
-                                           g_advancedSettings.m_videoSubsDelayRange, true);
+                   -videoSubsDelayRange, 0.1f, videoSubsDelayRange, true);
         return true;
       }
 
       case ACTION_AUDIO_DELAY:
       {
+        float videoAudioDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoAudioDelayRange;
         ShowSlider(action.GetID(), 297, g_application.GetAppPlayer().GetVideoSettings().m_AudioDelay,
-                                        -g_advancedSettings.m_videoAudioDelayRange, 0.025f,
-                                         g_advancedSettings.m_videoAudioDelayRange, true);
+                   -videoAudioDelayRange, 0.025f, videoAudioDelayRange, true);
         return true;
       }
 
       case ACTION_AUDIO_DELAY_MIN:
       {
+        float videoAudioDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoAudioDelayRange;
         CVideoSettings vs = g_application.GetAppPlayer().GetVideoSettings();
         vs.m_AudioDelay -= 0.025f;
-        if (vs.m_AudioDelay < -g_advancedSettings.m_videoAudioDelayRange)
-          vs.m_AudioDelay = -g_advancedSettings.m_videoAudioDelayRange;
+        if (vs.m_AudioDelay < -videoAudioDelayRange)
+          vs.m_AudioDelay = -videoAudioDelayRange;
         g_application.GetAppPlayer().SetAVDelay(vs.m_AudioDelay);
 
         ShowSlider(action.GetID(), 297, g_application.GetAppPlayer().GetVideoSettings().m_AudioDelay,
-                                        -g_advancedSettings.m_videoAudioDelayRange, 0.025f,
-                                         g_advancedSettings.m_videoAudioDelayRange);
+                   -videoAudioDelayRange, 0.025f, videoAudioDelayRange);
         return true;
       }
 
       case ACTION_AUDIO_DELAY_PLUS:
       {
+        float videoAudioDelayRange = CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoAudioDelayRange;
         CVideoSettings vs = g_application.GetAppPlayer().GetVideoSettings();
         vs.m_AudioDelay += 0.025f;
-        if (vs.m_AudioDelay > g_advancedSettings.m_videoAudioDelayRange)
-          vs.m_AudioDelay = g_advancedSettings.m_videoAudioDelayRange;
+        if (vs.m_AudioDelay > videoAudioDelayRange)
+          vs.m_AudioDelay = videoAudioDelayRange;
         g_application.GetAppPlayer().SetAVDelay(vs.m_AudioDelay);
 
         ShowSlider(action.GetID(), 297, g_application.GetAppPlayer().GetVideoSettings().m_AudioDelay,
-                                        -g_advancedSettings.m_videoAudioDelayRange, 0.025f,
-                                         g_advancedSettings.m_videoAudioDelayRange);
+                   -videoAudioDelayRange, 0.025f, videoAudioDelayRange);
         return true;
       }
 
@@ -211,8 +198,9 @@ bool CPlayerController::OnAction(const CAction &action)
           return true;
 
         int currentAudio = g_application.GetAppPlayer().GetAudioStream();
+        int audioStreamCount = g_application.GetAppPlayer().GetAudioStreamCount();
 
-        if (++currentAudio >= g_application.GetAppPlayer().GetAudioStreamCount())
+        if (++currentAudio >= audioStreamCount)
           currentAudio = 0;
         g_application.GetAppPlayer().SetAudioStream(currentAudio);    // Set the audio stream to the one selected
         std::string aud;
@@ -225,7 +213,28 @@ bool CPlayerController::OnAction(const CAction &action)
           aud = lan;
         else
           aud = StringUtils::Format("%s - %s", lan.c_str(), info.name.c_str());
-        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(460), aud, DisplTime, false, MsgTime);
+        std::string caption = g_localizeStrings.Get(460);
+        caption += StringUtils::Format(" (%i/%i)", currentAudio + 1, audioStreamCount);
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, caption, aud, DisplTime, false, MsgTime);
+        return true;
+      }
+
+      case ACTION_VIDEO_NEXT_STREAM:
+      {
+        if (g_application.GetAppPlayer().GetVideoStreamCount() == 1)
+          return true;
+
+        int currentVideo = g_application.GetAppPlayer().GetVideoStream();
+        int videoStreamCount = g_application.GetAppPlayer().GetVideoStreamCount();
+
+        if (++currentVideo >= videoStreamCount)
+          currentVideo = 0;
+        g_application.GetAppPlayer().SetVideoStream(currentVideo);
+        VideoStreamInfo info;
+        g_application.GetAppPlayer().GetVideoStreamInfo(currentVideo, info);
+        std::string caption = g_localizeStrings.Get(38031);
+        caption += StringUtils::Format(" (%i/%i)", currentVideo + 1, videoStreamCount);
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, caption, info.name, DisplTime, false, MsgTime);
         return true;
       }
 
@@ -315,8 +324,8 @@ bool CPlayerController::OnAction(const CAction &action)
 
       case ACTION_SUBTITLE_VSHIFT_UP:
       {
-        RESOLUTION_INFO res_info = g_graphicsContext.GetResInfo();
-        int subalign = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
+        RESOLUTION_INFO res_info = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+        int subalign = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
         if ((subalign == SUBTITLE_ALIGN_BOTTOM_OUTSIDE) || (subalign == SUBTITLE_ALIGN_TOP_INSIDE))
         {
           res_info.iSubtitles ++;
@@ -336,14 +345,14 @@ bool CPlayerController::OnAction(const CAction &action)
           else
             ShowSlider(action.GetID(), 274, (float) res_info.iSubtitles - res_info.iHeight, (float) -res_info.iHeight, -1.0f, 0.0f);
         }
-        g_graphicsContext.SetResInfo(g_graphicsContext.GetVideoResolution(), res_info);
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetResInfo(CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution(), res_info);
         return true;
       }
 
       case ACTION_SUBTITLE_VSHIFT_DOWN:
       {
-        RESOLUTION_INFO res_info =  g_graphicsContext.GetResInfo();
-        int subalign = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
+        RESOLUTION_INFO res_info =  CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+        int subalign = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
         if ((subalign == SUBTITLE_ALIGN_BOTTOM_OUTSIDE) || (subalign == SUBTITLE_ALIGN_TOP_INSIDE))
         {
           res_info.iSubtitles--;
@@ -363,14 +372,14 @@ bool CPlayerController::OnAction(const CAction &action)
           else
             ShowSlider(action.GetID(), 274, (float) res_info.iSubtitles - res_info.iHeight, (float) -res_info.iHeight, -1.0f, 0.0f);
         }
-        g_graphicsContext.SetResInfo(g_graphicsContext.GetVideoResolution(), res_info);
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetResInfo(CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution(), res_info);
         return true;
       }
 
       case ACTION_SUBTITLE_ALIGN:
       {
-        RESOLUTION_INFO res_info = g_graphicsContext.GetResInfo();
-        int subalign = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
+        RESOLUTION_INFO res_info = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+        int subalign = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_SUBTITLES_ALIGN);
 
         subalign++;
         if (subalign > SUBTITLE_ALIGN_TOP_OUTSIDE)
@@ -378,12 +387,12 @@ bool CPlayerController::OnAction(const CAction &action)
 
         res_info.iSubtitles = res_info.iHeight - 1;
 
-        CServiceBroker::GetSettings().SetInt(CSettings::SETTING_SUBTITLES_ALIGN, subalign);
+        CServiceBroker::GetSettingsComponent()->GetSettings()->SetInt(CSettings::SETTING_SUBTITLES_ALIGN, subalign);
         CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
                                               g_localizeStrings.Get(21460),
-                                              g_localizeStrings.Get(21461 + subalign), 
+                                              g_localizeStrings.Get(21461 + subalign),
                                               TOAST_DISPLAY_TIME, false);
-        g_graphicsContext.SetResInfo(g_graphicsContext.GetVideoResolution(), res_info);
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetResInfo(CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution(), res_info);
         return true;
       }
 
@@ -432,7 +441,7 @@ bool CPlayerController::OnAction(const CAction &action)
       {
         std::vector<ProgramInfo> programs;
         g_application.GetAppPlayer().GetPrograms(programs);
-        CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+        CGUIDialogSelect *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
         if (dialog)
         {
           int playing = 0;
@@ -450,6 +459,38 @@ bool CPlayerController::OnAction(const CAction &action)
           idx = dialog->GetSelectedItem();
           if (idx > 0)
             g_application.GetAppPlayer().SetProgram(programs[idx].id);
+        }
+        return true;
+      }
+
+      case ACTION_PLAYER_RESOLUTION_SELECT:
+      {
+        std::vector<CVariant> indexList = CServiceBroker::GetSettingsComponent()->GetSettings()->GetList(CSettings::SETTING_VIDEOSCREEN_WHITELIST);
+
+        CGUIDialogSelect *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+        if (dialog)
+        {
+          int current = 0;
+          int idx = 0;
+          auto currentRes = CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution();
+          for (const CVariant &mode : indexList)
+          {
+            auto res = CDisplaySettings::GetInstance().GetResFromString(mode.asString());
+            const RESOLUTION_INFO info = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo(res);
+            dialog->Add(info.strMode);
+            if (res == currentRes)
+              current = idx;
+            idx++;
+          }
+          dialog->SetHeading(CVariant{g_localizeStrings.Get(39110)});
+          dialog->SetSelected(current);
+          dialog->Open();
+          idx = dialog->GetSelectedItem();
+          if (idx >= 0)
+          {
+            auto res = CDisplaySettings::GetInstance().GetResFromString(indexList[idx].asString());
+            CServiceBroker::GetWinSystem()->GetGfxContext().SetVideoResolution(res, false);
+          }
         }
         return true;
       }

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #ifndef __STDC_LIMIT_MACROS
   #define __STDC_LIMIT_MACROS
@@ -107,20 +95,20 @@ unsigned int CAEUtil::DataFormatToBits(const enum AEDataFormat dataFormat)
     16,                  /* S16BE  */
     16,                  /* S16LE  */
     16,                  /* S16NE  */
-    
+
     32,                  /* S32BE  */
     32,                  /* S32LE  */
     32,                  /* S32NE  */
-    
+
     32,                  /* S24BE  */
     32,                  /* S24LE  */
     32,                  /* S24NE  */
     32,                  /* S24NER */
-    
+
     24,                  /* S24BE3 */
     24,                  /* S24LE3 */
     24,                  /* S24NE3 */
-    
+
     sizeof(double) << 3, /* DOUBLE */
     sizeof(float ) << 3, /* FLOAT  */
 
@@ -166,6 +154,8 @@ const char* CAEUtil::StreamTypeToStr(const enum CAEStreamInfo::DataType dataType
       return "STREAM_TYPE_AC3";
     case CAEStreamInfo::STREAM_TYPE_DTSHD:
       return "STREAM_TYPE_DTSHD";
+    case CAEStreamInfo::STREAM_TYPE_DTSHD_MA:
+      return "STREAM_TYPE_DTSHD_MA";
     case CAEStreamInfo::STREAM_TYPE_DTSHD_CORE:
       return "STREAM_TYPE_DTSHD_CORE";
     case CAEStreamInfo::STREAM_TYPE_DTS_1024:
@@ -198,23 +188,23 @@ const char* CAEUtil::DataFormatToStr(const enum AEDataFormat dataFormat)
     "AE_FMT_S16BE",
     "AE_FMT_S16LE",
     "AE_FMT_S16NE",
-    
+
     "AE_FMT_S32BE",
     "AE_FMT_S32LE",
     "AE_FMT_S32NE",
-    
+
     "AE_FMT_S24BE4",
     "AE_FMT_S24LE4",
     "AE_FMT_S24NE4",  /* S24 in 4 bytes */
     "AE_FMT_S24NE4MSB",
-    
+
     "AE_FMT_S24BE3",
     "AE_FMT_S24LE3",
     "AE_FMT_S24NE3", /* S24 in 3 bytes */
-    
+
     "AE_FMT_DOUBLE",
     "AE_FMT_FLOAT",
-    
+
     "AE_FMT_RAW",
 
     /* planar formats */

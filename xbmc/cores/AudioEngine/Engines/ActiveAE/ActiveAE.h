@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <list>
 #include <string>
@@ -42,7 +31,6 @@ extern "C" {
 
 class IAESink;
 class IAEEncoder;
-class CServiceManager;
 
 namespace ActiveAE
 {
@@ -66,7 +54,6 @@ struct AudioSettings
   bool stereoupmix;
   bool normalizelevels;
   bool passthrough;
-  bool dspaddonsenabled;
   int config;
   int guisoundmode;
   unsigned int samplerate;
@@ -144,6 +131,12 @@ struct MsgStreamNew
   IAEClockCallback *clock;
 };
 
+struct MsgStreamFree
+{
+  CActiveAEStream *stream;
+  bool finish; // if true switch back to gui sound mode
+};
+
 struct MsgStreamSample
 {
   CSampleBuffer *buffer;
@@ -194,12 +187,10 @@ public:
   float GetMaxDelay();
   float GetWaterLevel();
   void SetSuspended(bool state);
-  void SetDSP(bool state);
   void SetCurrentSinkFormat(const AEAudioFormat& SinkFormat);
   void SetSinkCacheTotal(float time) { m_sinkCacheTotal = time; }
   void SetSinkLatency(float time) { m_sinkLatency = time; }
   bool IsSuspended();
-  bool HasDSP();
   AEAudioFormat GetCurrentSinkFormat();
 protected:
   float m_sinkCacheTotal;
@@ -208,7 +199,6 @@ protected:
   unsigned int m_sinkSampleRate;
   AEDelayStatus m_sinkDelay;
   bool m_suspended;
-  bool m_hasDSP;
   AEAudioFormat m_sinkFormat;
   bool m_pcmOutput;
   CCriticalSection m_lock;
@@ -227,16 +217,15 @@ protected:
 class CActiveAE : public IAE, public IDispResource, private CThread
 {
 protected:
-  friend class ::CServiceManager;
   friend class CActiveAESound;
   friend class CActiveAEStream;
   friend class CSoundPacket;
   friend class CActiveAEBufferPoolResample;
-  CActiveAE();
-  ~CActiveAE() override;
-  bool  Initialize() override;
 
 public:
+  CActiveAE();
+  ~CActiveAE() override;
+  void Start() override;
   void Shutdown() override;
   bool Suspend() override;
   bool Resume() override;
@@ -250,13 +239,11 @@ public:
 
   /* returns a new stream for data in the specified format */
   IAEStream *MakeStream(AEAudioFormat &audioFormat, unsigned int options = 0, IAEClockCallback *clock = NULL) override;
-  bool FreeStream(IAEStream *stream) override;
+  bool FreeStream(IAEStream *stream, bool finish) override;
 
   /* returns a new sound object */
   IAESound *MakeSound(const std::string& file) override;
   void FreeSound(IAESound *sound) override;
-
-  void GarbageCollect() override {};
 
   void EnumerateOutputDevices(AEDeviceList &devices, bool passthrough) override;
   bool SupportsRaw(AEAudioFormat &format) override;
@@ -267,7 +254,6 @@ public:
   bool IsSettingVisible(const std::string &settingId) override;
   void KeepConfiguration(unsigned int millis) override;
   void DeviceChange() override;
-  bool HasDSP() override;
   bool GetCurrentSinkFormat(AEAudioFormat &SinkFormat) override;
 
   void RegisterAudioCallback(IAudioCallback* pCallback) override;
@@ -303,7 +289,6 @@ protected:
   bool InitSink();
   void DrainSink();
   void UnconfigureSink();
-  void Start();
   void Dispose();
   void LoadSettings();
   bool NeedReconfigureBuffers();
@@ -344,6 +329,7 @@ protected:
   unsigned int m_extKeepConfig;
   bool m_extDeferData;
   std::queue<time_t> m_extLastDeviceChange;
+  bool m_isWinSysReg = false;
 
   enum
   {

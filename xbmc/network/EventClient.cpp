@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "threads/SystemClock.h"
@@ -24,7 +12,6 @@
 #include "EventPacket.h"
 #include "threads/SingleLock.h"
 #include "input/GamepadTranslator.h"
-#include "input/InputManager.h"
 #include "input/IRTranslator.h"
 #include "input/KeyboardTranslator.h"
 #include <map>
@@ -33,7 +20,7 @@
 #include "utils/log.h"
 #include "utils/TimeUtils.h"
 #include "dialogs/GUIDialogKaiToast.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "input/Key.h"
 #include "guilib/LocalizeStrings.h"
 #include "utils/StringUtils.h"
@@ -90,16 +77,7 @@ void CEventButtonState::Load()
       else if ( (m_mapName.length() > 3) &&
                 (StringUtils::StartsWith(m_mapName, "LI:")) ) // starts with LI: ?
       {
-        if (CServiceBroker::GetInputManager().HasRemoteControl())
-        {
-          std::string lircDevice = m_mapName.substr(3);
-          m_iKeyCode = CServiceBroker::GetInputManager().TranslateLircRemoteString( lircDevice.c_str(),
-                                                                     m_buttonName.c_str() );
-        }
-        else
-        {
-          CLog::Log(LOGERROR, "ES: LIRC support not enabled");
-        }
+        CLog::Log(LOGNOTICE, "ES: LIRC support not implemented");
       }
       else
       {
@@ -119,7 +97,7 @@ void CEventButtonState::Load()
         - (unsigned char)'0'; // convert <num> to int
       m_joystickName = m_joystickName.substr(2); // extract joyname
     }
-    
+
     if (m_mapName.length() > 3 &&
         (StringUtils::StartsWith(m_mapName, "CC")) ) // custom map - CC:<controllerName>
     {
@@ -409,6 +387,8 @@ bool CEventClient::OnPacketBUTTON(CEventPacket *packet)
 
   float famount = 0;
   bool active = (flags & PTB_DOWN) ? true : false;
+  
+  CLog::Log(LOGDEBUG, "EventClient: button code %d %s", bcode, active ? "pressed" : "released");
 
   if(flags & PTB_USE_AMOUNT)
   {
@@ -458,15 +438,22 @@ bool CEventClient::OnPacketBUTTON(CEventPacket *packet)
 
         /* if last event had an amount, we must resend without amount */
         if(it2->m_bUseAmount && it2->m_fAmount != 0.0)
+        {
           m_buttonQueue.push_back(state);
+        }
 
         /* if the last event was waiting for a repeat interval, it has executed already.*/
         if(it2->m_bRepeat)
         {
           if(it2->m_iNextRepeat > 0)
+          {
             m_buttonQueue.erase(it2);
+          }
           else
+          {
             it2->m_bRepeat = false;
+            it2->m_bActive = false;
+          }
         }
 
       }
@@ -809,8 +796,8 @@ bool CEventClient::GetMousePos(float& x, float& y)
   CSingleLock lock(m_critSection);
   if (m_bMouseMoved)
   {
-    x = (float)((m_iMouseX / 65535.0f) * g_graphicsContext.GetWidth());
-    y = (float)((m_iMouseY / 65535.0f) * g_graphicsContext.GetHeight());
+    x = (m_iMouseX / 65535.0f) * CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth();
+    y = (m_iMouseY / 65535.0f) * CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight();
     m_bMouseMoved = false;
     return true;
   }

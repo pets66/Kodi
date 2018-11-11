@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2014-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PeripheralJoystick.h"
@@ -29,7 +17,7 @@
 #include "input/InputManager.h"
 #include "peripherals/Peripherals.h"
 #include "peripherals/addons/AddonButtonMap.h"
-#include "peripherals/bus/android/PeripheralBusAndroid.h"
+#include "platform/android/peripherals/PeripheralBusAndroid.h"
 #include "peripherals/bus/virtual/PeripheralBusAddon.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
@@ -82,10 +70,18 @@ bool CPeripheralJoystick::InitialiseFeature(const PeripheralFeature feature)
   {
     if (feature == FEATURE_JOYSTICK)
     {
-      if (m_bus->InitializeProperties(*this))
-        bSuccess = true;
+      // Ensure an add-on is present to translate input
+      if (!m_manager.GetAddonWithButtonMap(this))
+      {
+        CLog::Log(LOGERROR, "CPeripheralJoystick: No button mapping add-on for %s", m_strLocation.c_str());
+      }
       else
-        CLog::Log(LOGERROR, "CPeripheralJoystick: Invalid location (%s)", m_strLocation.c_str());
+      {
+        if (m_bus->InitializeProperties(*this))
+          bSuccess = true;
+        else
+          CLog::Log(LOGERROR, "CPeripheralJoystick: Invalid location (%s)", m_strLocation.c_str());
+      }
 
       if (bSuccess)
       {

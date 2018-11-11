@@ -11,6 +11,9 @@
           <default>false</default>
           <visible>false</visible>
         </setting>
+        <setting id="videoscreen.monitor">
+          <visible>false</visible>
+        </setting>
       </group>
     </category>
     <category id="audio">
@@ -34,6 +37,15 @@
           <default></default>
           <visible>false</visible>
         </setting>
+    </category>
+  </section>
+  <section id="games">
+    <category id="gamesgeneral">
+      <group id="1">
+        <setting id="gamesgeneral.enable">
+          <default>false</default>
+        </setting>
+      </group>
     </category>
   </section>
 </settings>

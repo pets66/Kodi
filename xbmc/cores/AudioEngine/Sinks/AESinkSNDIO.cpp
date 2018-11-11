@@ -2,20 +2,8 @@
 /*
  *  Copyright (C) 2016-2017 Tobias Kortkamp <t@tobik.me>
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AESinkSNDIO.h"
@@ -56,7 +44,7 @@ static struct sndio_formats formats[] =
   { AE_FMT_S32NE, 32, 4, 1, SIO_LE_NATIVE, 1 },
   { AE_FMT_S32LE, 32, 4, 1, 1, 1 },
   { AE_FMT_S32BE, 32, 4, 1, 0, 1 },
-  
+
   { AE_FMT_S24NE4, 24, 4, 1, SIO_LE_NATIVE, 0 },
   { AE_FMT_S24NE4, 24, 4, 1, SIO_LE_NATIVE, 1 },
   { AE_FMT_S24NE3, 24, 3, 1, SIO_LE_NATIVE, 0 },
@@ -68,7 +56,7 @@ static struct sndio_formats formats[] =
   { AE_FMT_S16LE, 16, 2, 1, 1, 0 },
   { AE_FMT_S16BE, 16, 2, 1, 0, 1 },
   { AE_FMT_S16BE, 16, 2, 1, 0, 0 },
-  
+
   { AE_FMT_U8, 8, 1, 0, 0, 0 },
   { AE_FMT_U8, 8, 1, 0, 0, 1 },
   { AE_FMT_U8, 8, 1, 0, 1, 0 },
@@ -78,15 +66,15 @@ static struct sndio_formats formats[] =
 static AEDataFormat lookupDataFormat(unsigned int bits, unsigned int bps,
                                      unsigned int sig, unsigned int le, unsigned int msb)
 {
-  for (size_t i = 0; i < nitems(formats); i++)
+  for (const sndio_formats& format : formats)
   {
-    if (bits == formats[i].bits &&
-        bps == formats[i].bps &&
-        sig == formats[i].sig &&
-        le == formats[i].le &&
-        msb == formats[i].msb)
+    if (bits == format.bits &&
+        bps == format.bps &&
+        sig == format.sig &&
+        le == format.le &&
+        msb == format.msb)
     {
-      return formats[i].fmt;
+      return format.fmt;
     }
   }
   return AE_FMT_INVALID;
@@ -100,15 +88,15 @@ void CAESinkSNDIO::AudioFormatToPar(AEAudioFormat& format)
   m_par.xrun = SIO_IGNORE;
   m_par.pchan = format.m_channelLayout.Count();
 
-  for (size_t i = 0; i < nitems(formats); i++)
+  for (const sndio_formats& f : formats)
   {
-    if (formats[i].fmt == format.m_dataFormat)
+    if (f.fmt == format.m_dataFormat)
     {
-      m_par.bits = formats[i].bits;
-      m_par.sig = formats[i].sig;
-      m_par.le = formats[i].le;
-      m_par.msb = formats[i].msb;
-      m_par.bps = formats[i].bps;
+      m_par.bits = f.bits;
+      m_par.sig = f.sig;
+      m_par.le = f.le;
+      m_par.msb = f.msb;
+      m_par.bps = f.bps;
       return;
     }
   }

@@ -1,24 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <atomic>
 #include <memory>
@@ -38,9 +26,8 @@
 #include "Edl.h"
 #include "FileItem.h"
 #include "threads/SystemClock.h"
-#include "threads/Thread.h"
-#include "utils/StreamDetails.h"
 #include "guilib/DispResource.h"
+#include <unordered_map>
 
 #ifdef TARGET_RASPBERRY_PI
 #include "OMXCore.h"
@@ -104,12 +91,14 @@ struct SPlayerState
     chapters.clear();
     canpause = false;
     canseek = false;
+    cantempo = false;
     caching = false;
     cache_bytes = 0;
     cache_level = 0.0;
     cache_delay = 0.0;
     cache_offset = 0.0;
     lastSeek = 0;
+    streamsReady = false;
   }
 
   double timestamp;         // last time of update
@@ -125,12 +114,14 @@ struct SPlayerState
   std::string player_state; // full player state
   bool isInMenu;
   bool hasMenu;
+  bool streamsReady;
 
   int chapter;              // current chapter
   std::vector<std::pair<std::string, int64_t>> chapters; // name and position for chapters
 
   bool canpause;            // pvr: can pause the current playing item
   bool canseek;             // pvr: can seek in the current playing item
+  bool cantempo;
   bool caching;
 
   int64_t cache_bytes;   // number of bytes current's cached
@@ -252,9 +243,9 @@ class CSelectionStreams
 public:
   CSelectionStreams() = default;
 
-  int IndexOf(StreamType type, int source, int64_t demuxerId, int id) const;
-  int Count(StreamType type) const;
-  int CountSource(StreamType type, StreamSource source) const;
+  int TypeIndexOf(StreamType type, int source, int64_t demuxerId, int id) const;
+  int CountTypeOfSource(StreamType type, StreamSource source) const;
+  int CountType(StreamType type) const;
   SelectionStream& Get(StreamType type, int index);
   bool Get(StreamType type, StreamFlags flag, SelectionStream& out);
   void Clear(StreamType type, StreamSource source);
@@ -336,7 +327,7 @@ public:
   void SetProgram(int progId) override;
   int GetProgramsCount() override;
 
-  TextCacheStruct_t* GetTeletextCache() override;
+  std::shared_ptr<TextCacheStruct_t> GetTeletextCache() override;
   void LoadPage(int p, int sp, unsigned char* buffer) override;
 
   std::string GetRadioText(unsigned int line) override;
@@ -389,6 +380,8 @@ public:
 
   CVideoSettings GetVideoSettings() override;
   void SetVideoSettings(CVideoSettings& settings) override;
+
+  void SetUpdateStreamDetails();
 
 protected:
   friend class CSelectionStreams;
@@ -486,6 +479,8 @@ protected:
   void UpdateContent();
   void UpdateContentState();
 
+  void UpdateFileItemStreamDetails(CFileItem& item);
+
   bool m_players_created;
 
   CFileItem m_item;
@@ -509,7 +504,7 @@ protected:
 
   struct SContent
   {
-    CCriticalSection m_section;
+    mutable CCriticalSection m_section;
     CSelectionStreams m_selectionStreams;
     std::vector<ProgramInfo> m_programs;
     int m_program;
@@ -520,16 +515,15 @@ protected:
 
   int m_playSpeed;
   int m_streamPlayerSpeed;
+  int m_demuxerSpeed = DVD_PLAYSPEED_NORMAL;
   struct SSpeedState
   {
-    double  lastpts;  // holds last display pts during ff/rw operations
+    double lastpts;  // holds last display pts during ff/rw operations
     int64_t lasttime;
     double lastseekpts;
-    double  lastabstime;
+    double lastabstime;
   } m_SpeedState;
-  std::atomic_bool m_canTempo;
 
-  int m_errorCount;
   double m_offset_pts;
 
   CDVDMessageQueue m_messenger;
@@ -546,7 +540,8 @@ protected:
 
   std::shared_ptr<CDVDInputStream> m_pInputStream;
   CDVDDemux* m_pDemuxer;
-  CDVDDemux* m_pSubtitleDemuxer;
+  std::shared_ptr<CDVDDemux> m_pSubtitleDemuxer;
+  std::unordered_map<int64_t, std::shared_ptr<CDVDDemux>> m_subtitleDemuxerMap;
   CDVDDemuxCC* m_pCCDemuxer;
 
   CRenderManager m_renderManager;
@@ -574,7 +569,7 @@ protected:
   } m_dvd;
 
   SPlayerState m_State;
-  CCriticalSection m_StateSection;
+  mutable CCriticalSection m_StateSection;
   XbmcThreads::EndTime m_syncTimer;
 
   CEdl m_Edl;
@@ -582,6 +577,8 @@ protected:
 
   bool m_HasVideo;
   bool m_HasAudio;
+
+  bool m_UpdateStreamDetails;
 
   std::atomic<bool> m_displayLost;
 

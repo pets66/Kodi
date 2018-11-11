@@ -1,24 +1,13 @@
 /*
- *      Copyright (C) 2010-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AESinkXAudio.h"
+#include "ServiceBroker.h"
 #include "cores/AudioEngine/AESinkFactory.h"
 #include "cores/AudioEngine/Sinks/windows/AESinkFactoryWin.h"
 #include "cores/AudioEngine/Utils/AEDeviceInfo.h"
@@ -26,12 +15,12 @@
 #include "platform/win32/CharsetConverter.h"
 #include "platform/win10/AsyncHelpers.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/TimeUtils.h"
 
 #include <algorithm>
-#include <collection.h>
 #include <ksmedia.h>
 #include <mfapi.h>
 #include <mmdeviceapi.h>
@@ -203,7 +192,7 @@ void CAESinkXAudio::GetDelay(AEDelayStatus& status)
 
   XAUDIO2_VOICE_STATE state;
   m_sourceVoice->GetState(&state, 0);
-  
+
   double delay = (double)(m_sinkFrames - state.SamplesPlayed) / m_format.m_sampleRate;
   status.SetDelay(delay);
   return;
@@ -361,7 +350,7 @@ void CAESinkXAudio::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList, bool fo
 
     std::wstring deviceId = KODI::PLATFORM::WINDOWS::ToW(details.strDeviceId);
 
-    /* Test format DTS-HD */
+    /* Test format DTS-HD-MA */
     wfxex.Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
     wfxex.Format.nSamplesPerSec = 192000;
     wfxex.dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
@@ -370,6 +359,33 @@ void CAESinkXAudio::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList, bool fo
     wfxex.Format.wBitsPerSample = 16;
     wfxex.Samples.wValidBitsPerSample = 16;
     wfxex.Format.nChannels = 8;
+    wfxex.Format.nBlockAlign = wfxex.Format.nChannels * (wfxex.Format.wBitsPerSample >> 3);
+    wfxex.Format.nAvgBytesPerSec = wfxex.Format.nSamplesPerSec * wfxex.Format.nBlockAlign;
+
+    hr2 = xaudio2->CreateMasteringVoice(&mMasterVoice, wfxex.Format.nChannels, wfxex.Format.nSamplesPerSec,
+                                        0, deviceId.c_str(), nullptr, AudioCategory_Media);
+    hr = xaudio2->CreateSourceVoice(&mSourceVoice, &wfxex.Format);
+
+    if (FAILED(hr))
+    {
+      CLog::Log(LOGNOTICE, __FUNCTION__": stream type \"%s\" on device \"%s\" seems to be not supported.", CAEUtil::StreamTypeToStr(CAEStreamInfo::STREAM_TYPE_DTSHD_MA), details.strDescription.c_str());
+    }
+    else
+    {
+      deviceInfo.m_streamTypes.push_back(CAEStreamInfo::STREAM_TYPE_DTSHD_MA);
+      add192 = true;
+    }
+    SafeDestroyVoice(&mSourceVoice);
+
+    /* Test format DTS-HD-HR */
+    wfxex.Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+    wfxex.Format.nSamplesPerSec = 192000;
+    wfxex.dwChannelMask = KSAUDIO_SPEAKER_5POINT1;
+    wfxex.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+    wfxex.SubFormat = KSDATAFORMAT_SUBTYPE_IEC61937_DTS_HD;
+    wfxex.Format.wBitsPerSample = 16;
+    wfxex.Samples.wValidBitsPerSample = 16;
+    wfxex.Format.nChannels = 2;
     wfxex.Format.nBlockAlign = wfxex.Format.nChannels * (wfxex.Format.wBitsPerSample >> 3);
     wfxex.Format.nAvgBytesPerSec = wfxex.Format.nSamplesPerSec * wfxex.Format.nBlockAlign;
 
@@ -390,13 +406,15 @@ void CAESinkXAudio::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList, bool fo
 
     /* Test format Dolby TrueHD */
     wfxex.SubFormat = KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP;
+    wfxex.Format.nChannels = 8;
+    wfxex.dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
 
     hr = xaudio2->CreateSourceVoice(&mSourceVoice, &wfxex.Format);
     if (FAILED(hr))
     {
       CLog::Log(LOGNOTICE, __FUNCTION__": stream type \"%s\" on device \"%s\" seems to be not supported.", CAEUtil::StreamTypeToStr(CAEStreamInfo::STREAM_TYPE_TRUEHD), details.strDescription.c_str());
     }
-    else 
+    else
     {
       deviceInfo.m_streamTypes.push_back(CAEStreamInfo::STREAM_TYPE_TRUEHD);
       add192 = true;
@@ -418,7 +436,7 @@ void CAESinkXAudio::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList, bool fo
     {
       CLog::Log(LOGNOTICE, __FUNCTION__": stream type \"%s\" on device \"%s\" seems to be not supported.", CAEUtil::StreamTypeToStr(CAEStreamInfo::STREAM_TYPE_EAC3), details.strDescription.c_str());
     }
-    else 
+    else
     {
       deviceInfo.m_streamTypes.push_back(CAEStreamInfo::STREAM_TYPE_EAC3);
       add192 = true;
@@ -639,7 +657,7 @@ bool CAESinkXAudio::InitializeInternal(std::string deviceId, AEAudioFormat &form
   if (format.m_dataFormat == AE_FMT_RAW) //No sense in trying other formats for passthrough.
     return false;
 
-  if (g_advancedSettings.CanLogComponent(LOGAUDIO))
+  if (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGAUDIO))
     CLog::Log(LOGDEBUG, __FUNCTION__": CreateSourceVoice failed (%s) - trying to find a compatible format", WASAPIErrToStr(hr));
 
   int closestMatch;
@@ -775,10 +793,10 @@ initialize:
     return false;
   }
 
-  m_uiBufferLen = (int)(format.m_sampleRate * 0.015);
+  m_uiBufferLen = (int)(format.m_sampleRate * 0.02);
   m_dwFrameSize = wfxex.Format.nBlockAlign;
   m_dwChunkSize = m_dwFrameSize * m_uiBufferLen;
-  m_dwBufferLen = m_dwChunkSize * 4; 
+  m_dwBufferLen = m_dwChunkSize * 4;
   m_AvgBytesPerSec = wfxex.Format.nAvgBytesPerSec;
 
   CLog::Log(LOGINFO, __FUNCTION__": XAudio Sink Initialized using: %s, %d, %d",
@@ -806,6 +824,9 @@ void CAESinkXAudio::Drain()
     try
     {
       m_sourceVoice->Stop();
+      m_sourceVoice->FlushSourceBuffers();
+      m_sinkFrames = 0;
+      m_framesInBuffers = 0;
     }
     catch (...)
     {
@@ -817,7 +838,7 @@ void CAESinkXAudio::Drain()
 
 bool CAESinkXAudio::IsUSBDevice()
 {
-#if 0 // TODO 
+#if 0 // TODO
   IPropertyStore *pProperty = nullptr;
   PROPVARIANT varName;
   PropVariantInit(&varName);

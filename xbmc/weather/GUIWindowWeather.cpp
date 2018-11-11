@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowWeather.h"
@@ -59,7 +47,7 @@ FIXME'S
 */
 
 CGUIWindowWeather::CGUIWindowWeather(void)
-    : CGUIWindow(WINDOW_WEATHER, "MyWeather.xml"), m_maxLocation(0)
+    : CGUIWindow(WINDOW_WEATHER, "MyWeather.xml")
 {
   m_loadType = KEEP_IN_MEMORY;
 }
@@ -111,7 +99,7 @@ bool CGUIWindowWeather::OnMessage(CGUIMessage& message)
     {
       if (message.GetSenderId() == 0 && m_maxLocation > 0) //handle only message from builtin
       {
-        // Clamp location between 1 and m_maxLocation 
+        // Clamp location between 1 and m_maxLocation
         int v = (CServiceBroker::GetWeatherManager().GetArea() + message.GetParam1() - 1) % m_maxLocation + 1;
         if (v < 1) v += m_maxLocation;
         SetLocation(v);
@@ -145,7 +133,7 @@ void CGUIWindowWeather::UpdateLocations()
   unsigned int iCurWeather = CServiceBroker::GetWeatherManager().GetArea();
 
   if (iCurWeather > m_maxLocation)
-  {  
+  {
     CServiceBroker::GetWeatherManager().SetArea(m_maxLocation);
     iCurWeather = m_maxLocation;
     ClearProperties();
@@ -295,7 +283,7 @@ void CGUIWindowWeather::ClearProperties()
   SetProperty("Current.DewPoint", "");
   SetProperty("Current.Humidity", "");
   SetProperty("Current.FanartCode", "");
-  
+
   // Future weather
   std::string day;
   for (int i = 0; i < NUM_DAYS; i++)

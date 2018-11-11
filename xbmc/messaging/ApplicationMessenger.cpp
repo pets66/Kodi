@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ApplicationMessenger.h"
@@ -23,7 +11,7 @@
 #include <memory>
 #include <utility>
 
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/GUIMessage.h"
 #include "messaging/IMessageTarget.h"
 #include "threads/SingleLock.h"
@@ -106,7 +94,7 @@ int CApplicationMessenger::SendMsg(ThreadMessage&& message, bool wait)
   std::shared_ptr<int> result;
 
   if (wait)
-  { 
+  {
     //Initialize result here as it's not needed for posted messages
     message.result = std::make_shared<int>(-1);
     // check that we're not being called from our application thread, else we'll be waiting
@@ -131,7 +119,7 @@ int CApplicationMessenger::SendMsg(ThreadMessage&& message, bool wait)
     return -1;
 
   ThreadMessage* msg = new ThreadMessage(std::move(message));
-  
+
   CSingleLock lock (m_critSection);
 
   if (msg->dwMessage == TMSG_GUI_MESSAGE)
@@ -146,9 +134,9 @@ int CApplicationMessenger::SendMsg(ThreadMessage&& message, bool wait)
                  //
   if (waitEvent) // ... it just so happens we have a spare reference to the
                  //  waitEvent ... just for such contingencies :)
-  { 
+  {
     // ensure the thread doesn't hold the graphics lock
-    CSingleExit exit(g_graphicsContext);
+    CSingleExit exit(CServiceBroker::GetWinSystem()->GetGfxContext());
     waitEvent->Wait();
     return *result;
   }
@@ -179,6 +167,11 @@ int CApplicationMessenger::SendMsg(uint32_t messageId, int param1, int param2, v
 void CApplicationMessenger::PostMsg(uint32_t messageId)
 {
   SendMsg(ThreadMessage{ messageId }, false);
+}
+
+void CApplicationMessenger::PostMsg(uint32_t messageId, int64_t param3)
+{
+  SendMsg(ThreadMessage{ messageId, param3 }, false);
 }
 
 void CApplicationMessenger::PostMsg(uint32_t messageId, int param1, int param2, void* payload)
@@ -213,7 +206,7 @@ void CApplicationMessenger::ProcessMessages()
     lock.Leave(); // <- see the large comment in SendMessage ^
 
     ProcessMessage(pMsg);
-    
+
     if (waitEvent)
       waitEvent->Set();
     delete pMsg;

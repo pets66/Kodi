@@ -1,24 +1,13 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GameClientInput.h"
+#include "GameClientController.h"
 #include "GameClientHardware.h"
 #include "GameClientJoystick.h"
 #include "GameClientKeyboard.h"
@@ -27,12 +16,12 @@
 #include "GameClientTopology.h"
 #include "addons/kodi-addon-dev-kit/include/kodi/kodi_game_types.h"
 #include "games/addons/GameClient.h"
+#include "games/addons/GameClientCallbacks.h"
 #include "games/controllers/Controller.h"
 #include "games/controllers/ControllerTopology.h"
 #include "games/GameServices.h"
-#include "guilib/GUIWindowManager.h"
-#include "guilib/WindowIDs.h"
 #include "input/joysticks/JoystickTypes.h"
+#include "peripherals/EventLockHandle.h"
 #include "peripherals/Peripherals.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
@@ -46,7 +35,8 @@ using namespace GAME;
 CGameClientInput::CGameClientInput(CGameClient &gameClient,
                                    AddonInstance_Game &addonStruct,
                                    CCriticalSection &clientAccess) :
-  CGameClientSubsystem(gameClient, addonStruct, clientAccess)
+  CGameClientSubsystem(gameClient, addonStruct, clientAccess),
+  m_topology(new CGameClientTopology)
 {
 }
 
@@ -59,49 +49,74 @@ void CGameClientInput::Initialize()
 {
   LoadTopology();
 
+  ActivateControllers(m_topology->ControllerTree());
+
+  SetControllerLayouts(m_topology->ControllerTree().GetControllers());
+}
+
+void CGameClientInput::Start(IGameInputCallback *input)
+{
+  m_inputCallback = input;
+
+  const CControllerTree &controllers = m_topology->ControllerTree();
+
   // Open keyboard
   //! @todo Move to player manager
   if (SupportsKeyboard())
   {
-    auto it = std::find_if(m_controllers.Ports().begin(), m_controllers.Ports().end(),
+    auto it = std::find_if(controllers.Ports().begin(), controllers.Ports().end(),
       [](const CControllerPortNode &port)
       {
         return port.PortType() == PORT_TYPE::KEYBOARD;
       });
 
-    OpenKeyboard(it->CompatibleControllers().at(0).Controller());
+    OpenKeyboard(it->ActiveController().Controller());
   }
 
   // Open mouse
   //! @todo Move to player manager
   if (SupportsMouse())
   {
-    auto it = std::find_if(m_controllers.Ports().begin(), m_controllers.Ports().end(),
+    auto it = std::find_if(controllers.Ports().begin(), controllers.Ports().end(),
       [](const CControllerPortNode &port)
       {
         return port.PortType() == PORT_TYPE::MOUSE;
       });
 
-    OpenMouse(it->CompatibleControllers().at(0).Controller());
+    OpenMouse(it->ActiveController().Controller());
   }
 
   // Open joysticks
   //! @todo Move to player manager
-  for (const auto &port : m_controllers.Ports())
+  for (const auto &port : controllers.Ports())
   {
     if (port.PortType() == PORT_TYPE::CONTROLLER && !port.CompatibleControllers().empty())
     {
-      ControllerPtr controller = port.CompatibleControllers().at(0).Controller();
+      ControllerPtr controller = port.ActiveController().Controller();
       OpenJoystick(port.Address(), controller);
     }
   }
 
   // Ensure hardware is open to receive events
   m_hardware.reset(new CGameClientHardware(m_gameClient));
+
+  if (CServiceBroker::IsServiceManagerUp())
+    CServiceBroker::GetPeripherals().RegisterObserver(this);
 }
 
 void CGameClientInput::Deinitialize()
 {
+  Stop();
+
+  m_topology->Clear();
+  m_controllerLayouts.clear();
+}
+
+void CGameClientInput::Stop()
+{
+  if (CServiceBroker::IsServiceManagerUp())
+    CServiceBroker::GetPeripherals().UnregisterObserver(this);
+
   m_hardware.reset();
 
   std::vector<std::string> ports;
@@ -115,11 +130,51 @@ void CGameClientInput::Deinitialize()
   CloseMouse();
 
   CloseKeyboard();
+
+  m_inputCallback = nullptr;
+}
+
+bool CGameClientInput::HasFeature(const std::string &controllerId, const std::string &featureName) const
+{
+  bool bHasFeature = false;
+
+  try
+  {
+    bHasFeature = m_struct.toAddon.HasFeature(controllerId.c_str(), featureName.c_str());
+  }
+  catch (...)
+  {
+    CLog::Log(LOGERROR, "GAME: %s: exception caught in HasFeature()", m_gameClient.ID().c_str());
+
+    // Fail gracefully
+    bHasFeature = true;
+  }
+
+  return bHasFeature;
 }
 
 bool CGameClientInput::AcceptsInput() const
 {
-  return g_windowManager.GetActiveWindowOrDialog() == WINDOW_FULLSCREEN_GAME;
+  if (m_inputCallback != nullptr)
+    return m_inputCallback->AcceptsInput();
+
+  return false;
+}
+
+bool CGameClientInput::InputEvent(const game_input_event &event)
+{
+  bool bHandled = false;
+
+  try
+  {
+    bHandled = m_struct.toAddon.InputEvent(&event);
+  }
+  catch (...)
+  {
+    CLog::Log(LOGERROR, "GAME: %s: exception caught in InputEvent()", m_gameClient.ID().c_str());
+  }
+
+  return bHandled;
 }
 
 void CGameClientInput::LoadTopology()
@@ -133,6 +188,7 @@ void CGameClientInput::LoadTopology()
   }
 
   GameClientPortVec hardwarePorts;
+  int playerLimit = -1;
 
   if (topologyStruct != nullptr)
   {
@@ -145,7 +201,7 @@ void CGameClientInput::LoadTopology()
         hardwarePorts.emplace_back(new CGameClientPort(ports[i]));
     }
 
-    m_playerLimit = topologyStruct->player_limit;
+    playerLimit = topologyStruct->player_limit;
 
     try { m_struct.toAddon.FreeTopology(topologyStruct); }
     catch (...) { m_gameClient.LogException("FreeTopology()"); }
@@ -156,30 +212,94 @@ void CGameClientInput::LoadTopology()
   if (hardwarePorts.empty())
     hardwarePorts.emplace_back(new CGameClientPort(GetControllers(m_gameClient)));
 
-  CGameClientTopology topology(std::move(hardwarePorts));
-  m_controllers = topology.GetControllerTree();
+  m_topology.reset(new CGameClientTopology(std::move(hardwarePorts), playerLimit));
+}
+
+void CGameClientInput::ActivateControllers(CControllerHub &hub)
+{
+  for (auto &port : hub.Ports())
+  {
+    port.SetConnected(true);
+    port.SetActiveController(0);
+    ActivateControllers(port.ActiveController().Hub());
+  }
+}
+
+void CGameClientInput::SetControllerLayouts(const ControllerVector &controllers)
+{
+  if (controllers.empty())
+    return;
+
+  for (const auto &controller : controllers)
+  {
+    const std::string controllerId = controller->ID();
+    if (m_controllerLayouts.find(controllerId) == m_controllerLayouts.end())
+      m_controllerLayouts[controllerId].reset(new CGameClientController(*this, controller));
+  }
+
+  std::vector<game_controller_layout> controllerStructs;
+  for (const auto &it : m_controllerLayouts)
+    controllerStructs.emplace_back(it.second->TranslateController());
+
+  try
+  {
+    m_struct.toAddon.SetControllerLayouts(controllerStructs.data(), static_cast<unsigned int>(controllerStructs.size()));
+  }
+  catch (...)
+  {
+    m_gameClient.LogException("SetControllerLayouts()");
+  }
+}
+
+const CControllerTree &CGameClientInput::GetControllerTree() const
+{
+  return m_topology->ControllerTree();
 }
 
 bool CGameClientInput::SupportsKeyboard() const
 {
-  auto it = std::find_if(m_controllers.Ports().begin(), m_controllers.Ports().end(),
+  const CControllerTree &controllers = m_topology->ControllerTree();
+
+  auto it = std::find_if(controllers.Ports().begin(), controllers.Ports().end(),
     [](const CControllerPortNode &port)
     {
       return port.PortType() == PORT_TYPE::KEYBOARD;
     });
 
-  return it != m_controllers.Ports().end() && !it->CompatibleControllers().empty();
+  return it != controllers.Ports().end() && !it->CompatibleControllers().empty();
 }
 
 bool CGameClientInput::SupportsMouse() const
 {
-  auto it = std::find_if(m_controllers.Ports().begin(), m_controllers.Ports().end(),
+  const CControllerTree &controllers = m_topology->ControllerTree();
+
+  auto it = std::find_if(controllers.Ports().begin(), controllers.Ports().end(),
     [](const CControllerPortNode &port)
     {
       return port.PortType() == PORT_TYPE::MOUSE;
     });
 
-  return it != m_controllers.Ports().end() && !it->CompatibleControllers().empty();
+  return it != controllers.Ports().end() && !it->CompatibleControllers().empty();
+}
+
+bool CGameClientInput::HasAgent() const
+{
+  //! @todo We check m_portMap instead of m_joysticks because m_joysticks is
+  //        always populated with the default joystick configuration (i.e.
+  //        all ports are connected to the first controller they accept).
+  //        The game has no way of knowing which joysticks are actually being
+  //        controlled by agents -- this information is stored in m_portMap,
+  //        which is not exposed to the game.
+  if (!m_portMap.empty())
+    return true;
+
+  if (m_keyboard)
+    return true;
+
+  if (m_mouse)
+    return true;
+
+  return false;
 }
 
 bool CGameClientInput::OpenKeyboard(const ControllerPtr &controller)
@@ -198,20 +318,6 @@ bool CGameClientInput::OpenKeyboard(const ControllerPtr &controller)
   if (keyboards.empty())
     return false;
 
-  std::string controllerId = controller->ID();
-
-  game_controller controllerStruct{};
-
-  controllerStruct.controller_id        = controllerId.c_str();
-  controllerStruct.digital_button_count = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::DIGITAL);
-  controllerStruct.analog_button_count  = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::ANALOG);
-  controllerStruct.analog_stick_count   = controller->FeatureCount(FEATURE_TYPE::ANALOG_STICK);
-  controllerStruct.accelerometer_count  = controller->FeatureCount(FEATURE_TYPE::ACCELEROMETER);
-  controllerStruct.key_count            = controller->FeatureCount(FEATURE_TYPE::KEY);
-  controllerStruct.rel_pointer_count    = controller->FeatureCount(FEATURE_TYPE::RELPOINTER);
-  controllerStruct.abs_pointer_count    = controller->FeatureCount(FEATURE_TYPE::ABSPOINTER);
-  controllerStruct.motor_count          = controller->FeatureCount(FEATURE_TYPE::MOTOR);
-
   bool bSuccess = false;
 
   {
@@ -221,7 +327,7 @@ bool CGameClientInput::OpenKeyboard(const ControllerPtr &controller)
     {
       try
       {
-        bSuccess = m_struct.toAddon.EnableKeyboard(true, &controllerStruct);
+        bSuccess = m_struct.toAddon.EnableKeyboard(true, controller->ID().c_str());
       }
       catch (...)
       {
@@ -232,7 +338,7 @@ bool CGameClientInput::OpenKeyboard(const ControllerPtr &controller)
 
   if (bSuccess)
   {
-    m_keyboard.reset(new CGameClientKeyboard(m_gameClient, controllerId, m_struct.toAddon, keyboards.at(0).get()));
+    m_keyboard.reset(new CGameClientKeyboard(m_gameClient, controller->ID(), keyboards.at(0).get()));
     return true;
   }
 
@@ -276,20 +382,6 @@ bool CGameClientInput::OpenMouse(const ControllerPtr &controller)
   if (mice.empty())
     return false;
 
-  std::string controllerId = controller->ID();
-
-  game_controller controllerStruct{};
-
-  controllerStruct.controller_id        = controllerId.c_str();
-  controllerStruct.digital_button_count = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::DIGITAL);
-  controllerStruct.analog_button_count  = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::ANALOG);
-  controllerStruct.analog_stick_count   = controller->FeatureCount(FEATURE_TYPE::ANALOG_STICK);
-  controllerStruct.accelerometer_count  = controller->FeatureCount(FEATURE_TYPE::ACCELEROMETER);
-  controllerStruct.key_count            = controller->FeatureCount(FEATURE_TYPE::KEY);
-  controllerStruct.rel_pointer_count    = controller->FeatureCount(FEATURE_TYPE::RELPOINTER);
-  controllerStruct.abs_pointer_count    = controller->FeatureCount(FEATURE_TYPE::ABSPOINTER);
-  controllerStruct.motor_count          = controller->FeatureCount(FEATURE_TYPE::MOTOR);
-
   bool bSuccess = false;
 
   {
@@ -299,7 +391,7 @@ bool CGameClientInput::OpenMouse(const ControllerPtr &controller)
     {
       try
       {
-        bSuccess = m_struct.toAddon.EnableMouse(true, &controllerStruct);
+        bSuccess = m_struct.toAddon.EnableMouse(true, controller->ID().c_str());
       }
       catch (...)
       {
@@ -310,7 +402,7 @@ bool CGameClientInput::OpenMouse(const ControllerPtr &controller)
 
   if (bSuccess)
   {
-    m_mouse.reset(new CGameClientMouse(m_gameClient, controllerId, m_struct.toAddon, mice.at(0).get()));
+    m_mouse.reset(new CGameClientMouse(m_gameClient, controller->ID(), mice.at(0).get()));
     return true;
   }
 
@@ -348,28 +440,15 @@ bool CGameClientInput::OpenJoystick(const std::string &portAddress, const Contro
     return false;
   }
 
-  const CControllerPortNode &port = m_controllers.GetPort(portAddress);
+  const CControllerTree &controllerTree = m_topology->ControllerTree();
+
+  const CControllerPortNode &port = controllerTree.GetPort(portAddress);
   if (!port.IsControllerAccepted(portAddress, controller->ID()))
   {
     CLog::Log(LOGERROR, "Failed to open port: Invalid controller \"%s\" on port \"%s\"",
               controller->ID().c_str(), portAddress.c_str());
     return false;
   }
-
-  std::string strId = controller->ID();
-
-  game_controller controllerStruct{};
-
-  controllerStruct.controller_id        = strId.c_str();
-  controllerStruct.provides_input       = controller->Topology().ProvidesInput();
-  controllerStruct.digital_button_count = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::DIGITAL);
-  controllerStruct.analog_button_count  = controller->FeatureCount(FEATURE_TYPE::SCALAR, INPUT_TYPE::ANALOG);
-  controllerStruct.analog_stick_count   = controller->FeatureCount(FEATURE_TYPE::ANALOG_STICK);
-  controllerStruct.accelerometer_count  = controller->FeatureCount(FEATURE_TYPE::ACCELEROMETER);
-  controllerStruct.key_count            = controller->FeatureCount(FEATURE_TYPE::KEY);
-  controllerStruct.rel_pointer_count    = controller->FeatureCount(FEATURE_TYPE::RELPOINTER);
-  controllerStruct.abs_pointer_count    = controller->FeatureCount(FEATURE_TYPE::ABSPOINTER);
-  controllerStruct.motor_count          = controller->FeatureCount(FEATURE_TYPE::MOTOR);
 
   bool bSuccess = false;
 
@@ -380,7 +459,7 @@ bool CGameClientInput::OpenJoystick(const std::string &portAddress, const Contro
     {
       try
       {
-        bSuccess = m_struct.toAddon.ConnectController(true, portAddress.c_str(), &controllerStruct);
+        bSuccess = m_struct.toAddon.ConnectController(true, portAddress.c_str(), controller->ID().c_str());
       }
       catch (...)
       {
@@ -391,8 +470,11 @@ bool CGameClientInput::OpenJoystick(const std::string &portAddress, const Contro
 
   if (bSuccess)
   {
-    m_joysticks[portAddress].reset(new CGameClientJoystick(m_gameClient, portAddress, controller, m_struct.toAddon));
+    PERIPHERALS::EventLockHandlePtr lock = CServiceBroker::GetPeripherals().RegisterEventLock();
+
+    m_joysticks[portAddress].reset(new CGameClientJoystick(m_gameClient, portAddress, controller));
     ProcessJoysticks();
+
     return true;
   }
 
@@ -406,7 +488,12 @@ void CGameClientInput::CloseJoystick(const std::string &portAddress)
   {
     std::unique_ptr<CGameClientJoystick> joystick = std::move(it->second);
     m_joysticks.erase(it);
-    ProcessJoysticks();
+    {
+      PERIPHERALS::EventLockHandlePtr lock = CServiceBroker::GetPeripherals().RegisterEventLock();
+
+      ProcessJoysticks();
+      joystick.reset();
+    }
   }
 
   {
@@ -466,7 +553,10 @@ void CGameClientInput::Notify(const Observable& obs, const ObservableMessage msg
   {
   case ObservableMessagePeripheralsChanged:
   {
+    PERIPHERALS::EventLockHandlePtr lock = CServiceBroker::GetPeripherals().RegisterEventLock();
+
     ProcessJoysticks();
+
     break;
   }
   default:
@@ -479,10 +569,30 @@ void CGameClientInput::ProcessJoysticks()
   PERIPHERALS::PeripheralVector joysticks;
   CServiceBroker::GetPeripherals().GetPeripheralsWithFeature(joysticks, PERIPHERALS::FEATURE_JOYSTICK);
 
+  // Update expired joysticks
+  PortMap portMapCopy = m_portMap;
+  for (auto& it : portMapCopy)
+  {
+    JOYSTICK::IInputProvider* inputProvider = it.first;
+    CGameClientJoystick* gameJoystick = it.second;
+
+    const bool bExpired = std::find_if(joysticks.begin(), joysticks.end(),
+      [inputProvider](const PERIPHERALS::PeripheralPtr &joystick)
+      {
+        return inputProvider == static_cast<JOYSTICK::IInputProvider*>(joystick.get());
+      }) == joysticks.end();
+
+    if (bExpired)
+    {
+      gameJoystick->UnregisterInput(nullptr);
+      m_portMap.erase(inputProvider);
+    }
+  }
+
   // Perform the port mapping
   PortMap newPortMap = MapJoysticks(joysticks, m_joysticks);
 
-  // Update each joystick
+  // Update connected joysticks
   for (auto& peripheralJoystick : joysticks)
   {
     // Upcast to input interface
@@ -527,7 +637,8 @@ CGameClientInput::PortMap CGameClientInput::MapJoysticks(const PERIPHERALS::Peri
       break;
 
     // Check topology player limit
-    if (m_playerLimit >= 0 && static_cast<int>(i) >= m_playerLimit)
+    const int playerLimit = m_topology->PlayerLimit();
+    if (playerLimit >= 0 && static_cast<int>(i) >= playerLimit)
       break;
 
     // Dereference iterators

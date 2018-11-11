@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://xbmc.org
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "filesystem/SpecialProtocol.h"
@@ -52,6 +40,22 @@ const CGFloat timeFadeSecs                    = 2.0;
     [_touchView setMultipleTouchEnabled:YES];
     [_touchView setContentMode:UIViewContentModeCenter];
 
+    //load the splash image
+    std::string strUserSplash = CUtil::GetSplashPath();
+    xbmcLogo = [UIImage imageWithContentsOfFile:[NSString stringWithUTF8String:strUserSplash.c_str()]];
+    
+    //make a view with the image
+    xbmcLogoView = [[UIImageView alloc] initWithImage:xbmcLogo];
+    //center the image and add it to the view
+    [xbmcLogoView setFrame:frame];
+    [xbmcLogoView setContentMode:UIViewContentModeScaleAspectFill];
+    //autoresize the image frame
+    [xbmcLogoView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+    [xbmcLogoView setAutoresizesSubviews:YES];
+    [_touchView addSubview:xbmcLogoView];
+    //send the image to the background
+    [_touchView sendSubviewToBack:xbmcLogoView];
+    [xbmcLogoView release];
 
     CGRect labelRect = frame;
     labelRect.size.height/=2;
@@ -84,23 +88,6 @@ const CGFloat timeFadeSecs                    = 2.0;
     [_touchView addSubview:descriptionLabel];
     [descriptionLabel release];
 
-    //load the splash image
-    std::string strUserSplash = CUtil::GetSplashPath();
-    xbmcLogo = [UIImage imageWithContentsOfFile:[NSString stringWithUTF8String:strUserSplash.c_str()]];
-
-    //make a view with the image
-    xbmcLogoView = [[UIImageView alloc] initWithImage:xbmcLogo];
-    //center the image and add it to the view
-    [xbmcLogoView setFrame:frame];
-    [xbmcLogoView setContentMode:UIViewContentModeCenter];
-    //autoresize the image frame
-    [xbmcLogoView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
-    [xbmcLogoView setAutoresizesSubviews:YES];
-    [_touchView addSubview:xbmcLogoView];
-    //send the image to the background
-    [_touchView sendSubviewToBack:xbmcLogoView];
-    [xbmcLogoView release];
-
     [[self view] addSubview: _touchView];
 
     [self createGestureRecognizers];
@@ -110,8 +97,6 @@ const CGFloat timeFadeSecs                    = 2.0;
     [_internalWindow setScreen:[UIScreen mainScreen]];
     [_internalWindow makeKeyAndVisible];
     [_internalWindow setRootViewController:self];
-
-    [self setWantsFullScreenLayout:YES];
 
     [self startSleepTimer];//will fade from black too
   }
@@ -321,7 +306,6 @@ const CGFloat timeFadeSecs                    = 2.0;
 //--------------------------------------------------------------
 - (void)viewWillAppear:(BOOL)animated
 {
-  _startup = true;
   [super viewWillAppear:animated];
 }
 //--------------------------------------------------------------
@@ -331,56 +315,6 @@ const CGFloat timeFadeSecs                    = 2.0;
   [_touchView release];
   [_internalWindow release];
   [super dealloc];
-}
-//--------------------------------------------------------------
-// - iOS6 rotation API - will be called on iOS7 runtime!--------
-- (NSUInteger)supportedInterfaceOrientations
-{
-  // mask defines available as of ios6 sdk
-  //return UIInterfaceOrientationMaskAll;
-  return (1 << UIInterfaceOrientationLandscapeLeft) | (1 << UIInterfaceOrientationLandscapeRight) |
-  (1 << UIInterfaceOrientationPortraitUpsideDown) | (1 << UIInterfaceOrientationPortrait);
-}
-- (BOOL)shouldAutorotate
-{
-  _startup = false;
-  return [self shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)[[UIDevice currentDevice] orientation]];
-}
-// - old rotation API will be called on iOS6 and lower - removed in iOS7
--(BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
-{
-  if(_startup)
-  {
-    //start with landscape
-    switch(interfaceOrientation)
-    {
-      case UIInterfaceOrientationLandscapeLeft:
-      case UIInterfaceOrientationLandscapeRight:
-        return YES;
-      default:
-        return FALSE;
-    }
-  }
-  else
-  {
-    return YES;//we allow all rotations after startup...
-  }
-}
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
-{
-  if(_startup)
-  {
-    //start with landscape
-    switch(toInterfaceOrientation)
-    {
-      case UIInterfaceOrientationLandscapeLeft:
-      case UIInterfaceOrientationLandscapeRight:
-        _startup = false;//allow all orientations after initial landscape rotation
-        break;
-      default:
-        break;
-    }
-  }
 }
 //--------------------------------------------------------------
 @end

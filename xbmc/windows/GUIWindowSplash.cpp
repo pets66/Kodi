@@ -1,32 +1,18 @@
 /*
- *      Copyright (C) 2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2015-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowSplash.h"
 
-#include "filesystem/File.h"
-#include "filesystem/SpecialProtocol.h"
 #include "guilib/GUIImage.h"
 #include "guilib/GUIWindowManager.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "Util.h"
-#include "utils/log.h"
 
 CGUIWindowSplash::CGUIWindowSplash(void) : CGUIWindow(WINDOW_SPLASH, "")
 {
@@ -38,22 +24,22 @@ CGUIWindowSplash::~CGUIWindowSplash(void) = default;
 
 void CGUIWindowSplash::OnInitWindow()
 {
-  if (!g_advancedSettings.m_splashImage)
+  if (!CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_splashImage)
     return;
 
-  m_image = std::unique_ptr<CGUIImage>(new CGUIImage(0, 0, 0, 0, g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight(), CTextureInfo(CUtil::GetSplashPath())));
+  m_image = std::unique_ptr<CGUIImage>(new CGUIImage(0, 0, 0, 0, CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth(), CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight(), CTextureInfo(CUtil::GetSplashPath())));
   m_image->SetAspectRatio(CAspectRatio::AR_SCALE);
 }
 
 void CGUIWindowSplash::Render()
 {
-  g_graphicsContext.SetRenderingResolution(g_graphicsContext.GetResInfo(), true);
+  CServiceBroker::GetWinSystem()->GetGfxContext().SetRenderingResolution(CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo(), true);
 
   if (!m_image)
     return;
 
-  m_image->SetWidth(g_graphicsContext.GetWidth());
-  m_image->SetHeight(g_graphicsContext.GetHeight());
+  m_image->SetWidth(CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth());
+  m_image->SetHeight(CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight());
   m_image->AllocResources();
   m_image->Render();
   m_image->FreeResources();

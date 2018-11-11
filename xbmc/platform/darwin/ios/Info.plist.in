@@ -56,7 +56,7 @@
 	<key>DTPlatformBuild</key>
 	<string>13E230</string>
 	<key>UIFileSharingEnabled</key>
-	<string>YES</string>
+	<true/>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -320,6 +320,7 @@
           <string>aif</string>
           <string>aiff</string>
           <string>wpl</string>
+          <string>xspf</string>
           <string>ape</string>
           <string>mac</string>
           <string>mpc</string>
@@ -431,6 +432,7 @@
           <string>rar</string>
           <string>001</string>
           <string>wpl</string>
+          <string>xspf</string>
           <string>zip</string>
           <string>vdr</string>
           <string>dvr-ms</string>

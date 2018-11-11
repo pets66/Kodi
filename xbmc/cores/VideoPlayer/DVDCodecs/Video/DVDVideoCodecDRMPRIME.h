@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -30,6 +18,17 @@ extern "C" {
 #include "libavutil/hwcontext_drm.h"
 }
 
+// Color enums is copied from linux include/drm/drm_color_mgmt.h (strangely not part of uapi)
+enum drm_color_encoding {
+  DRM_COLOR_YCBCR_BT601,
+  DRM_COLOR_YCBCR_BT709,
+  DRM_COLOR_YCBCR_BT2020,
+};
+enum drm_color_range {
+  DRM_COLOR_YCBCR_LIMITED_RANGE,
+  DRM_COLOR_YCBCR_FULL_RANGE,
+};
+
 class CVideoBufferPoolDRMPRIME;
 
 class CVideoBufferDRMPRIME
@@ -37,17 +36,18 @@ class CVideoBufferDRMPRIME
 {
 public:
   CVideoBufferDRMPRIME(IVideoBufferPool& pool, int id);
-  virtual ~CVideoBufferDRMPRIME();
+  ~CVideoBufferDRMPRIME();
   void SetRef(AVFrame* frame);
   void Unref();
 
-  uint32_t m_drm_fd = -1;
   uint32_t m_fb_id = 0;
   uint32_t m_handles[AV_DRM_MAX_PLANES] = {0};
 
   AVDRMFrameDescriptor* GetDescriptor() const { return reinterpret_cast<AVDRMFrameDescriptor*>(m_pFrame->data[0]); }
   uint32_t GetWidth() const { return m_pFrame->width; }
   uint32_t GetHeight() const { return m_pFrame->height; }
+  int GetColorEncoding() const;
+  int GetColorRange() const;
 protected:
   AVFrame* m_pFrame = nullptr;
 };
@@ -57,7 +57,7 @@ class CDVDVideoCodecDRMPRIME
 {
 public:
   explicit CDVDVideoCodecDRMPRIME(CProcessInfo& processInfo);
-  ~CDVDVideoCodecDRMPRIME() override;
+  ~CDVDVideoCodecDRMPRIME();
 
   static CDVDVideoCodec* Create(CProcessInfo& processInfo);
   static void Register();
@@ -67,13 +67,12 @@ public:
   void Reset() override;
   CDVDVideoCodec::VCReturn GetPicture(VideoPicture* pVideoPicture) override;
   const char* GetName() override { return m_name.c_str(); };
-  unsigned GetAllowedReferences() override { return 4; };
+  unsigned GetAllowedReferences() override { return 5; };
   void SetCodecControl(int flags) override { m_codecControlFlags = flags; };
 
 protected:
-  virtual AVCodec* FindDecoder(CDVDStreamInfo& hints);
-  virtual void Drain();
-  virtual void SetPictureParams(VideoPicture* pVideoPicture);
+  void Drain();
+  void SetPictureParams(VideoPicture* pVideoPicture);
 
   std::string m_name;
   int m_codecControlFlags = 0;

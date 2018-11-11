@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #ifndef __GNUC__
 #pragma warning(push)
@@ -56,15 +45,15 @@ public:
 class DllOMX : public DllDynamic, DllOMXInterface
 {
 public:
-  virtual OMX_ERRORTYPE OMX_Init(void) 
+  virtual OMX_ERRORTYPE OMX_Init(void)
     { return ::OMX_Init(); };
-  virtual OMX_ERRORTYPE OMX_Deinit(void) 
+  virtual OMX_ERRORTYPE OMX_Deinit(void)
     { return ::OMX_Deinit(); };
   virtual OMX_ERRORTYPE OMX_GetHandle(OMX_HANDLETYPE *pHandle, OMX_STRING cComponentName, OMX_PTR pAppData, OMX_CALLBACKTYPE *pCallBacks)
     { return ::OMX_GetHandle(pHandle, cComponentName, pAppData, pCallBacks); };
   virtual OMX_ERRORTYPE OMX_FreeHandle(OMX_HANDLETYPE hComponent)
     { return ::OMX_FreeHandle(hComponent); };
-  virtual OMX_ERRORTYPE OMX_GetComponentsOfRole(OMX_STRING role, OMX_U32 *pNumComps, OMX_U8 **compNames) 
+  virtual OMX_ERRORTYPE OMX_GetComponentsOfRole(OMX_STRING role, OMX_U32 *pNumComps, OMX_U8 **compNames)
     { return ::OMX_GetComponentsOfRole(role, pNumComps, compNames); };
   virtual OMX_ERRORTYPE OMX_GetRolesOfComponent(OMX_STRING compName, OMX_U32 *pNumRoles, OMX_U8 **roles)
     { return ::OMX_GetRolesOfComponent(compName, pNumRoles, roles); };
@@ -72,9 +61,9 @@ public:
     { return ::OMX_ComponentNameEnum(cComponentName, nNameLength, nIndex); };
   virtual OMX_ERRORTYPE OMX_SetupTunnel(OMX_HANDLETYPE hOutput, OMX_U32 nPortOutput, OMX_HANDLETYPE hInput, OMX_U32 nPortInput)
     { return ::OMX_SetupTunnel(hOutput, nPortOutput, hInput, nPortInput); };
-  virtual bool ResolveExports() 
+  virtual bool ResolveExports()
     { return true; }
-  virtual bool Load() 
+  virtual bool Load()
   {
     CLog::Log(LOGDEBUG, "DllOMX: Using omx system library");
     return true;

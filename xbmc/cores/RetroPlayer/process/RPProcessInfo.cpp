@@ -1,30 +1,17 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RPProcessInfo.h"
 #include "ServiceBroker.h"
-#include "cores/RetroPlayer/process/RenderBufferManager.h"
+#include "cores/RetroPlayer/buffers/RenderBufferManager.h"
 #include "cores/RetroPlayer/rendering/RenderContext.h"
 #include "cores/DataCacheCore.h"
-#include "guilib/GraphicContext.h"
-#include "rendering/RenderSystem.h"
+#include "windowing/GraphicContext.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "threads/SingleLock.h"
@@ -47,16 +34,17 @@ CCriticalSection CRPProcessInfo::m_createSection;
 CRPProcessInfo::CRPProcessInfo(std::string platformName) :
   m_platformName(std::move(platformName)),
   m_renderBufferManager(new CRenderBufferManager),
-  m_renderContext(new CRenderContext(&CServiceBroker::GetRenderSystem(),
-                                     &CServiceBroker::GetWinSystem(),
-                                     g_graphicsContext,
+  m_renderContext(new CRenderContext(CServiceBroker::GetRenderSystem(),
+                                     CServiceBroker::GetWinSystem(),
+                                     CServiceBroker::GetWinSystem()->GetGfxContext(),
                                      CDisplaySettings::GetInstance(),
                                      CMediaSettings::GetInstance()))
 {
   for (auto &rendererFactory : m_rendererFactories)
   {
     RenderBufferPoolVector bufferPools = rendererFactory->CreateBufferPools(*m_renderContext);
-    m_renderBufferManager->RegisterPools(rendererFactory.get(), std::move(bufferPools));
+    if (!bufferPools.empty())
+      m_renderBufferManager->RegisterPools(rendererFactory.get(), std::move(bufferPools));
   }
 
   // Initialize default scaling method
@@ -176,16 +164,16 @@ void CRPProcessInfo::ResetInfo()
   }
 }
 
-bool CRPProcessInfo::HasScalingMethod(ESCALINGMETHOD scalingMethod) const
+bool CRPProcessInfo::HasScalingMethod(SCALINGMETHOD scalingMethod) const
 {
   return m_renderBufferManager->HasScalingMethod(scalingMethod);
 }
 
-std::vector<ESCALINGMETHOD> CRPProcessInfo::GetScalingMethods()
+std::vector<SCALINGMETHOD> CRPProcessInfo::GetScalingMethods()
 {
   return {
-    VS_SCALINGMETHOD_NEAREST,
-    VS_SCALINGMETHOD_LINEAR,
+    SCALINGMETHOD::NEAREST,
+    SCALINGMETHOD::LINEAR,
   };
 }
 

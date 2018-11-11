@@ -1,38 +1,25 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonDll.h"
 
 #include "addons/AddonStatusHandler.h"
 #include "GUIUserMessages.h"
-#include "ServiceBroker.h"
 #include "addons/settings/AddonSettings.h"
 #include "addons/settings/GUIDialogAddonSettings.h"
 #include "events/EventLog.h"
 #include "events/NotificationEvent.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "utils/URIUtils.h"
 #include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
-#include "filesystem/Directory.h"
-#include "messaging/helpers/DialogOKHelper.h" 
+#include "messaging/helpers/DialogOKHelper.h"
 #include "settings/lib/SettingSection.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -41,7 +28,6 @@
 #include "Util.h"
 
 // Global addon callback handle classes
-#include "addons/interfaces/AudioEngine.h"
 #include "addons/interfaces/Filesystem.h"
 #include "addons/interfaces/General.h"
 #include "addons/interfaces/Network.h"
@@ -51,6 +37,8 @@ using namespace KODI::MESSAGING;
 
 namespace ADDON
 {
+
+std::vector<ADDON_GET_INTERFACE_FN> CAddonDll::s_registeredInterfaces;
 
 CAddonDll::CAddonDll(CAddonInfo addonInfo, BinaryAddonBasePtr addonBase)
   : CAddon(std::move(addonInfo)),
@@ -78,6 +66,11 @@ CAddonDll::~CAddonDll()
     Destroy();
 }
 
+void CAddonDll::RegisterInterface(ADDON_GET_INTERFACE_FN fn)
+{
+  s_registeredInterfaces.push_back(fn);
+}
+
 std::string CAddonDll::GetDllPath(const std::string &libPath)
 {
   std::string strFileName = libPath;
@@ -88,11 +81,33 @@ std::string CAddonDll::GetDllPath(const std::string &libPath)
 
   /* Check if lib being loaded exists, else check in XBMC binary location */
 #if defined(TARGET_ANDROID)
-  // Android libs MUST live in this path, else multi-arch will break.
-  // The usual soname requirements apply. no subdirs, and filename is ^lib.*\.so$
+  if (XFILE::CFile::Exists(strFileName))
+  {
+    bool doCopy = true;
+    std::string dstfile = URIUtils::AddFileToFolder(CSpecialProtocol::TranslatePath("special://xbmcaltbinaddons/"), strLibName);
+
+    struct __stat64 dstFileStat;
+    if (XFILE::CFile::Stat(dstfile, &dstFileStat) == 0)
+    {
+      struct __stat64 srcFileStat;
+      if (XFILE::CFile::Stat(strFileName, &srcFileStat) == 0)
+      {
+        if (dstFileStat.st_size == srcFileStat.st_size && dstFileStat.st_mtime > srcFileStat.st_mtime)
+          doCopy = false;
+      }
+    }
+
+    if (doCopy)
+    {
+      CLog::Log(LOGDEBUG, "ADDON: caching %s to %s", strFileName.c_str(), dstfile.c_str());
+      XFILE::CFile::Copy(strFileName, dstfile);
+    }
+
+    strFileName = dstfile;
+  }
   if (!XFILE::CFile::Exists(strFileName))
   {
-    std::string tempbin = getenv("XBMC_ANDROID_LIBS");
+    std::string tempbin = getenv("KODI_ANDROID_LIBS");
     strFileName = tempbin + "/" + strLibName;
   }
 #endif
@@ -356,11 +371,6 @@ void CAddonDll::SaveSettings()
     TransferSettings();
 }
 
-std::string CAddonDll::GetSetting(const std::string& key)
-{
-  return CAddon::GetSetting(key);
-}
-
 ADDON_STATUS CAddonDll::TransferSettings()
 {
   bool restart = false;
@@ -450,7 +460,7 @@ bool CAddonDll::CheckAPIVersion(int type)
   /* If a instance (not global) version becomes checked must be the version
    * present.
    */
-  if (kodiMinVersion > addonVersion || 
+  if (kodiMinVersion > addonVersion ||
       addonVersion > AddonVersion(kodi::addon::GetTypeVersion(type)))
   {
     CLog::Log(LOGERROR, "Add-on '%s' is using an incompatible API version for type '%s'. Kodi API min version = '%s', add-on API version '%s'",
@@ -470,10 +480,10 @@ bool CAddonDll::CheckAPIVersion(int type)
 
 bool CAddonDll::UpdateSettingInActiveDialog(const char* id, const std::string& value)
 {
-  if (!g_windowManager.IsWindowActive(WINDOW_DIALOG_ADDON_SETTINGS))
+  if (!CServiceBroker::GetGUI()->GetWindowManager().IsWindowActive(WINDOW_DIALOG_ADDON_SETTINGS))
     return false;
 
-  CGUIDialogAddonSettings* dialog = g_windowManager.GetWindow<CGUIDialogAddonSettings>(WINDOW_DIALOG_ADDON_SETTINGS);
+  CGUIDialogAddonSettings* dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogAddonSettings>(WINDOW_DIALOG_ADDON_SETTINGS);
   if (dialog->GetCurrentAddonID() != m_addonInfo.ID())
     return false;
 
@@ -482,7 +492,7 @@ bool CAddonDll::UpdateSettingInActiveDialog(const char* id, const std::string& v
   params.push_back(id);
   params.push_back(value);
   message.SetStringParams(params);
-  g_windowManager.SendThreadMessage(message, WINDOW_DIALOG_ADDON_SETTINGS);
+  CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message, WINDOW_DIALOG_ADDON_SETTINGS);
 
   return true;
 }
@@ -531,10 +541,11 @@ bool CAddonDll::InitInterface(KODI_HANDLE firstKodiInstance)
   m_interface.toAddon = (KodiToAddonFuncTable_Addon*) calloc(1, sizeof(KodiToAddonFuncTable_Addon));
 
   Interface_General::Init(&m_interface);
-  Interface_AudioEngine::Init(&m_interface);
   Interface_Filesystem::Init(&m_interface);
   Interface_Network::Init(&m_interface);
   Interface_GUIGeneral::Init(&m_interface);
+
+  m_interface.toKodi->get_interface = get_interface;
 
   return true;
 }
@@ -544,11 +555,10 @@ void CAddonDll::DeInitInterface()
   Interface_GUIGeneral::DeInit(&m_interface);
   Interface_Network::DeInit(&m_interface);
   Interface_Filesystem::DeInit(&m_interface);
-  Interface_AudioEngine::DeInit(&m_interface);
   Interface_General::DeInit(&m_interface);
 
   if (m_interface.libBasePath)
-    free((char*)m_interface.libBasePath);
+    free(const_cast<char*>(m_interface.libBasePath));
   if (m_interface.toKodi)
     free((char*)m_interface.toKodi);
   if (m_interface.toAddon)
@@ -557,7 +567,7 @@ void CAddonDll::DeInitInterface()
 }
 
 char* CAddonDll::get_addon_path(void* kodiBase)
-{ 
+{
   CAddonDll* addon = static_cast<CAddonDll*>(kodiBase);
   if (addon == nullptr)
   {
@@ -569,7 +579,7 @@ char* CAddonDll::get_addon_path(void* kodiBase)
 }
 
 char* CAddonDll::get_base_user_path(void* kodiBase)
-{ 
+{
   CAddonDll* addon = static_cast<CAddonDll*>(kodiBase);
   if (addon == nullptr)
   {
@@ -678,13 +688,16 @@ bool CAddonDll::get_setting_int(void* kodiBase, const char* id, int* value)
     return false;
   }
 
-  if (setting->GetType() != SettingType::Integer)
+  if (setting->GetType() != SettingType::Integer && setting->GetType() != SettingType::Number)
   {
     CLog::Log(LOGERROR, "kodi::General::%s - setting '%s' is not a integer in '%s'", __FUNCTION__, id, addon->Name().c_str());
     return false;
   }
 
-  *value = std::static_pointer_cast<CSettingInt>(setting)->GetValue();
+  if (setting->GetType() == SettingType::Integer)
+    *value = std::static_pointer_cast<CSettingInt>(setting)->GetValue();
+  else
+    *value = static_cast<int>(std::static_pointer_cast<CSettingNumber>(setting)->GetValue());
   return true;
 }
 
@@ -874,6 +887,19 @@ void CAddonDll::free_string_array(void* kodiBase, char** arr, int numElements)
   }
 }
 
+void* CAddonDll::get_interface(void* kodiBase, const char *name, const char *version)
+{
+  if (!name || !version)
+    return nullptr;
+
+  void *retval(nullptr);
+
+  for (auto fn : s_registeredInterfaces)
+    if ((retval = fn(name, version)))
+      break;
+
+  return retval;
+}
 
 //@}
 

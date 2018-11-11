@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonUtils.h"
@@ -52,7 +40,7 @@ namespace XBMCAddonUtils
 
   static char defaultImage[1024];
 
-  const char *getDefaultImage(char* cControlType, char* cTextureType)
+  const char *getDefaultImage(const char* cControlType, const char* cTextureType)
   {
     // create an xml block so that we can resolve our defaults
     // <control type="type">
@@ -102,17 +90,17 @@ namespace XBMCAddonUtils
 
   const char* TraceGuard::getSpaces() { return spaces[depth]; }
 
-  TraceGuard::TraceGuard(const char* _function) :function(_function) 
+  TraceGuard::TraceGuard(const char* _function) :function(_function)
   {
     parent = tlParent;
     depth = parent == NULL ? 0 : parent->depth + 1;
 
     tlParent = this;
 
-    CLog::Log(LOGDEBUG, "%sNEWADDON Entering %s", spaces[depth], function); 
+    CLog::Log(LOGDEBUG, "%sNEWADDON Entering %s", spaces[depth], function);
   }
 
-  TraceGuard::TraceGuard() :function(NULL) 
+  TraceGuard::TraceGuard() :function(NULL)
   {
     parent = tlParent;
     depth = parent == NULL ? 0 : parent->depth + 1;
@@ -120,7 +108,7 @@ namespace XBMCAddonUtils
     // silent
   }
 
-  TraceGuard::~TraceGuard() 
+  TraceGuard::~TraceGuard()
   {
     if (function)
       CLog::Log(LOGDEBUG, "%sNEWADDON Leaving %s", spaces[depth], function);

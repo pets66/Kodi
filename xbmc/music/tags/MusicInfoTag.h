@@ -1,36 +1,23 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 class CSong;
 class CArtist;
 class CVariant;
 
-#include <stdint.h>
 #include <string>
 #include <vector>
 
 #include "ReplayGain.h"
 #include "XBDateTime.h"
 #include "music/Album.h"
-#include "music/Artist.h"
 #include "utils/IArchivable.h"
 #include "utils/ISerializable.h"
 #include "utils/ISortable.h"
@@ -38,13 +25,10 @@ class CVariant;
 
 namespace MUSIC_INFO
 {
-class CMusicInfoTag : public IArchivable, public ISerializable, public ISortable
+class CMusicInfoTag final : public IArchivable, public ISerializable, public ISortable
 {
 public:
   CMusicInfoTag(void);
-  CMusicInfoTag(const CMusicInfoTag& tag);
-  ~CMusicInfoTag() override;
-  CMusicInfoTag& operator =(const CMusicInfoTag& tag);
   bool operator !=(const CMusicInfoTag& tag) const;
   bool Loaded() const;
   const std::string& GetTitle() const;
@@ -119,7 +103,7 @@ public:
   void SetLoaded(bool bOnOff = true);
   void SetArtist(const CArtist& artist);
   void SetAlbum(const CAlbum& album);
-  void SetSong(const CSong& song);  
+  void SetSong(const CSong& song);
   void SetMusicBrainzTrackID(const std::string& strTrackID);
   void SetMusicBrainzArtistID(const std::vector<std::string>& musicBrainzArtistId);
   void SetMusicBrainzArtistHints(const std::vector<std::string>& musicBrainzArtistHints);
@@ -165,7 +149,7 @@ public:
    \param genre genre to add.
    */
   void AppendGenre(const std::string &genre);
-  
+
   void AddArtistRole(const std::string& Role, const std::string& strArtist);
   void AddArtistRole(const std::string& Role, const std::vector<std::string>& artists);
   void AppendArtistRole(const CMusicRole& ArtistRole);

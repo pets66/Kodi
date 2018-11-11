@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: KODI Main\n"
-"Report-Msgid-Bugs-To: http://trac.kodi.tv/\n"
+"Report-Msgid-Bugs-To: https://github.com/xbmc/xbmc/issues/\n"
 "POT-Creation-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Kodi Translation Team\n"
@@ -448,6 +448,10 @@ msgctxt "#31132"
 msgid "Select Program"
 msgstr "Seleziona programma"
 
+msgctxt "#31133"
+msgid "Select Resolution"
+msgstr "Seleziona risoluzione"
+
 msgctxt "#31134"
 msgid "Remaining"
 msgstr "Rimanenti"
@@ -555,3 +559,11 @@ msgstr "Gioca ai tuoi giochi personali o scarica uno dei tanti giochi Add-on dal
 msgctxt "#31163"
 msgid "Show Fanart background"
 msgstr "Mostra sfondo Fanart"
+
+msgctxt "#31164"
+msgid "Choose kind of profile identification"
+msgstr "Scegli il tipo di indentificazione del profilo"
+
+msgctxt "#31165"
+msgid "Profile name"
+msgstr "Nome profilo"

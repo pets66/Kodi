@@ -1,28 +1,15 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Variant.h"
 
 #include <stdlib.h>
 #include <string.h>
-#include <sstream>
 #include <utility>
 
 #ifndef strtoll
@@ -410,7 +397,7 @@ int64_t CVariant::asInteger(int64_t fallback) const
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -436,7 +423,7 @@ uint64_t CVariant::asUnsignedInteger(uint64_t fallback) const
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -462,7 +449,7 @@ double CVariant::asDouble(double fallback) const
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -483,7 +470,7 @@ float CVariant::asFloat(float fallback) const
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -510,7 +497,7 @@ bool CVariant::asBoolean(bool fallback) const
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -523,22 +510,15 @@ std::string CVariant::asString(const std::string &fallback /* = "" */) const
     case VariantTypeBoolean:
       return m_data.boolean ? "true" : "false";
     case VariantTypeInteger:
+      return std::to_string(m_data.integer);
     case VariantTypeUnsignedInteger:
+      return std::to_string(m_data.unsignedinteger);
     case VariantTypeDouble:
-    {
-      std::ostringstream strStream;
-      if (m_type == VariantTypeInteger)
-        strStream << m_data.integer;
-      else if (m_type == VariantTypeUnsignedInteger)
-        strStream << m_data.unsignedinteger;
-      else
-        strStream << m_data.dvalue;
-      return strStream.str();
-    }
+      return std::to_string(m_data.dvalue);
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 
@@ -551,22 +531,15 @@ std::wstring CVariant::asWideString(const std::wstring &fallback /* = L"" */) co
     case VariantTypeBoolean:
       return m_data.boolean ? L"true" : L"false";
     case VariantTypeInteger:
+      return std::to_wstring(m_data.integer);
     case VariantTypeUnsignedInteger:
+      return std::to_wstring(m_data.unsignedinteger);
     case VariantTypeDouble:
-    {
-      std::wostringstream strStream;
-      if (m_type == VariantTypeInteger)
-        strStream << m_data.integer;
-      else if (m_type == VariantTypeUnsignedInteger)
-        strStream << m_data.unsignedinteger;
-      else
-        strStream << m_data.dvalue;
-      return strStream.str();
-    }
+      return std::to_wstring(m_data.dvalue);
     default:
       return fallback;
   }
-  
+
   return fallback;
 }
 

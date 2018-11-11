@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2012-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <string>
 #include <map>
@@ -47,20 +36,20 @@ private:
    */
   static void FormatTemperature(std::string &text, double temp);
 
-  struct ci_less : std::binary_function<std::string, std::string, bool>
+  struct ci_less
   {
     // case-independent (ci) compare_less binary function
-    struct nocase_compare : public std::binary_function<unsigned char,unsigned char,bool>
+    struct nocase_compare
     {
       bool operator() (const unsigned char& c1, const unsigned char& c2) const {
-        return tolower (c1) < tolower (c2);
+        return tolower(c1) < tolower(c2);
       }
     };
-    bool operator() (const std::string & s1, const std::string & s2) const {
+    bool operator()(const std::string & s1, const std::string & s2) const {
       return std::lexicographical_compare
-      (s1.begin (), s1.end (),
-       s2.begin (), s2.end (),
-       nocase_compare ());
+      (s1.begin(), s1.end(),
+        s2.begin(), s2.end(),
+        nocase_compare());
     }
   };
 

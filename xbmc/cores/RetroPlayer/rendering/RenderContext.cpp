@@ -1,25 +1,13 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "RenderContext.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "rendering/RenderSystem.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
@@ -84,6 +72,9 @@ static ESHADERMETHOD TranslateShaderMethod(GL_SHADER_METHOD method)
   {
   case GL_SHADER_METHOD::DEFAULT: return SM_DEFAULT;
   case GL_SHADER_METHOD::TEXTURE: return SM_TEXTURE;
+#if defined(HAS_GLES)
+  case GL_SHADER_METHOD::TEXTURE_RGBA_OES: return SM_TEXTURE_RGBA_OES;
+#endif
   default:
     break;
   }
@@ -225,7 +216,7 @@ RESOLUTION CRenderContext::GetVideoResolution()
   return m_graphicsContext.GetVideoResolution();
 }
 
-void CRenderContext::Clear(color_t color /* = 0 */)
+void CRenderContext::Clear(UTILS::Color color /* = 0 */)
 {
   m_graphicsContext.Clear(color);
 }
@@ -240,7 +231,7 @@ void CRenderContext::SetRenderingResolution(const RESOLUTION_INFO &res, bool nee
   m_graphicsContext.SetRenderingResolution(res, needsScaling);
 }
 
-color_t CRenderContext::MergeAlpha(color_t color)
+UTILS::Color CRenderContext::MergeAlpha(UTILS::Color color)
 {
   return m_graphicsContext.MergeAlpha(color);
 }

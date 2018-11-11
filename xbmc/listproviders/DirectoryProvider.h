@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2013-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2013-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -26,13 +14,17 @@
 #include "IListProvider.h"
 #include "favourites/FavouritesService.h"
 #include "guilib/GUIStaticItem.h"
-#include "pvr/PVREvent.h"
 #include "utils/Job.h"
 #include "threads/CriticalSection.h"
 #include "interfaces/IAnnouncer.h"
 
 class TiXmlElement;
 class CVariant;
+
+namespace PVR
+{
+  enum class PVREvent;
+}
 
 enum class InfoTagType
 {
@@ -73,18 +65,18 @@ private:
   UpdateState      m_updateState;
   bool             m_isAnnounced;
   unsigned int     m_jobID;
-  CGUIInfoLabel    m_url;
-  CGUIInfoLabel    m_target;
-  CGUIInfoLabel    m_sortMethod;
-  CGUIInfoLabel    m_sortOrder;
-  CGUIInfoLabel    m_limit;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_url;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_target;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_sortMethod;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_sortOrder;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_limit;
   std::string      m_currentUrl;
   std::string      m_currentTarget;   ///< \brief node.target property on the list as a whole
   SortDescription  m_currentSort;
   unsigned int     m_currentLimit;
   std::vector<CGUIStaticItemPtr> m_items;
   std::vector<InfoTagType> m_itemTypes;
-  CCriticalSection m_section;
+  mutable CCriticalSection m_section;
 
   bool UpdateURL();
   bool UpdateLimit();

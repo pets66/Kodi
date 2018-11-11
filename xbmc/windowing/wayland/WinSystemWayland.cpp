@@ -1,26 +1,13 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "WinSystemWayland.h"
 
-#include "OptionalsReg.h"
 #include <algorithm>
 #include <limits>
 #include <numeric>
@@ -34,16 +21,19 @@
 #include "input/InputManager.h"
 #include "input/touch/generic/GenericTouchActionHandler.h"
 #include "input/touch/generic/GenericTouchInputHandler.h"
-#include "powermanagement/linux/LinuxPowerSyscall.h"
+#include "platform/linux/powermanagement/LinuxPowerSyscall.h"
+#include "platform/linux/OptionalsReg.h"
 #include "platform/linux/PlatformConstants.h"
 #include "platform/linux/TimeUtils.h"
 #include "messaging/ApplicationMessenger.h"
+#include "OptionalsReg.h"
 #include "OSScreenSaverIdleInhibitUnstableV1.h"
 #include "Registry.h"
 #include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "ShellSurfaceWlShell.h"
 #include "ShellSurfaceXdgShell.h"
 #include "ShellSurfaceXdgShellUnstableV6.h"
@@ -148,32 +138,40 @@ CWinSystemWayland::CWinSystemWayland()
 : CWinSystemBase{}, m_protocol{"WinSystemWaylandInternal"}
 {
   std::string envSink;
-  if (getenv("AE_SINK"))
-    envSink = getenv("AE_SINK");
+  if (getenv("KODI_AE_SINK"))
+    envSink = getenv("KODI_AE_SINK");
   if (StringUtils::EqualsNoCase(envSink, "ALSA"))
   {
-    ::WAYLAND::ALSARegister();
+    OPTIONALS::ALSARegister();
   }
   else if (StringUtils::EqualsNoCase(envSink, "PULSE"))
   {
-    ::WAYLAND::PulseAudioRegister();
+    OPTIONALS::PulseAudioRegister();
+  }
+  else if (StringUtils::EqualsNoCase(envSink, "OSS"))
+  {
+    OPTIONALS::OSSRegister();
   }
   else if (StringUtils::EqualsNoCase(envSink, "SNDIO"))
   {
-    ::WAYLAND::SndioRegister();
+    OPTIONALS::SndioRegister();
   }
   else
   {
-    if (!::WAYLAND::PulseAudioRegister())
+    if (!OPTIONALS::PulseAudioRegister())
     {
-      if (!::WAYLAND::ALSARegister())
+      if (!OPTIONALS::ALSARegister())
       {
-        ::WAYLAND::SndioRegister();
+        if (!OPTIONALS::SndioRegister())
+        {
+          OPTIONALS::OSSRegister();
+        }
       }
     }
   }
   m_winEvents.reset(new CWinEventsWayland());
   CLinuxPowerSyscall::Register();
+  m_lirc.reset(OPTIONALS::LircRegister());
 }
 
 CWinSystemWayland::~CWinSystemWayland() noexcept
@@ -321,7 +319,7 @@ bool CWinSystemWayland::CreateNewWindow(const std::string& name,
   if (fullScreen)
   {
     // Try to start on correct monitor and with correct buffer scale
-    auto output = FindOutputByUserFriendlyName(CServiceBroker::GetSettings().GetString(CSettings::SETTING_VIDEOSCREEN_MONITOR));
+    auto output = FindOutputByUserFriendlyName(CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_VIDEOSCREEN_MONITOR));
     auto wlOutput = output ? output->GetWaylandOutput() : wayland::output_t{};
     m_lastSetOutput = wlOutput;
     m_shellSurface->SetFullScreen(wlOutput, res.fRefreshRate);
@@ -346,7 +344,7 @@ bool CWinSystemWayland::CreateNewWindow(const std::string& name,
   ApplyWindowGeometry();
 
   // Update resolution with real size as it could have changed due to configure()
-  UpdateDesktopResolution(res, 0, m_bufferSize.Width(), m_bufferSize.Height(), res.fRefreshRate);
+  UpdateDesktopResolution(res, m_bufferSize.Width(), m_bufferSize.Height(), res.fRefreshRate, 0);
   res.bFullScreen = fullScreen;
 
   m_seatRegistry.reset(new CRegistry{*m_connection});
@@ -415,23 +413,6 @@ bool CWinSystemWayland::CanDoWindowed()
   return true;
 }
 
-int CWinSystemWayland::GetNumScreens()
-{
-  // Multiple screen/resolution support in core Kodi badly needs refactoring, but as
-  // it touches a lot of code we just do it like X11 for the moment:
-  // Pretend that there is only one screen, show more screens with
-  // custom names in the GUI using an #ifdef in DisplaySettings
-  // - otherwise we would just get a selection between "Full Screen #1" and
-  // "Full Screen #2" etc. instead of actual monitor names.
-  return 1;
-}
-
-int CWinSystemWayland::GetCurrentScreen()
-{
-  // See GetNumScreens()
-  return 1;
-}
-
 void CWinSystemWayland::GetConnectedOutputs(std::vector<std::string>* outputs)
 {
   CSingleLock lock(m_outputsMutex);
@@ -439,6 +420,11 @@ void CWinSystemWayland::GetConnectedOutputs(std::vector<std::string>* outputs)
                  [this](decltype(m_outputs)::value_type const& pair)
                  {
                    return UserFriendlyOutputName(pair.second); });
+}
+
+bool CWinSystemWayland::UseLimitedColor()
+{
+  return CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_VIDEOSCREEN_LIMITEDRANGE);
 }
 
 void CWinSystemWayland::UpdateResolutions()
@@ -449,7 +435,7 @@ void CWinSystemWayland::UpdateResolutions()
 
   // Mimic X11:
   // Only show resolutions for the currently selected output
-  std::string userOutput = CServiceBroker::GetSettings().GetString(CSettings::SETTING_VIDEOSCREEN_MONITOR);
+  std::string userOutput = CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(CSettings::SETTING_VIDEOSCREEN_MONITOR);
 
   CSingleLock lock(m_outputsMutex);
 
@@ -485,7 +471,7 @@ void CWinSystemWayland::UpdateResolutions()
     CLog::LogF(LOGINFO, "- %dx%d @%.3f Hz pixel ratio %.3f%s", mode.size.Width(), mode.size.Height(), mode.refreshMilliHz / 1000.0f, pixelRatio, isCurrent ? " current" : "");
 
     RESOLUTION_INFO res;
-    UpdateDesktopResolution(res, 0, mode.size.Width(), mode.size.Height(), mode.GetRefreshInHz());
+    UpdateDesktopResolution(res, mode.size.Width(), mode.size.Height(), mode.GetRefreshInHz(), 0);
     res.strOutput = outputName;
     res.fPixelRatio = pixelRatio;
 
@@ -899,7 +885,7 @@ void CWinSystemWayland::SetResolutionInternal(CSizeInt size, std::int32_t scale,
       {
         // Add new resolution if none found
         RESOLUTION_INFO newResInfo;
-        UpdateDesktopResolution(newResInfo, 0, sizes.bufferSize.Width(), sizes.bufferSize.Height(), refreshRate);
+        UpdateDesktopResolution(newResInfo, sizes.bufferSize.Width(), sizes.bufferSize.Height(), refreshRate, 0);
         newResInfo.strOutput = CDisplaySettings::GetInstance().GetCurrentResolutionInfo().strOutput; // we just assume the compositor put us on the right output
         CDisplaySettings::GetInstance().AddResolutionInfo(newResInfo);
         CDisplaySettings::GetInstance().ApplyCalibrations();
@@ -1331,7 +1317,7 @@ void CWinSystemWayland::PrepareFramePresentation()
     };
     feedback.on_presented() = [this,iter](std::uint32_t tvSecHi, std::uint32_t tvSecLo, std::uint32_t tvNsec, std::uint32_t refresh, std::uint32_t seqHi, std::uint32_t seqLo, wayland::presentation_feedback_kind flags)
     {
-      timespec tv = { .tv_sec = static_cast<std::time_t> ((static_cast<std::uint64_t>(tvSecHi) << 32) + tvSecLo), .tv_nsec = tvNsec };
+      timespec tv = { .tv_sec = static_cast<std::time_t> ((static_cast<std::uint64_t>(tvSecHi) << 32) + tvSecLo), .tv_nsec = static_cast<long>(tvNsec) };
       std::int64_t latency{KODI::LINUX::TimespecDifference(iter->submissionTime, tv)};
       std::uint64_t msc{(static_cast<std::uint64_t>(seqHi) << 32) + seqLo};
       m_presentationFeedbackHandlers.Invoke(tv, refresh, m_syncOutputID, m_syncOutputRefreshRate, msc);
@@ -1528,4 +1514,9 @@ void CWinSystemWayland::OnWindowMaximize()
 void CWinSystemWayland::OnClose()
 {
   KODI::MESSAGING::CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
+}
+
+bool CWinSystemWayland::MessagePump()
+{
+  return m_winEvents->MessagePump();
 }

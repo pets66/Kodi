@@ -1,29 +1,18 @@
-//#pragma once
 /*
- *      Copyright (C) 2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
+#pragma once
+
 #include "cores/AudioEngine/Engines/ActiveAE/ActiveAE.h"
-#include "powermanagement/windows/Win32PowerSyscall.h"
+#include "platform/win32/CharsetConverter.h"
+#include "platform/win32/powermanagement/Win32PowerSyscall.h"
 #include "ServiceBroker.h"
 #include "utils/log.h"
-#include "platform/win32/CharsetConverter.h"
 
 #include <mmdeviceapi.h>
 #include <wrl/client.h>
@@ -85,7 +74,7 @@ public:
   HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR pwstrDeviceId)
   {
     // if the default device changes this function is called four times.
-    // therefore we call CServiceBroker::GetActiveAE().DeviceChange() only for one role.
+    // therefore we call CServiceBroker::GetActiveAE()->DeviceChange() only for one role.
     char  *pszFlow = "?????";
     char  *pszRole = "?????";
 
@@ -157,7 +146,7 @@ public:
 
   HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR pwstrDeviceId, const PROPERTYKEY key)
   {
-    CLog::Log(LOGDEBUG, "%s: Changed device property of %s is {{%8.8x-%4.4x-%4.4x-%2.2x%2.2x-%2.2x%2.2x%2.2x%2.2x%2.2x%2.2x}}#%d", 
+    CLog::Log(LOGDEBUG, "%s: Changed device property of %s is {{%8.8x-%4.4x-%4.4x-%2.2x%2.2x-%2.2x%2.2x%2.2x%2.2x%2.2x%2.2x}}#%d",
               __FUNCTION__, FromW(pwstrDeviceId), key.fmtid.Data1, key.fmtid.Data2, key.fmtid.Data3,
                                            key.fmtid.Data4[0], key.fmtid.Data4[1],
                                            key.fmtid.Data4[2], key.fmtid.Data4[3],
@@ -170,6 +159,6 @@ public:
   void STDMETHODCALLTYPE NotifyAE()
   {
     if(!CWin32PowerSyscall::IsSuspending())
-      CServiceBroker::GetActiveAE().DeviceChange();
+      CServiceBroker::GetActiveAE()->DeviceChange();
   }
 };

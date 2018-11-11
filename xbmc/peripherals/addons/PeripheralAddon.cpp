@@ -1,26 +1,12 @@
 /*
- *      Copyright (C) 2014-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PeripheralAddon.h"
-#include "PeripheralAddonTranslator.h"
-#include "AddonButtonMap.h"
 #include "PeripheralAddonTranslator.h"
 #include "addons/AddonManager.h"
 #include "filesystem/Directory.h"
@@ -28,14 +14,10 @@
 #include "games/controllers/Controller.h"
 #include "games/controllers/ControllerManager.h"
 #include "input/joysticks/interfaces/IButtonMap.h"
-#include "input/joysticks/interfaces/IDriverHandler.h"
 #include "input/joysticks/DriverPrimitive.h"
-#include "input/joysticks/JoystickTranslator.h"
-#include "input/joysticks/JoystickUtils.h"
 #include "peripherals/Peripherals.h"
 #include "peripherals/bus/virtual/PeripheralBusAddon.h"
 #include "peripherals/devices/PeripheralJoystick.h"
-#include "settings/Settings.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -278,9 +260,9 @@ bool CPeripheralAddon::SupportsFeature(PeripheralFeature feature) const
   return false;
 }
 
-int CPeripheralAddon::GetPeripheralsWithFeature(PeripheralVector &results, const PeripheralFeature feature) const
+unsigned int CPeripheralAddon::GetPeripheralsWithFeature(PeripheralVector &results, const PeripheralFeature feature) const
 {
-  int iReturn(0);
+  unsigned int iReturn = 0;
   CSingleLock lock(m_critSection);
   for (auto it : m_peripherals)
   {
@@ -293,15 +275,15 @@ int CPeripheralAddon::GetPeripheralsWithFeature(PeripheralVector &results, const
   return iReturn;
 }
 
-size_t CPeripheralAddon::GetNumberOfPeripherals(void) const
+unsigned int CPeripheralAddon::GetNumberOfPeripherals(void) const
 {
   CSingleLock lock(m_critSection);
-  return m_peripherals.size();
+  return static_cast<unsigned int>(m_peripherals.size());
 }
 
-size_t CPeripheralAddon::GetNumberOfPeripheralsWithId(const int iVendorId, const int iProductId) const
+unsigned int CPeripheralAddon::GetNumberOfPeripheralsWithId(const int iVendorId, const int iProductId) const
 {
-  int iReturn(0);
+  unsigned int iReturn = 0;
   CSingleLock lock(m_critSection);
   for (auto it : m_peripherals)
   {
@@ -642,12 +624,13 @@ bool CPeripheralAddon::SetIgnoredPrimitives(const CPeripheral* device, const Pri
 
   JOYSTICK_DRIVER_PRIMITIVE* addonPrimitives = nullptr;
   kodi::addon::DriverPrimitives::ToStructs(primitives, &addonPrimitives);
+  const unsigned int primitiveCount = static_cast<unsigned int>(primitives.size());
 
   LogError(retVal = m_struct.toAddon.set_ignored_primitives(&m_struct, &joystickStruct,
-        primitives.size(), addonPrimitives), "SetIgnoredPrimitives()");
+    primitiveCount, addonPrimitives), "SetIgnoredPrimitives()");
 
   kodi::addon::Joystick::FreeStruct(joystickStruct);
-  kodi::addon::DriverPrimitives::FreeStructs(primitives.size(), addonPrimitives);
+  kodi::addon::DriverPrimitives::FreeStructs(primitiveCount, addonPrimitives);
 
   return retVal == PERIPHERAL_NO_ERROR;
 }

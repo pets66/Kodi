@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #pragma once
@@ -30,12 +18,12 @@ namespace XBMCAddon
    *   functor (functoid?) for a call to a member function.</p>
    *
    * <p>This class combined with the attending CallbackHandlers should make
-   *  sure that the AddonClass isn't in the midst of deallocating when 
+   *  sure that the AddonClass isn't in the midst of deallocating when
    *  the callback executes. In this way the Callback class acts as
    *  a weak reference.</p>
    */
-  class Callback : public AddonClass 
-  { 
+  class Callback : public AddonClass
+  {
   protected:
     AddonClass* addonClassObject;
     explicit Callback(AddonClass* _object) : addonClassObject(_object) { XBMC_TRACE; }
@@ -50,17 +38,17 @@ namespace XBMCAddon
   struct cb_null_type {};
 
   // stub type template to be partial specialized
-  template<typename M = cb_null_type, typename T1 = cb_null_type, 
-           typename T2 = cb_null_type, typename T3 = cb_null_type, 
-           typename T4 = cb_null_type, typename Extraneous = cb_null_type> 
+  template<typename M = cb_null_type, typename T1 = cb_null_type,
+           typename T2 = cb_null_type, typename T3 = cb_null_type,
+           typename T4 = cb_null_type, typename Extraneous = cb_null_type>
   class CallbackFunction {};
-  
+
   /**
    * This is the template to carry a callback to a member function
    *  that returns 'void' (has no return) and takes no parameters.
    */
   template<class M> class CallbackFunction<M, cb_null_type, cb_null_type, cb_null_type, cb_null_type, cb_null_type> : public Callback
-  { 
+  {
   public:
     typedef void (M::*MemberFunction)();
 
@@ -69,7 +57,7 @@ namespace XBMCAddon
     M* obj;
 
   public:
-    CallbackFunction(M* object, MemberFunction method) : 
+    CallbackFunction(M* object, MemberFunction method) :
       Callback(object), meth(method), obj(object) { XBMC_TRACE; }
 
     ~CallbackFunction() override { XBMC_TRACE; deallocating(); }
@@ -82,7 +70,7 @@ namespace XBMCAddon
    *  that returns 'void' (has no return) and takes one parameter.
    */
   template<class M, typename P1> class CallbackFunction<M,P1, cb_null_type, cb_null_type, cb_null_type, cb_null_type> : public Callback
-  { 
+  {
   public:
     typedef void (M::*MemberFunction)(P1);
 
@@ -92,7 +80,7 @@ namespace XBMCAddon
     P1 param;
 
   public:
-    CallbackFunction(M* object, MemberFunction method, P1 parameter) : 
+    CallbackFunction(M* object, MemberFunction method, P1 parameter) :
       Callback(object), meth(method), obj(object),
       param(parameter) { XBMC_TRACE; }
 
@@ -107,7 +95,7 @@ namespace XBMCAddon
    *  that can be held in an AddonClass::Ref
    */
   template<class M, typename P1> class CallbackFunction<M,AddonClass::Ref<P1>, cb_null_type, cb_null_type, cb_null_type, cb_null_type> : public Callback
-  { 
+  {
   public:
     typedef void (M::*MemberFunction)(P1*);
 
@@ -117,7 +105,7 @@ namespace XBMCAddon
     AddonClass::Ref<P1> param;
 
   public:
-    CallbackFunction(M* object, MemberFunction method, P1* parameter) : 
+    CallbackFunction(M* object, MemberFunction method, P1* parameter) :
       Callback(object), meth(method), obj(object),
       param(parameter) { XBMC_TRACE; }
 
@@ -132,7 +120,7 @@ namespace XBMCAddon
    *  that returns 'void' (has no return) and takes two parameters.
    */
   template<class M, typename P1, typename P2> class CallbackFunction<M,P1,P2, cb_null_type, cb_null_type, cb_null_type> : public Callback
-  { 
+  {
   public:
     typedef void (M::*MemberFunction)(P1,P2);
 
@@ -143,7 +131,7 @@ namespace XBMCAddon
     P2 param2;
 
   public:
-    CallbackFunction(M* object, MemberFunction method, P1 parameter, P2 parameter2) : 
+    CallbackFunction(M* object, MemberFunction method, P1 parameter, P2 parameter2) :
       Callback(object), meth(method), obj(object),
       param1(parameter), param2(parameter2) { XBMC_TRACE; }
 
@@ -170,7 +158,7 @@ namespace XBMCAddon
     P3 param3;
 
   public:
-    CallbackFunction(M* object, MemberFunction method, P1 parameter, P2 parameter2, P3 parameter3) : 
+    CallbackFunction(M* object, MemberFunction method, P1 parameter, P2 parameter2, P3 parameter3) :
       Callback(object), meth(method), obj(object),
       param1(parameter), param2(parameter2), param3(parameter3) { XBMC_TRACE; }
 

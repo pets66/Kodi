@@ -1,26 +1,14 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "VideoSyncAML.h"
 #include "ServiceBroker.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
 #include "threads/Thread.h"
@@ -48,7 +36,7 @@ bool CVideoSyncAML::Setup(PUPDATECLOCK func)
 
   m_abort = false;
 
-  CServiceBroker::GetWinSystem().Register(this);
+  CServiceBroker::GetWinSystem()->Register(this);
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: setting up AML");
 
   return true;
@@ -89,12 +77,12 @@ void CVideoSyncAML::Run(CEvent& stopEvent)
 void CVideoSyncAML::Cleanup()
 {
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: cleaning up AML");
-  CServiceBroker::GetWinSystem().Unregister(this);
+  CServiceBroker::GetWinSystem()->Unregister(this);
 }
 
 float CVideoSyncAML::GetFps()
 {
-  m_fps = g_graphicsContext.GetFPS();
+  m_fps = CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: fps: %.3f", m_fps);
   return m_fps;
 }

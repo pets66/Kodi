@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2012-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "addons/AddonInfo.h"
 #include "addons/AddonEvents.h"
@@ -66,6 +55,11 @@ public:
    */
   std::string GetFileFolderExtensions() const;
 
+  /*!
+   * @brief Returns whether a url protocol from add-ons use encoded hostnames
+   */
+  bool EncodedHostName(const std::string& protocol) const;
+
 private:
   std::string GetAddonExtensions(const ADDON::TYPE &type) const;
   std::string GetAddonFileFolderExtensions(const ADDON::TYPE &type) const;
@@ -75,11 +69,14 @@ private:
   void OnAddonEvent(const ADDON::AddonEvent& event);
 
   // Construction properties
+  std::shared_ptr<CAdvancedSettings> m_advancedSettings;
   ADDON::CAddonMgr &m_addonManager;
   ADDON::CBinaryAddonManager &m_binaryAddonManager;
 
   // File extension properties
   std::map<ADDON::TYPE, std::string> m_addonExtensions;
-  std::shared_ptr<CAdvancedSettings> m_advancedSettings;
   std::map<ADDON::TYPE, std::string> m_addonFileFolderExtensions;
+
+  // Protocols from add-ons with encoded host names
+  std::vector<std::string> m_encoded;
 };

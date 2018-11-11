@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "Application.h"
@@ -23,7 +11,7 @@
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlaySpu.h"
 #include "cores/VideoPlayer/DVDCodecs/Overlay/DVDOverlaySSA.h"
 #include "guilib/D3DResource.h"
-#include "guilib/GraphicContext.h"
+#include "windowing/GraphicContext.h"
 #include "guilib/GUIShaderDX.h"
 #include "OverlayRenderer.h"
 #include "OverlayRendererUtil.h"
@@ -83,7 +71,7 @@ COverlayQuadsDX::COverlayQuadsDX(ASS_Image* images, int width, int height)
   SQuads quads;
   if(!convert_quad(images, quads, width))
     return;
-  
+
   float u, v;
   if(!LoadTexture(quads.size_x
                 , quads.size_y
@@ -169,17 +157,17 @@ void COverlayQuadsDX::Render(SRenderState &state)
     return;
 
   ID3D11DeviceContext* pContext = DX::DeviceResources::Get()->GetD3DContext();
-  CGUIShaderDX* pGUIShader = DX::Windowing().GetGUIShader();
+  CGUIShaderDX* pGUIShader = DX::Windowing()->GetGUIShader();
 
   XMMATRIX world, view, proj;
   pGUIShader->GetWVP(world, view, proj);
 
-  if (g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_SPLIT_HORIZONTAL
-   || g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_SPLIT_HORIZONTAL
+   || CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_SPLIT_VERTICAL)
   {
     CRect rect;
-    DX::Windowing().GetViewPort(rect);
-    DX::Windowing().SetCameraPosition(CPoint(rect.Width() * 0.5f, rect.Height() * 0.5f),
+    DX::Windowing()->GetViewPort(rect);
+    DX::Windowing()->SetCameraPosition(CPoint(rect.Width() * 0.5f, rect.Height() * 0.5f),
                                   static_cast<int>(rect.Width()),
                                   static_cast<int>(rect.Height()));
   }
@@ -197,7 +185,7 @@ void COverlayQuadsDX::Render(SRenderState &state)
   // Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
   pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  DX::Windowing().SetAlphaBlendEnable(true);
+  DX::Windowing()->SetAlphaBlendEnable(true);
   pGUIShader->Begin(SHADER_METHOD_RENDER_FONT);
 
   pGUIShader->SetShaderViews(1, m_texture.GetAddressOfSRV());
@@ -338,17 +326,17 @@ void COverlayImageDX::Render(SRenderState &state)
     return;
 
   ID3D11DeviceContext* pContext = DX::DeviceResources::Get()->GetD3DContext();
-  CGUIShaderDX* pGUIShader = DX::Windowing().GetGUIShader();
+  CGUIShaderDX* pGUIShader = DX::Windowing()->GetGUIShader();
 
   XMMATRIX world, view, proj;
   pGUIShader->GetWVP(world, view, proj);
 
-  if (g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_SPLIT_HORIZONTAL
-   || g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_SPLIT_HORIZONTAL
+   || CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode() == RENDER_STEREO_MODE_SPLIT_VERTICAL)
   {
     CRect rect;
-    DX::Windowing().GetViewPort(rect);
-    DX::Windowing().SetCameraPosition(CPoint(rect.Width() * 0.5f, rect.Height() * 0.5f),
+    DX::Windowing()->GetViewPort(rect);
+    DX::Windowing()->SetCameraPosition(CPoint(rect.Width() * 0.5f, rect.Height() * 0.5f),
                                   static_cast<int>(rect.Width()),
                                   static_cast<int>(rect.Height()));
   }
@@ -367,7 +355,7 @@ void COverlayImageDX::Render(SRenderState &state)
   pContext->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
   pGUIShader->Begin(SHADER_METHOD_RENDER_TEXTURE_NOBLEND);
-  DX::Windowing().SetAlphaBlendEnable(true);
+  DX::Windowing()->SetAlphaBlendEnable(true);
 
   pGUIShader->SetShaderViews(1, m_texture.GetAddressOfSRV());
   pGUIShader->Draw(4, 0);

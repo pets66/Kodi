@@ -34,7 +34,7 @@ case $XBMC_PLATFORM_DIR in
     ;;
 
   android)
-    DEFAULT_NDK_VERSION="16"
+    DEFAULT_NDK_VERSION="18"
     DEFAULT_NDK_API="21"
     DEFAULT_XBMC_DEPENDS_ROOT=$WORKSPACE/tools/depends/xbmc-depends
     DEFAULT_CONFIGURATION="Debug"
@@ -64,12 +64,12 @@ fi
 if [ "$NDK_VERSION" == "Default" ]
 then
   NDK_VERSION=$DEFAULT_NDK_VERSION
-fi 
+fi
 
 if [ "$NDK_API" == "Default" ]
 then
   NDK_API=$DEFAULT_NDK_API
-fi 
+fi
 
 if [ "$XBMC_DEPENDS_ROOT" == "Default" ]
 then
@@ -78,7 +78,7 @@ fi
 
 if [ "$DARWIN_ARM_CPU" == "Default" ]
 then
-  DARWIN_ARM_CPU=$DEFAULT_DARWIN_ARM_CPU  
+  DARWIN_ARM_CPU=$DEFAULT_DARWIN_ARM_CPU
 fi
 
 if [ "$XCODE_APP" == "Default" ]
@@ -101,7 +101,7 @@ fi
 
 #helper functions
 
-#hash a dir based on the git revision, SDK_PATH, NDK_PATH, NDK_VERSION, SDK_VERSION, TOOLCHAIN and XBMC_DEPENDS_ROOT
+#hash a dir based on the git revision, Configuration, SDK_PATH, NDK_PATH, NDK_VERSION, SDK_VERSION, TOOLCHAIN and XBMC_DEPENDS_ROOT
 #param1 path to be hashed
 function getBuildHash ()
 {
@@ -109,7 +109,7 @@ function getBuildHash ()
   checkPath="$1"
   local hashStr
   hashStr="$(git rev-list HEAD --max-count=1  -- $checkPath)"
-  hashStr="$hashStr $SDK_PATH $NDK_PATH $NDK_VERSION $SDK_VERSION $TOOLCHAIN $XBMC_DEPENDS_ROOT $XCODE_APP"
+  hashStr="$hashStr $Configuration $SDK_PATH $NDK_PATH $NDK_VERSION $SDK_VERSION $TOOLCHAIN $XBMC_DEPENDS_ROOT $XCODE_APP"
   echo $hashStr
 }
 
@@ -119,12 +119,6 @@ function pathChanged ()
   local ret
   local checkPath
   ret="0"
-  #no optims in release builds!
-  if [ "$Configuration" == "Release" ]
-  then
-    echo "1"
-    return
-  fi
 
   checkPath="$1"
   if [ -e $checkPath/$PATH_CHANGE_REV_FILENAME ]
@@ -136,7 +130,7 @@ function pathChanged ()
   else
     ret="1"
   fi
-  
+
   echo $ret
 }
 

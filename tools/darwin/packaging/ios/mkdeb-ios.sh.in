@@ -14,15 +14,15 @@ ARM64=false
 if [ "${SWITCH#*debug}" != "${SWITCH}" ]; then
   echo "Packaging Debug target for iOS"
   APP="$DIRNAME/../../../../build/Debug-iphoneos/@APP_NAME@.app"
-  DSYM="$DIRNAME/../../../../build/Debug-iphoneos/$DSYM_FILENAME"  
+  DSYM="$DIRNAME/../../../../build/Debug-iphoneos/$DSYM_FILENAME"
 elif [ "${SWITCH#*release}" != "${SWITCH}" ]; then
   echo "Packaging Release target for iOS"
   APP="$DIRNAME/../../../../build/Release-iphoneos/@APP_NAME@.app"
-  DSYM="$DIRNAME/../../../../build/Release-iphoneos/$DSYM_FILENAME"   
+  DSYM="$DIRNAME/../../../../build/Release-iphoneos/$DSYM_FILENAME"
 else
   echo "You need to specify the build target"
-  exit 1 
-fi  
+  exit 1
+fi
 
 # check if build is 64-bit
 if [[ "$(lipo -info "$APP/@APP_NAME@" | awk '{print $NF}')" == "arm64" ]]; then
@@ -112,6 +112,8 @@ chmod +x $DIRNAME/$PACKAGE/DEBIAN/prerm
 echo "#!/bin/sh"                                  >  $DIRNAME/$PACKAGE/DEBIAN/postinst
 echo "chown -R mobile:mobile /Applications/@APP_NAME@.app" >> $DIRNAME/$PACKAGE/DEBIAN/postinst
 cat $DIRNAME/../migrate_to_kodi_ios.sh            >> $DIRNAME/$PACKAGE/DEBIAN/postinst
+echo "/usr/bin/uicache"                           >>  $DIRNAME/$PACKAGE/DEBIAN/postinst
+echo "echo 'finish:respringing ...'"              >>  $DIRNAME/$PACKAGE/DEBIAN/postinst
 chmod +x $DIRNAME/$PACKAGE/DEBIAN/postinst
 
 # prep @APP_NAME@.app

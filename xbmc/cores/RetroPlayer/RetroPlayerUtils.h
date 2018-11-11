@@ -1,25 +1,16 @@
 /*
- *      Copyright (C) 2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
 #pragma once
 
-#include "cores/IPlayer.h"
+#include "cores/GameSettings.h"
+
+#include <string>
 
 namespace KODI
 {
@@ -28,7 +19,26 @@ namespace RETRO
   class CRetroPlayerUtils
   {
   public:
-    static std::string ViewModeToDescription(ViewMode viewMode);
+    /*!
+     * \brief Convert a stretch mode enum to a short string identifier
+     *
+     * \param stretchMode The stretch mode
+     *
+     * \return A short string identifier specified by GameSettings.h, or an
+     *         empty string if the stretch mode is invalid
+     */
+    static const char* StretchModeToIdentifier(STRETCHMODE stretchMode);
+
+    /*!
+     * \brief Convert a stretch mode identifier to an enum
+     *
+     * \param stretchMode The short string identifier, from GameSettings.h,
+     *        representing the stretch mode
+     *
+     * \return The stretch mode enum, or STRETCHMODE::Normal if the identifier
+     *         is invalid
+     */
+    static STRETCHMODE IdentifierToStretchMode(const std::string &stretchMode);
   };
 }
 }

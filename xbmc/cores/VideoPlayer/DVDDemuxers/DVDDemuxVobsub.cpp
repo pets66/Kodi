@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "DVDDemuxVobsub.h"
@@ -208,8 +196,7 @@ bool CDVDDemuxVobsub::ParseId(SState& state, char* line)
   std::unique_ptr<CStream> stream(new CStream(this));
 
   while(*line == ' ') line++;
-  strncpy(stream->language, line, 2);
-  stream->language[2] = '\0';
+  stream->language = std::string(line, 2);
   line+=2;
 
   while(*line == ' ' || *line == ',') line++;
@@ -225,6 +212,7 @@ bool CDVDDemuxVobsub::ParseId(SState& state, char* line)
   stream->codec = AV_CODEC_ID_DVD_SUBTITLE;
   stream->uniqueId = m_Streams.size();
   stream->source = m_source;
+  stream->demuxerId = m_demuxerId;
 
   state.id = stream->uniqueId;
   m_Streams.push_back(stream.release());

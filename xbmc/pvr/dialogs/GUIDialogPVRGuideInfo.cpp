@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogPVRGuideInfo.h"
@@ -24,6 +12,7 @@
 
 #include "Application.h"
 #include "ServiceBroker.h"
+#include "addons/PVRClient.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
@@ -34,7 +23,6 @@
 
 #include "pvr/PVRGUIActions.h"
 #include "pvr/PVRManager.h"
-#include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/epg/EpgInfoTag.h"
 #include "pvr/timers/PVRTimerInfoTag.h"
@@ -225,12 +213,15 @@ void CGUIDialogPVRGuideInfo::OnInitWindow()
       bHideRecord = false;
     }
   }
-  else if (m_progItem->Channel() && CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_progItem->Channel()->ClientID()).SupportsTimers() &&
-           m_progItem->IsRecordable())
+  else if (m_progItem->Channel() && m_progItem->IsRecordable())
   {
-    SET_CONTROL_LABEL(CONTROL_BTN_RECORD, 264);     /* Record */
-    bHideRecord = false;
-    bHideAddTimer = false;
+    const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_progItem->ClientID());
+    if (client && client->GetClientCapabilities().SupportsTimers())
+    {
+      SET_CONTROL_LABEL(CONTROL_BTN_RECORD, 264);     /* Record */
+      bHideRecord = false;
+      bHideAddTimer = false;
+    }
   }
 
   if (!m_progItem->IsPlayable())

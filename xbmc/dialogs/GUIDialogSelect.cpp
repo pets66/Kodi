@@ -1,26 +1,15 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogSelect.h"
 #include "FileItem.h"
 #include "input/Key.h"
+#include "guilib/GUIMessage.h"
 #include "guilib/LocalizeStrings.h"
 #include "utils/StringUtils.h"
 
@@ -240,8 +229,8 @@ void CGUIDialogSelect::Sort(bool bSortOrder /*=true*/)
 
 void CGUIDialogSelect::SetSelected(int iSelected)
 {
-  if (iSelected < 0 || iSelected >= (int)m_vecList->Size() ||
-      m_vecList->Get(iSelected).get() == NULL) 
+  if (iSelected < 0 || iSelected >= m_vecList->Size() ||
+      m_vecList->Get(iSelected).get() == NULL)
     return;
 
   // only set m_iSelected if there is no multi-select
@@ -323,7 +312,7 @@ void CGUIDialogSelect::OnInitWindow()
 
   SET_CONTROL_LABEL(CONTROL_NUMBER_OF_ITEMS, StringUtils::Format("%i %s",
       m_vecList->Size(), g_localizeStrings.Get(127).c_str()));
-  
+
   if (m_multiSelection)
     EnableButton(true, 186);
 

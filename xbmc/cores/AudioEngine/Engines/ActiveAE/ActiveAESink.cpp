@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <sstream>
@@ -154,6 +142,7 @@ bool CActiveAESink::SupportsFormat(const std::string &device, AEAudioFormat &for
                 break;
 
               case CAEStreamInfo::STREAM_TYPE_DTSHD:
+              case CAEStreamInfo::STREAM_TYPE_DTSHD_MA:
                 samplerate = 192000;
                 break;
 
@@ -480,10 +469,17 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
         case CSinkDataProtocol::SAMPLE:
           m_extError = false;
           OpenSink();
-          OutputSamples(&m_sampleOfSilence);
-          m_state = S_TOP_CONFIGURED_PLAY;
-          m_extTimeout = 0;
-          m_bStateMachineSelfTrigger = true;
+          if (!m_extError)
+          {
+            OutputSamples(&m_sampleOfSilence);
+            m_state = S_TOP_CONFIGURED_PLAY;
+            m_extTimeout = 0;
+            m_bStateMachineSelfTrigger = true;
+          }
+          else
+          {
+            m_state = S_TOP_UNCONFIGURED;
+          }
           return;
         case CSinkDataProtocol::DRAIN:
           msg->Reply(CSinkDataProtocol::ACC);
@@ -674,6 +670,9 @@ void CActiveAESink::Process()
 void CActiveAESink::EnumerateSinkList(bool force)
 {
   if (!m_sinkInfoList.empty() && !force)
+    return;
+
+  if (!CAESinkFactory::HasSinks())
     return;
 
   unsigned int c_retry = 4;
@@ -914,7 +913,6 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
           {
             int offset;
             int len;
-            m_packer->GetBuffer();
             for (int i=0; i<24; i++)
             {
               offset = i*2560;
@@ -1080,25 +1078,31 @@ void CActiveAESink::GenerateNoise()
       }
       while(R1 == 0.0f);
 
-      noise[i] = (float) sqrt( -2.0f * log( R1 )) * cos( 2.0f * PI * R2 ) * 0.00001f;
+      noise[i] = sqrt( -2.0f * log( R1 )) * cos( 2.0f * PI * R2 ) * 0.00001f;
     }
   }
 
   SampleConfig config = m_sampleOfSilence.pkt->config;
   IAEResample *resampler = CAEResampleFactory::Create(AERESAMPLEFACTORY_QUICK_RESAMPLE);
-  resampler->Init(config.channel_layout,
-                 config.channels,
-                 config.sample_rate,
-                 config.fmt,
-                 config.bits_per_sample,
-                 config.dither_bits,
-                 config.channel_layout,
-                 config.channels,
-                 config.sample_rate,
-                 AV_SAMPLE_FMT_FLT,
-                 CAEUtil::DataFormatToUsedBits(m_sinkFormat.m_dataFormat),
-                 CAEUtil::DataFormatToDitherBits(m_sinkFormat.m_dataFormat),
-                 false, false, nullptr, AE_QUALITY_UNKNOWN, false);
+
+  SampleConfig dstConfig, srcConfig;
+  dstConfig.channel_layout = config.channel_layout;
+  dstConfig.channels = config.channels;
+  dstConfig.sample_rate = config.sample_rate;
+  dstConfig.fmt = config.fmt;
+  dstConfig.bits_per_sample = config.bits_per_sample;
+  dstConfig.dither_bits = config.dither_bits;
+
+  srcConfig.channel_layout = config.channel_layout;
+  srcConfig.channels = config.channels;
+  srcConfig.sample_rate = config.sample_rate;
+  srcConfig.fmt = AV_SAMPLE_FMT_FLT;
+  srcConfig.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_sinkFormat.m_dataFormat);
+  srcConfig.dither_bits = CAEUtil::DataFormatToDitherBits(m_sinkFormat.m_dataFormat);
+
+  resampler->Init(dstConfig, srcConfig,
+                  false, false, M_SQRT1_2, nullptr, AE_QUALITY_UNKNOWN, false);
+
   resampler->Resample(m_sampleOfSilence.pkt->data, m_sampleOfSilence.pkt->max_nb_samples,
                      (uint8_t**)&noise, m_sampleOfSilence.pkt->max_nb_samples, 1.0);
 

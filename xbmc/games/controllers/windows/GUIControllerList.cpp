@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2014-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2014-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this Program; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIControllerList.h"
@@ -29,17 +17,19 @@
 #include "GUIFeatureList.h"
 #include "addons/AddonManager.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "games/addons/input/GameClientInput.h"
+#include "games/addons/GameClient.h"
+#include "games/controllers/types/ControllerTree.h"
 #include "games/controllers/Controller.h"
 #include "games/controllers/ControllerIDs.h"
-#include "games/controllers/ControllerFeature.h"
 #include "games/controllers/ControllerLayout.h"
 #include "games/controllers/guicontrols/GUIControllerButton.h"
 #include "games/controllers/guicontrols/GUIGameController.h"
 #include "games/GameServices.h"
+#include "guilib/GUIMessage.h"
 #include "guilib/GUIButtonControl.h"
 #include "guilib/GUIControlGroupList.h"
 #include "guilib/GUIWindow.h"
-#include "guilib/WindowIDs.h"
 #include "messaging/ApplicationMessenger.h"
 #include "peripherals/Peripherals.h"
 #include "utils/StringUtils.h"
@@ -49,12 +39,13 @@ using namespace KODI;
 using namespace ADDON;
 using namespace GAME;
 
-CGUIControllerList::CGUIControllerList(CGUIWindow* window, IFeatureList* featureList) :
+CGUIControllerList::CGUIControllerList(CGUIWindow* window, IFeatureList* featureList, GameClientPtr gameClient) :
   m_guiWindow(window),
   m_featureList(featureList),
   m_controllerList(nullptr),
   m_controllerButton(nullptr),
-  m_focusedController(-1) // Initially unfocused
+  m_focusedController(-1), // Initially unfocused
+  m_gameClient(std::move(gameClient))
 {
   assert(m_featureList != nullptr);
 }
@@ -123,6 +114,11 @@ void CGUIControllerList::OnFocus(unsigned int controllerIndex)
     CGUIGameController* pController = dynamic_cast<CGUIGameController*>(m_guiWindow->GetControl(CONTROL_GAME_CONTROLLER));
     if (pController)
       pController->ActivateController(controller);
+
+    // Update controller description
+    CGUIMessage msg(GUI_MSG_LABEL_SET, m_guiWindow->GetID(), CONTROL_CONTROLLER_DESCRIPTION);
+    msg.SetLabel(controller->Description());
+    m_guiWindow->OnMessage(msg);
   }
 }
 
@@ -155,7 +151,7 @@ void CGUIControllerList::OnEvent(const ADDON::AddonEvent& event)
   {
     using namespace MESSAGING;
     CGUIMessage msg(GUI_MSG_REFRESH_LIST, m_guiWindow->GetID(), CONTROL_CONTROLLER_LIST);
-    CApplicationMessenger::GetInstance().SendGUIMessage(msg);
+    CApplicationMessenger::GetInstance().SendGUIMessage(msg, m_guiWindow->GetID());
   }
 }
 
@@ -165,20 +161,19 @@ bool CGUIControllerList::RefreshControllers(void)
   CGameServices& gameServices = CServiceBroker::GetGameServices();
   ControllerVector newControllers = gameServices.GetControllers();
 
-  // Don't show an empty list in the GUI
-  auto HasButtonForFeature = [this](const CControllerFeature &feature)
-    {
-      return m_featureList->HasButton(feature.Type());
-    };
+  // Filter by current game add-on
+  if (m_gameClient)
+  {
+    const CControllerTree &controllers = m_gameClient->Input().GetControllerTree();
 
-  auto HasButtonForController = [&](const ControllerPtr &controller)
-    {
-      const auto &features = controller->Features();
-      auto it = std::find_if(features.begin(), features.end(), HasButtonForFeature);
-      return it == features.end();
-    };
+    auto ControllerNotAccepted = [&controllers](const ControllerPtr &controller)
+      {
+        return !controllers.IsControllerAccepted(controller->ID());
+      };
 
-  newControllers.erase(std::remove_if(newControllers.begin(), newControllers.end(), HasButtonForController), newControllers.end());
+    if (!std::all_of(newControllers.begin(), newControllers.end(), ControllerNotAccepted))
+      newControllers.erase(std::remove_if(newControllers.begin(), newControllers.end(), ControllerNotAccepted), newControllers.end());
+  }
 
   // Check for changes
   std::set<std::string> oldControllerIds;

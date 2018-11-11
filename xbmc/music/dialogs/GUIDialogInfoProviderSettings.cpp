@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogInfoProviderSettings.h"
@@ -35,20 +23,18 @@
 #include "filesystem/Directory.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "dialogs/GUIDialogKaiToast.h"
-#include "dialogs/GUIDialogSelect.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "interfaces/builtins/Builtins.h"
 #include "ServiceBroker.h"
 #include "settings/lib/Setting.h"
-#include "settings/lib/SettingsManager.h"
-#include "settings/SettingUtils.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "settings/windows/GUIControlSettings.h"
 #include "storage/MediaManager.h"
 #include "Util.h"
 #include "utils/log.h"
-#include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 
 using namespace ADDON;
@@ -58,40 +44,39 @@ const std::string SETTING_ARTISTSCRAPER_SETTINGS = "artistscrapersettings";
 const std::string SETTING_APPLYTOITEMS = "applysettingstoitems";
 
 CGUIDialogInfoProviderSettings::CGUIDialogInfoProviderSettings()
-  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_INFOPROVIDER_SETTINGS, "DialogSettings.xml"),
-    m_showSingleScraper(false),
-    m_singleScraperType(CONTENT_NONE),
-    m_applyToItems(INFOPROVIDER_THISITEM)
+  : CGUIDialogSettingsManualBase(WINDOW_DIALOG_INFOPROVIDER_SETTINGS, "DialogSettings.xml")
 { }
 
 bool CGUIDialogInfoProviderSettings::Show()
 {
-  CGUIDialogInfoProviderSettings *dialog = g_windowManager.GetWindow<CGUIDialogInfoProviderSettings>(WINDOW_DIALOG_INFOPROVIDER_SETTINGS);
+  CGUIDialogInfoProviderSettings *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogInfoProviderSettings>(WINDOW_DIALOG_INFOPROVIDER_SETTINGS);
   if (!dialog)
     return false;
+
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
 
   dialog->m_showSingleScraper = false;
 
   // Get current default info provider settings from service broker
-  dialog->m_fetchInfo = CServiceBroker::GetSettings().GetBool(CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO);
+  dialog->m_fetchInfo = settings->GetBool(CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO);
 
   ADDON::AddonPtr defaultScraper;
   // Get default album scraper (when enabled - can default scraper be disabled??)
   if (ADDON::CAddonSystemSettings::GetInstance().GetActive(ADDON::ADDON_SCRAPER_ALBUMS, defaultScraper))
   {
     ADDON::ScraperPtr scraper = std::dynamic_pointer_cast<ADDON::CScraper>(defaultScraper);
-    dialog->SetAlbumScraper(scraper);    
+    dialog->SetAlbumScraper(scraper);
   }
 
-  // Get default artist scraper 
+  // Get default artist scraper
   if (ADDON::CAddonSystemSettings::GetInstance().GetActive(ADDON::ADDON_SCRAPER_ARTISTS, defaultScraper))
   {
     ADDON::ScraperPtr scraper = std::dynamic_pointer_cast<ADDON::CScraper>(defaultScraper);
     dialog->SetArtistScraper(scraper);
   }
-    
-  dialog->m_strArtistInfoPath = CServiceBroker::GetSettings().GetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
-    
+
+  dialog->m_strArtistInfoPath = settings->GetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER);
+
   dialog->Open();
 
   dialog->ResetDefaults();
@@ -100,7 +85,7 @@ bool CGUIDialogInfoProviderSettings::Show()
 
 int CGUIDialogInfoProviderSettings::Show(ADDON::ScraperPtr& scraper)
 {
-  CGUIDialogInfoProviderSettings *dialog = g_windowManager.GetWindow<CGUIDialogInfoProviderSettings>(WINDOW_DIALOG_INFOPROVIDER_SETTINGS);
+  CGUIDialogInfoProviderSettings *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogInfoProviderSettings>(WINDOW_DIALOG_INFOPROVIDER_SETTINGS);
   if (!dialog || !scraper)
     return -1;
   if (scraper->Content() != CONTENT_ARTISTS && scraper->Content() != CONTENT_ALBUMS)
@@ -108,7 +93,7 @@ int CGUIDialogInfoProviderSettings::Show(ADDON::ScraperPtr& scraper)
 
   dialog->m_showSingleScraper = true;
   dialog->m_singleScraperType = scraper->Content();
-  
+
   if (dialog->m_singleScraperType == CONTENT_ALBUMS)
     dialog->SetAlbumScraper(scraper);
   else
@@ -130,7 +115,7 @@ int CGUIDialogInfoProviderSettings::Show(ADDON::ScraperPtr& scraper)
       scraper = dialog->GetArtistScraper();
       // Save artist information folder (here not in the caller) when applying setting as default for all artists
       if (applyToItems == INFOPROVIDERAPPLYOPTIONS::INFOPROVIDER_DEFAULT)
-        CServiceBroker::GetSettings().SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER, dialog->m_strArtistInfoPath);
+        CServiceBroker::GetSettingsComponent()->GetSettings()->SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER, dialog->m_strArtistInfoPath);
     }
     if (scraper)
       scraper->SetPathSettings(dialog->m_singleScraperType, "");
@@ -182,7 +167,7 @@ void CGUIDialogInfoProviderSettings::OnSettingAction(std::shared_ptr<const CSett
   CGUIDialogSettingsManualBase::OnSettingAction(setting);
 
   const std::string &settingId = setting->GetId();
-  
+
   if (settingId == CSettings::SETTING_MUSICLIBRARY_ALBUMSSCRAPER)
   {
     std::string currentScraperId;
@@ -220,7 +205,7 @@ void CGUIDialogInfoProviderSettings::OnSettingAction(std::shared_ptr<const CSett
   else if (settingId == SETTING_ALBUMSCRAPER_SETTINGS)
     CGUIDialogAddonSettings::ShowForAddon(m_albumscraper, false);
   else if (settingId == SETTING_ARTISTSCRAPER_SETTINGS)
-    CGUIDialogAddonSettings::ShowForAddon(m_artistscraper, false);  
+    CGUIDialogAddonSettings::ShowForAddon(m_artistscraper, false);
   else if (settingId == CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER)
   {
     VECSOURCES shares;
@@ -263,15 +248,16 @@ void CGUIDialogInfoProviderSettings::Save()
   // Save default settings for fetching additional information and art
   CLog::Log(LOGINFO, "%s called", __FUNCTION__);
   // Save Fetch addiitional info during update
-  CServiceBroker::GetSettings().SetBool(CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO, m_fetchInfo);
-  // Save default scrapers and addon setting values 
-  CServiceBroker::GetSettings().SetString(CSettings::SETTING_MUSICLIBRARY_ALBUMSSCRAPER, m_albumscraper->ID());
+  const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  settings->SetBool(CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO, m_fetchInfo);
+  // Save default scrapers and addon setting values
+  settings->SetString(CSettings::SETTING_MUSICLIBRARY_ALBUMSSCRAPER, m_albumscraper->ID());
   m_albumscraper->SaveSettings();
-  CServiceBroker::GetSettings().SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSSCRAPER, m_artistscraper->ID());
+  settings->SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSSCRAPER, m_artistscraper->ID());
   m_artistscraper->SaveSettings();
   // Save artist information folder
-  CServiceBroker::GetSettings().SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER, m_strArtistInfoPath);
-  CServiceBroker::GetSettings().Save();
+  settings->SetString(CSettings::SETTING_MUSICLIBRARY_ARTISTSFOLDER, m_strArtistInfoPath);
+  settings->Save();
 }
 
 void CGUIDialogInfoProviderSettings::SetupView()
@@ -388,9 +374,9 @@ void CGUIDialogInfoProviderSettings::InitializeSettings()
     CLog::Log(LOGERROR, "%s: unable to setup settings", __FUNCTION__);
     return;
   }
-  
+
   if (!m_showSingleScraper)
-  {    
+  {
     AddToggle(group1, CSettings::SETTING_MUSICLIBRARY_DOWNLOADINFO, 38333, SettingLevel::Basic, m_fetchInfo); // "Fetch additional information during scan"
   }
   else

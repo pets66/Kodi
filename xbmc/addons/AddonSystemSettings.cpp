@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2015-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonSystemSettings.h"
@@ -23,9 +11,12 @@
 #include "addons/AddonManager.h"
 #include "addons/AddonInstaller.h"
 #include "addons/RepositoryUpdater.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "settings/lib/Setting.h"
 #include "utils/log.h"
 
 
@@ -60,12 +51,12 @@ void CAddonSystemSettings::OnSettingAction(std::shared_ptr<const CSetting> setti
   if (setting->GetId() == CSettings::SETTING_ADDONS_MANAGE_DEPENDENCIES)
   {
     std::vector<std::string> params{"addons://dependencies/", "return"};
-    g_windowManager.ActivateWindow(WINDOW_ADDON_BROWSER, params);
+    CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_ADDON_BROWSER, params);
   }
   else if (setting->GetId() == CSettings::SETTING_ADDONS_SHOW_RUNNING)
   {
     std::vector<std::string> params{"addons://running/", "return"};
-    g_windowManager.ActivateWindow(WINDOW_ADDON_BROWSER, params);
+    CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_ADDON_BROWSER, params);
   }
 }
 
@@ -74,10 +65,10 @@ void CAddonSystemSettings::OnSettingChanged(std::shared_ptr<const CSetting> sett
   using namespace KODI::MESSAGING::HELPERS;
 
   if (setting->GetId() == CSettings::SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES
-    && CServiceBroker::GetSettings().GetBool(CSettings::SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES)
+    && CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES)
     && ShowYesNoDialogText(19098, 36618) != DialogResponse::YES)
   {
-    CServiceBroker::GetSettings().SetBool(CSettings::SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES, false);
+    CServiceBroker::GetSettingsComponent()->GetSettings()->SetBool(CSettings::SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES, false);
   }
 }
 
@@ -86,7 +77,7 @@ bool CAddonSystemSettings::GetActive(const TYPE& type, AddonPtr& addon)
   auto it = m_activeSettings.find(type);
   if (it != m_activeSettings.end())
   {
-    auto settingValue = CServiceBroker::GetSettings().GetString(it->second);
+    auto settingValue = CServiceBroker::GetSettingsComponent()->GetSettings()->GetString(it->second);
     return CServiceBroker::GetAddonMgr().GetAddon(settingValue, addon, type);
   }
   return false;
@@ -97,7 +88,7 @@ bool CAddonSystemSettings::SetActive(const TYPE& type, const std::string& addonI
   auto it = m_activeSettings.find(type);
   if (it != m_activeSettings.end())
   {
-    CServiceBroker::GetSettings().SetString(it->second, addonID);
+    CServiceBroker::GetSettingsComponent()->GetSettings()->SetString(it->second, addonID);
     return true;
   }
   return false;
@@ -115,7 +106,7 @@ bool CAddonSystemSettings::UnsetActive(const AddonPtr& addon)
   if (it == m_activeSettings.end())
     return true;
 
-  auto setting = std::static_pointer_cast<CSettingString>(CServiceBroker::GetSettings().GetSetting(it->second));
+  auto setting = std::static_pointer_cast<CSettingString>(CServiceBroker::GetSettingsComponent()->GetSettings()->GetSetting(it->second));
   if (setting->GetValue() != addon->ID())
     return true;
 
@@ -140,7 +131,7 @@ std::vector<std::string> CAddonSystemSettings::MigrateAddons(std::function<void(
   if (getIncompatible().empty())
     return std::vector<std::string>();
 
-  if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_ON)
+  if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_ON)
   {
     onMigrate();
 

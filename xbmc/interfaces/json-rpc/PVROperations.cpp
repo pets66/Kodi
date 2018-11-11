@@ -1,26 +1,13 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVROperations.h"
 
-#include "messaging/ApplicationMessenger.h"
 #include "ServiceBroker.h"
 
 #include "pvr/PVRGUIActions.h"
@@ -41,7 +28,7 @@ JSONRPC_STATUS CPVROperations::GetProperties(const std::string &method, ITranspo
 {
   if (!CServiceBroker::GetPVRManager().IsStarted())
     return FailedToExecute;
-  
+
   CVariant properties = CVariant(CVariant::VariantTypeObject);
   for (unsigned int index = 0; index < parameterObject["properties"].size(); index++)
   {
@@ -63,7 +50,7 @@ JSONRPC_STATUS CPVROperations::GetChannelGroups(const std::string &method, ITran
 {
   if (!CServiceBroker::GetPVRManager().IsStarted())
     return FailedToExecute;
-  
+
   CPVRChannelGroupsContainerPtr channelGroupContainer = CServiceBroker::GetPVRManager().ChannelGroups();
   if (!channelGroupContainer)
     return FailedToExecute;
@@ -90,7 +77,7 @@ JSONRPC_STATUS CPVROperations::GetChannelGroupDetails(const std::string &method,
   CPVRChannelGroupsContainerPtr channelGroupContainer = CServiceBroker::GetPVRManager().ChannelGroups();
   if (!channelGroupContainer)
     return FailedToExecute;
-  
+
   CPVRChannelGroupPtr channelGroup;
   CVariant id = parameterObject["channelgroupid"];
   if (id.isInteger())
@@ -100,9 +87,9 @@ JSONRPC_STATUS CPVROperations::GetChannelGroupDetails(const std::string &method,
 
   if (channelGroup == NULL)
     return InvalidParams;
-  
+
   FillChannelGroupDetails(channelGroup, parameterObject, result["channelgroupdetails"], false);
-  
+
   return OK;
 }
 
@@ -110,27 +97,27 @@ JSONRPC_STATUS CPVROperations::GetChannels(const std::string &method, ITransport
 {
   if (!CServiceBroker::GetPVRManager().IsStarted())
     return FailedToExecute;
-  
+
   CPVRChannelGroupsContainerPtr channelGroupContainer = CServiceBroker::GetPVRManager().ChannelGroups();
   if (!channelGroupContainer)
     return FailedToExecute;
-  
+
   CPVRChannelGroupPtr channelGroup;
   CVariant id = parameterObject["channelgroupid"];
   if (id.isInteger())
     channelGroup = channelGroupContainer->GetByIdFromAll((int)id.asInteger());
   else if (id.isString())
     channelGroup = channelGroupContainer->GetGroupAll(id.asString() == "allradio");
-  
+
   if (channelGroup == NULL)
     return InvalidParams;
-  
+
   CFileItemList channels;
   if (channelGroup->GetMembers(channels) < 0)
     return InvalidParams;
-  
+
   HandleFileItemList("channelid", false, "channels", channels, parameterObject, result, true);
-    
+
   return OK;
 }
 
@@ -138,17 +125,17 @@ JSONRPC_STATUS CPVROperations::GetChannelDetails(const std::string &method, ITra
 {
   if (!CServiceBroker::GetPVRManager().IsStarted())
     return FailedToExecute;
-  
+
   CPVRChannelGroupsContainerPtr channelGroupContainer = CServiceBroker::GetPVRManager().ChannelGroups();
   if (!channelGroupContainer)
     return FailedToExecute;
-  
+
   CPVRChannelPtr channel = channelGroupContainer->GetChannelById((int)parameterObject["channelid"].asInteger());
   if (channel == NULL)
     return InvalidParams;
 
   HandleFileItem("channelid", false, "channeldetails", CFileItemPtr(new CFileItem(channel)), parameterObject, parameterObject["properties"], result, false);
-    
+
   return OK;
 }
 

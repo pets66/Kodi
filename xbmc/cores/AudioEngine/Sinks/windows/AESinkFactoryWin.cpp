@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2010-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2010-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include "AESinkFactoryWin.h"
 #include "utils/log.h"
@@ -119,8 +107,8 @@ const char *WASAPIErrToStr(HRESULT err)
     {
       wfxex.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
       if (format.m_dataFormat == AE_FMT_RAW &&
-        ((format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_AC3) ||
-        (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_EAC3) ||
+         ((format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_AC3) ||
+          (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_EAC3) ||
           (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD_CORE) ||
           (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTS_2048) ||
           (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTS_1024) ||
@@ -139,10 +127,11 @@ const char *WASAPIErrToStr(HRESULT err)
           CLog::Log(LOGERROR, "Invalid sample rate supplied for RAW format");
       }
       else if (format.m_dataFormat == AE_FMT_RAW &&
-        ((format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD) ||
-        (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_TRUEHD)))
+        ((format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD_MA) ||
+        (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_TRUEHD) ||
+        (format.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_DTSHD)))
       {
-        // IEC 61937 transmissions over HDMI       
+        // IEC 61937 transmissions over HDMI
         wfxex.Format.nSamplesPerSec = 192000L;
         wfxex.Format.wBitsPerSample = 16;
         wfxex.Samples.wValidBitsPerSample = 16;
@@ -155,10 +144,15 @@ const char *WASAPIErrToStr(HRESULT err)
           wfxex.Format.nChannels = 8; // Four IEC 60958 Lines.
           wfxex.dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
           break;
-        case CAEStreamInfo::STREAM_TYPE_DTSHD:
+        case CAEStreamInfo::STREAM_TYPE_DTSHD_MA:
           wfxex.SubFormat = KSDATAFORMAT_SUBTYPE_IEC61937_DTS_HD;
           wfxex.Format.nChannels = 8; // Four IEC 60958 Lines.
           wfxex.dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
+          break;
+        case CAEStreamInfo::STREAM_TYPE_DTSHD:
+          wfxex.SubFormat = KSDATAFORMAT_SUBTYPE_IEC61937_DTS_HD;
+          wfxex.Format.nChannels = 2; // One IEC 60958 Lines.
+          wfxex.dwChannelMask = KSAUDIO_SPEAKER_5POINT1;
           break;
         }
 

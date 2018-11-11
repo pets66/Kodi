@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include <atomic>
 #include <functional>
@@ -25,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "addons/Addon.h"
 #include "addons/binary-addons/AddonDll.h"
 #include "addons/kodi-addon-dev-kit/include/kodi/xbmc_pvr_types.h"
 
@@ -35,8 +23,8 @@ namespace PVR
 {
   class CPVRChannelGroups;
   class CPVRTimersContainer;
-
-  typedef std::vector<PVR_MENUHOOK> PVR_MENUHOOKS;
+  class CPVRClientMenuHook;
+  class CPVRClientMenuHooks;
 
   class CPVRClient;
   typedef std::shared_ptr<CPVRClient> CPVRClientPtr;
@@ -67,37 +55,37 @@ namespace PVR
 
     /*!
      * @brief Check whether this add-on supports TV channels.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsTV() const { return m_addonCapabilities && m_addonCapabilities->bSupportsTV; }
 
     /*!
      * @brief Check whether this add-on supports radio channels.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsRadio() const { return m_addonCapabilities && m_addonCapabilities->bSupportsRadio; }
 
     /*!
      * @brief Check whether this add-on supports channel groups.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsChannelGroups() const { return m_addonCapabilities && m_addonCapabilities->bSupportsChannelGroups; }
 
     /*!
      * @brief Check whether this add-on supports scanning for new channels on the backend.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsChannelScan() const { return m_addonCapabilities && m_addonCapabilities->bSupportsChannelScan; }
 
     /*!
      * @brief Check whether this add-on supports the following functions: DeleteChannel, RenameChannel, DialogChannelSettings and DialogAddChannel.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsChannelSettings() const { return m_addonCapabilities && m_addonCapabilities->bSupportsChannelSettings; }
 
     /*!
      * @brief Check whether this add-on supports descramble information for playing channels.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsDescrambleInfo() const { return m_addonCapabilities && m_addonCapabilities->bSupportsDescrambleInfo; }
 
@@ -109,9 +97,15 @@ namespace PVR
 
     /*!
      * @brief Check whether this add-on provides EPG information.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsEPG() const { return m_addonCapabilities && m_addonCapabilities->bSupportsEPG; }
+
+    /*!
+     * @brief Check whether this add-on supports asynchronous transfer of epg events.
+     * @return True if supported, false otherwise.
+     */
+    bool SupportsAsyncEPGTransfer() const { return m_addonCapabilities && m_addonCapabilities->bSupportsAsyncEPGTransfer; }
 
     /////////////////////////////////////////////////////////////////////////////////
     //
@@ -121,7 +115,7 @@ namespace PVR
 
     /*!
      * @brief Check whether this add-on supports the creation and editing of timers.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsTimers() const { return m_addonCapabilities && m_addonCapabilities->bSupportsTimers; }
 
@@ -133,7 +127,7 @@ namespace PVR
 
     /*!
      * @brief Check whether this add-on supports recordings.
-     * @return True if recordings are supported, false otherwise.
+     * @return True if supported, false otherwise.
      */
     bool SupportsRecordings() const { return m_addonCapabilities && m_addonCapabilities->bSupportsRecordings; }
 
@@ -160,6 +154,12 @@ namespace PVR
      * @return True if supported, false otherwise.
      */
     bool SupportsRecordingsEdl() const { return m_addonCapabilities && m_addonCapabilities->bSupportsRecordings && m_addonCapabilities->bSupportsRecordingEdl; }
+
+    /*!
+     * @brief Check whether this add-on supports retrieving an edit decision list for epg tags.
+     * @return True if supported, false otherwise.
+     */
+    bool SupportsEpgTagEdl() const { return m_addonCapabilities && m_addonCapabilities->bSupportsEPG && m_addonCapabilities->bSupportsEPGEdl; }
 
     /*!
      * @brief Check whether this add-on supports renaming recordings..
@@ -394,24 +394,6 @@ namespace PVR
      */
     PVR_ERROR FillEpgTagStreamFileItem(CFileItem &fileItem);
 
-    /*!
-     * @return True if this add-on has menu hooks, false otherwise.
-     */
-    bool HasMenuHooks(PVR_MENUHOOK_CAT cat) const;
-
-    /*!
-     * @return The menu hooks for this add-on.
-     */
-    PVR_MENUHOOKS& GetMenuHooks();
-
-    /*!
-     * @brief Call one of the menu hooks of this client.
-     * @param hook The hook to call.
-     * @param item The selected file item for which the hook was called.
-     * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
-     */
-    PVR_ERROR CallMenuHook(const PVR_MENUHOOK &hook, const CFileItemPtr item);
-
     //@}
     /** @name PVR EPG methods */
     //@{
@@ -456,7 +438,7 @@ namespace PVR
 
     /*!
      * @brief Request the list of all group members from the backend.
-     * @param groups The group to get the members for.
+     * @param group The group to get the members for.
      * @return PVR_ERROR_NO_ERROR if the list has been fetched successfully.
      */
     PVR_ERROR GetChannelGroupMembers(CPVRChannelGroup *group);
@@ -545,7 +527,7 @@ namespace PVR
     /*!
     * @brief Set the last watched position of a recording on the backend.
     * @param recording The recording.
-    * @param position The last watched position in seconds
+    * @param lastplayedposition The last watched position in seconds
     * @return PVR_ERROR_NO_ERROR if the position has been stored successfully.
     */
     PVR_ERROR SetRecordingLastPlayedPosition(const CPVRRecording &recording, int lastplayedposition);
@@ -565,6 +547,14 @@ namespace PVR
     * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
     */
     PVR_ERROR GetRecordingEdl(const CPVRRecording &recording, std::vector<PVR_EDL_ENTRY> &edls);
+
+    /*!
+    * @brief Retrieve the edit decision list (EDL) from the backend.
+    * @param epgTag The EPG tag.
+    * @param edls The edit decision list (empty on error).
+    * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
+    */
+    PVR_ERROR GetEpgTagEdl(const CConstPVREpgInfoTagPtr &epgTag, std::vector<PVR_EDL_ENTRY> &edls);
 
     //@}
     /** @name PVR timer methods */
@@ -671,7 +661,7 @@ namespace PVR
 
     /*!
      * @brief Get the descramble information of the stream that's currently open.
-     * @param qualityinfo The descramble information.
+     * @param descrambleinfo The descramble information.
      * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
      */
     PVR_ERROR GetDescrambleInfo(PVR_DESCRAMBLE_INFO &descrambleinfo) const;
@@ -796,13 +786,6 @@ namespace PVR
     static const char *ToString(const PVR_ERROR error);
 
     /*!
-     * @brief Check whether timeshifting is active for the currently playing stream, if any.
-     * @param bTimeshifting True, if timeshifting is active, false otherwise.
-     * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
-     */
-    PVR_ERROR IsTimeshifting(bool &bTimeshifting) const;
-
-    /*!
      * @brief Check whether the currently playing stream, if any, is a real-time stream.
      * @param bRealTime True if real-time, false otherwise.
      * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
@@ -821,6 +804,20 @@ namespace PVR
      * @return True on success, false otherwise.
      */
     bool GetAddonProperties(void);
+
+    /*!
+     * @brief Get the client's menu hooks.
+     * @return The hooks. Guaranteed never to be null.
+     */
+    std::shared_ptr<CPVRClientMenuHooks> GetMenuHooks();
+
+    /*!
+     * @brief Call one of the menu hooks of the client.
+     * @param hook The hook to call.
+     * @param item The item associated with the hook to be called.
+     * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
+     */
+    PVR_ERROR CallMenuHook(const CPVRClientMenuHook &hook, const CFileItemPtr &item);
 
     /*!
      * @brief Propagate power management events to this add-on
@@ -842,6 +839,13 @@ namespace PVR
      * @param iPriority The new priority.
      */
     void SetPriority(int iPriority);
+
+    /*!
+     * @brief Obtain the chunk size to use when reading streams.
+     * @param iChunkSize the chunk size in bytes.
+     * @return PVR_ERROR_NO_ERROR on success, respective error code otherwise.
+     */
+    PVR_ERROR GetStreamReadChunkSize(int &iChunkSize);
 
     /*!
      * @brief Get the interface table used between addon and Kodi.
@@ -1063,7 +1067,6 @@ namespace PVR
     PVR_CONNECTION_STATE   m_connectionState;      /*!< the backend connection state */
     PVR_CONNECTION_STATE   m_prevConnectionState;  /*!< the previous backend connection state */
     bool                   m_ignoreClient;         /*!< signals to PVRManager to ignore this client until it has been connected */
-    PVR_MENUHOOKS          m_menuhooks;            /*!< the menu hooks for this add-on */
     CPVRTimerTypes         m_timertypes;           /*!< timer types supported by this backend */
     int                    m_iClientId;            /*!< unique ID of the client */
     mutable int            m_iPriority;            /*!< priority of the client */
@@ -1076,12 +1079,13 @@ namespace PVR
     std::string            m_strFriendlyName;      /*!< the cached friendly name */
     std::string            m_strBackendHostname;   /*!< the cached backend hostname */
     CPVRClientCapabilities m_clientCapabilities;   /*!< the cached add-on's capabilities */
+    std::shared_ptr<CPVRClientMenuHooks> m_menuhooks; /*!< the menu hooks for this add-on */
 
     /* stored strings to make sure const char* members in PVR_PROPERTIES stay valid */
     std::string            m_strUserPath;         /*!< @brief translated path to the user profile */
     std::string            m_strClientPath;       /*!< @brief translated path to this add-on */
 
-    CCriticalSection m_critSection;
+    mutable CCriticalSection m_critSection;
 
     AddonInstance_PVR m_struct;
   };

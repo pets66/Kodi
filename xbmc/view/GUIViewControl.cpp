@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIViewControl.h"
@@ -24,6 +12,8 @@
 
 #include "FileItem.h"
 #include "GUIInfoManager.h"
+#include "ServiceBroker.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/IGUIContainer.h"
 #include "guilib/LocalizeStrings.h"
@@ -123,7 +113,7 @@ void CGUIViewControl::SetCurrentView(int viewMode, bool bRefresh /* = false */)
   if (hasFocus)
   {
     CGUIMessage msg(GUI_MSG_SETFOCUS, m_parentWindow, pNewView->GetID(), 0);
-    g_windowManager.SendMessage(msg, m_parentWindow);
+    CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
   }
 
   UpdateViewAsControl(static_cast<IGUIContainer*>(pNewView)->GetLabel());
@@ -141,7 +131,7 @@ void CGUIViewControl::UpdateContents(const CGUIControl *control, int currentItem
 {
   if (!control || !m_fileItems) return;
   CGUIMessage msg(GUI_MSG_LABEL_BIND, m_parentWindow, control->GetID(), currentItem, 0, m_fileItems);
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 }
 
 void CGUIViewControl::UpdateView()
@@ -162,7 +152,7 @@ int CGUIViewControl::GetSelectedItem(const CGUIControl *control) const
     return -1;
 
   CGUIMessage msg(GUI_MSG_ITEM_SELECTED, m_parentWindow, control->GetID());
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 
   int iItem = msg.GetParam1();
   if (iItem >= m_fileItems->Size())
@@ -204,7 +194,7 @@ void CGUIViewControl::SetSelectedItem(int item)
     return; // no valid current view!
 
   CGUIMessage msg(GUI_MSG_ITEM_SELECT, m_parentWindow, m_visibleViews[m_currentView]->GetID(), item);
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 }
 
 void CGUIViewControl::SetSelectedItem(const std::string &itemPath)
@@ -235,7 +225,7 @@ void CGUIViewControl::SetFocused()
     return; // no valid current view!
 
   CGUIMessage msg(GUI_MSG_SETFOCUS, m_parentWindow, m_visibleViews[m_currentView]->GetID(), 0);
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 }
 
 bool CGUIViewControl::HasControl(int viewControlID) const
@@ -305,7 +295,7 @@ void CGUIViewControl::Clear()
     return; // no valid current view!
 
   CGUIMessage msg(GUI_MSG_LABEL_RESET, m_parentWindow, m_visibleViews[m_currentView]->GetID(), 0);
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 }
 
 int CGUIViewControl::GetView(VIEW_TYPE type, int id) const
@@ -331,20 +321,22 @@ void CGUIViewControl::UpdateViewAsControl(const std::string &viewLabel)
   }
   CGUIMessage msg(GUI_MSG_SET_LABELS, m_parentWindow, m_viewAsControl, m_currentView);
   msg.SetPointer(&labels);
-  g_windowManager.SendMessage(msg, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msg, m_parentWindow);
 
   // otherwise it's just a normal button
   std::string label = StringUtils::Format(g_localizeStrings.Get(534).c_str(), viewLabel.c_str()); // View: %s
   CGUIMessage msgSet(GUI_MSG_LABEL_SET, m_parentWindow, m_viewAsControl);
   msgSet.SetLabel(label);
-  g_windowManager.SendMessage(msgSet, m_parentWindow);
+  CServiceBroker::GetGUI()->GetWindowManager().SendMessage(msgSet, m_parentWindow);
 }
 
 void CGUIViewControl::UpdateViewVisibility()
 {
   // first reset our infomanager cache, as it's likely that the vis conditions
   // used for views (i.e. based on contenttype) may have changed
-  g_infoManager.ResetCache();
+  CGUIInfoManager& infoMgr = CServiceBroker::GetGUI()->GetInfoManager();
+  infoMgr.ResetCache();
+  infoMgr.GetInfoProviders().GetGUIControlsInfoProvider().ResetContainerMovingCache();
   m_visibleViews.clear();
   for (unsigned int i = 0; i < m_allViews.size(); i++)
   {

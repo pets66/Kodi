@@ -1,29 +1,17 @@
+/*
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
+ *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
+ */
+
+#pragma once
+
 /*!
 \file GUIEditControl.h
 \brief
 */
-
-#pragma once
-
-/*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
- *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
- */
 
 #include "GUIButtonControl.h"
 #include "utils/Stopwatch.h"
@@ -66,7 +54,7 @@ public:
 
   void SetLabel(const std::string &text) override;
   void SetLabel2(const std::string &text) override;
-  void SetHint(const CGUIInfoLabel& hint);
+  void SetHint(const KODI::GUILIB::GUIINFO::CGUIInfoLabel& hint);
 
   std::string GetLabel2() const override;
 
@@ -95,7 +83,7 @@ protected:
   void UpdateText(bool sendUpdate = true);
   void OnPasteClipboard();
   void OnSMSCharacter(unsigned int key);
-  void DefaultConstructor();  
+  void DefaultConstructor();
 
   virtual bool ValidateInput(const std::wstring &data) const;
   void ValidateInput();
@@ -104,10 +92,10 @@ protected:
    \return true if the password is cleared, false otherwise.
    */
   bool ClearMD5();
-  
+
   std::wstring m_text2;
   std::string  m_text;
-  CGUIInfoLabel m_hintInfo;
+  KODI::GUILIB::GUIINFO::CGUIInfoLabel m_hintInfo;
   float m_textOffset;
   float m_textWidth;
   CRect m_clipRect; ///< clipping rect for the second label

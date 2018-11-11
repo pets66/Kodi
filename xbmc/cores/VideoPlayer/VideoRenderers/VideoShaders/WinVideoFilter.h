@@ -1,25 +1,12 @@
-#pragma once
-
 /*
- *      Copyright (C) 2007-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2007-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
+#pragma once
 
 #include "cores/IPlayer.h"
 #include "cores/VideoPlayer/VideoRenderers/VideoShaders/ConversionMatrix.h"
@@ -83,6 +70,7 @@ public:
   void SetCLUT(int clutSize, ID3D11ShaderResourceView *pCLUTView);
   void SetDisplayMetadata(bool hasDisplayMetadata, AVMasteringDisplayMetadata displayMetadata,
                           bool hasLightMetadata, AVContentLightMetadata lightMetadata);
+  void SetToneMapParam(float param) { m_toneMappingParam = param; }
 
   static bool CreateCLUTView(int clutSize, uint16_t* clutData, bool isRGB, ID3D11ShaderResourceView** ppCLUTView);
 
@@ -96,7 +84,7 @@ private:
   unsigned m_sourceWidth{ 0 };
   unsigned m_sourceHeight{ 0 };
   CRect m_sourceRect{ 0.f, 0.f, 0.f, 0.f };
-  CPoint m_destPoints[4] = 
+  CPoint m_destPoints[4] =
   {
     { 0.f, 0.f },
     { 0.f, 0.f },
@@ -116,6 +104,7 @@ private:
 
   // tone mapping
   bool m_toneMapping{ false };
+  float m_toneMappingParam{ 1.0f };
   bool m_hasDisplayMetadata{ false };
   bool m_hasLightMetadata{ false };
   AVMasteringDisplayMetadata m_displayMetadata;
@@ -160,11 +149,11 @@ public:
   virtual void Render(CD3DTexture &sourceTexture,
                       unsigned int sourceWidth, unsigned int sourceHeight,
                       unsigned int destWidth, unsigned int destHeight,
-                      CRect sourceRect, CRect destRect, bool useLimitRange, 
+                      CRect sourceRect, CRect destRect, bool useLimitRange,
                       CD3DTexture *target) = 0;
   CConvolutionShader();
   virtual ~CConvolutionShader();
-  
+
 protected:
   virtual bool ChooseKernelD3DFormat();
   virtual bool CreateHQKernel(ESCALINGMETHOD method);
@@ -189,14 +178,14 @@ public:
   void Render(CD3DTexture &sourceTexture,
               unsigned int sourceWidth, unsigned int sourceHeight,
               unsigned int destWidth, unsigned int destHeight,
-              CRect sourceRect, CRect destRect, bool useLimitRange, 
+              CRect sourceRect, CRect destRect, bool useLimitRange,
               CD3DTexture *target) override;
   CConvolutionShader1Pass() : CConvolutionShader(), m_sourceWidth(0), m_sourceHeight(0) {}
 
 protected:
   void PrepareParameters(unsigned int sourceWidth, unsigned int sourceHeight,
                          CRect sourceRect, CRect destRect);
-  void SetShaderParameters(CD3DTexture &sourceTexture, float* texSteps, 
+  void SetShaderParameters(CD3DTexture &sourceTexture, float* texSteps,
                            int texStepsCount, bool useLimitRange) override;
 
 
@@ -224,7 +213,7 @@ protected:
   void PrepareParameters(unsigned int sourceWidth, unsigned int sourceHeight,
                          unsigned int destWidth, unsigned int destHeight,
                          CRect sourceRect, CRect destRect);
-  void SetShaderParameters(CD3DTexture &sourceTexture, float* texSteps, 
+  void SetShaderParameters(CD3DTexture &sourceTexture, float* texSteps,
                            int texStepsCount, bool useLimitRange) override;
   void SetStepParams(UINT stepIndex) override;
 

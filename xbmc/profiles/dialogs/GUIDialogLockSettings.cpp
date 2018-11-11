@@ -1,30 +1,20 @@
 /*
- *      Copyright (C) 2005-2014 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogLockSettings.h"
 
 #include <utility>
 
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogGamepad.h"
 #include "dialogs/GUIDialogNumeric.h"
 #include "dialogs/GUIDialogSelect.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIKeyboardFactory.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
@@ -50,12 +40,7 @@
 
 CGUIDialogLockSettings::CGUIDialogLockSettings()
     : CGUIDialogSettingsManualBase(WINDOW_DIALOG_LOCK_SETTINGS, "DialogSettings.xml"),
-      m_changed(false),
-      m_details(true),
-      m_conditionalDetails(false),
-      m_getUser(false),
-      m_saveUserDetails(NULL),
-      m_buttonLabel(20091)
+      m_saveUserDetails(NULL)
 { }
 
 CGUIDialogLockSettings::~CGUIDialogLockSettings() = default;
@@ -75,7 +60,7 @@ bool CGUIDialogLockSettings::ShowAndGetLock(LockType &lockMode, std::string &pas
 
 bool CGUIDialogLockSettings::ShowAndGetLock(CProfile::CLock &locks, int buttonLabel /* = 20091 */, bool conditional /* = false */, bool details /* = true */)
 {
-  CGUIDialogLockSettings *dialog = g_windowManager.GetWindow<CGUIDialogLockSettings>(WINDOW_DIALOG_LOCK_SETTINGS);
+  CGUIDialogLockSettings *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogLockSettings>(WINDOW_DIALOG_LOCK_SETTINGS);
   if (dialog == NULL)
     return false;
 
@@ -95,7 +80,7 @@ bool CGUIDialogLockSettings::ShowAndGetLock(CProfile::CLock &locks, int buttonLa
 
 bool CGUIDialogLockSettings::ShowAndGetUserAndPassword(std::string &user, std::string &password, const std::string &url, bool *saveUserDetails)
 {
-  CGUIDialogLockSettings *dialog = g_windowManager.GetWindow<CGUIDialogLockSettings>(WINDOW_DIALOG_LOCK_SETTINGS);
+  CGUIDialogLockSettings *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogLockSettings>(WINDOW_DIALOG_LOCK_SETTINGS);
   if (dialog == NULL)
     return false;
 
@@ -156,7 +141,7 @@ void CGUIDialogLockSettings::OnSettingAction(std::shared_ptr<const CSetting> set
   const std::string &settingId = setting->GetId();
   if (settingId == SETTING_LOCKCODE)
   {
-    CGUIDialogSelect* dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+    CGUIDialogSelect* dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
     if (!dialog)
       return;
 
@@ -224,7 +209,7 @@ void CGUIDialogLockSettings::OnCancel()
 void CGUIDialogLockSettings::SetupView()
 {
   CGUIDialogSettingsManualBase::SetupView();
-  
+
   // set the title
   if (m_getUser)
     SetHeading(StringUtils::Format(g_localizeStrings.Get(20152).c_str(), CURL::Decode(m_url).c_str()));
@@ -291,7 +276,7 @@ void CGUIDialogLockSettings::InitializeSettings()
     settingsLevelOptions.push_back(std::make_pair(10038, LOCK_LEVEL::ADVANCED));
     settingsLevelOptions.push_back(std::make_pair(10039, LOCK_LEVEL::EXPERT));
     AddList(groupDetails, SETTING_LOCK_SETTINGS, 20043, SettingLevel::Basic, static_cast<int>(m_locks.settings), settingsLevelOptions, 20043);
-    
+
     AddToggle(groupDetails, SETTING_LOCK_ADDONMANAGER, 24090, SettingLevel::Basic, m_locks.addonManager);
   }
 

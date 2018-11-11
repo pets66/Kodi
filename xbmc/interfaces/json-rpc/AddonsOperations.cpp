@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2011-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2011-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonsOperations.h"
@@ -130,11 +118,11 @@ JSONRPC_STATUS CAddonsOperations::GetAddons(const std::string &method, ITranspor
 
   int start, end;
   HandleLimits(parameterObject, result, addons.size(), start, end);
-  
+
   CAddonDatabase addondb;
   for (int index = start; index < end; index++)
     FillDetails(addons.at(index), parameterObject["properties"], result["addons"], addondb, true);
-  
+
   return OK;
 }
 
@@ -145,7 +133,7 @@ JSONRPC_STATUS CAddonsOperations::GetAddonDetails(const std::string &method, ITr
   if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon.get() == NULL ||
       addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
     return InvalidParams;
-    
+
   CAddonDatabase addondb;
   FillDetails(addon, parameterObject["properties"], result["addon"], addondb);
 
@@ -180,7 +168,7 @@ JSONRPC_STATUS CAddonsOperations::ExecuteAddon(const std::string &method, ITrans
   if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon) || addon.get() == NULL ||
       addon->Type() < ADDON_VIZ || addon->Type() >= ADDON_MAX)
     return InvalidParams;
-    
+
   std::string argv;
   CVariant params = parameterObject["params"];
   if (params.isObject())
@@ -206,7 +194,7 @@ JSONRPC_STATUS CAddonsOperations::ExecuteAddon(const std::string &method, ITrans
     if (!params.empty())
       argv = StringUtils::Paramify(params.asString());
   }
-  
+
   std::string cmd;
   if (params.empty())
     cmd = StringUtils::Format("RunAddon(%s)", id.c_str());
@@ -217,7 +205,7 @@ JSONRPC_STATUS CAddonsOperations::ExecuteAddon(const std::string &method, ITrans
     CApplicationMessenger::GetInstance().SendMsg(TMSG_EXECUTE_BUILT_IN, -1, -1, nullptr, cmd);
   else
     CApplicationMessenger::GetInstance().PostMsg(TMSG_EXECUTE_BUILT_IN, -1, -1, nullptr, cmd);
-  
+
   return ACK;
 }
 
@@ -245,7 +233,7 @@ static CVariant Serialize(const AddonPtr& addon)
     info["optional"] = dep.optional;
     variant["dependencies"].push_back(std::move(info));
   }
-  if (addon->Broken().empty())
+  if (!addon->IsBroken())
     variant["broken"] = false;
   else
     variant["broken"] = addon->Broken();
@@ -265,17 +253,17 @@ void CAddonsOperations::FillDetails(AddonPtr addon, const CVariant& fields, CVar
 {
   if (addon.get() == NULL)
     return;
-  
+
   CVariant addonInfo = Serialize(addon);
 
   CVariant object;
   object["addonid"] = addonInfo["addonid"];
   object["type"] = addonInfo["type"];
-  
+
   for (unsigned int index = 0; index < fields.size(); index++)
   {
     std::string field = fields[index].asString();
-    
+
     // we need to manually retrieve the enabled / installed state of every addon
     // from the addon database because it can't be read from addon.xml
     if (field == "enabled")
@@ -301,7 +289,7 @@ void CAddonsOperations::FillDetails(AddonPtr addon, const CVariant& fields, CVar
     else if (addonInfo.isMember(field))
       object[field] = addonInfo[field];
   }
-  
+
   if (append)
     result.append(object);
   else

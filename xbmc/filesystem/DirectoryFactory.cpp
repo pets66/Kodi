@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <stdlib.h>
@@ -42,15 +30,18 @@
 #include "network/WakeOnAccess.h"
 
 #ifdef TARGET_POSIX
-#include "posix/PosixDirectory.h"
+#include "platform/posix/filesystem/PosixDirectory.h"
 #elif defined(TARGET_WINDOWS)
-#include "win32/Win32Directory.h"
+#include "platform/win32/filesystem/Win32Directory.h"
+#ifdef TARGET_WINDOWS_STORE
+#include "platform/win10/filesystem/WinLibraryDirectory.h"
+#endif
 #endif
 #ifdef HAS_FILESYSTEM_SMB
 #ifdef TARGET_WINDOWS
-#include "win32/Win32SMBDirectory.h"
+#include "platform/win32/filesystem/Win32SMBDirectory.h"
 #else
-#include "SMBDirectory.h"
+#include "platform/posix/filesystem/SMBDirectory.h"
 #endif
 #endif
 #include "CDDADirectory.h"
@@ -61,7 +52,7 @@
 #endif
 #include "PVRDirectory.h"
 #if defined(TARGET_ANDROID)
-#include "APKDirectory.h"
+#include "platform/android/filesystem/APKDirectory.h"
 #endif
 #include "XbtDirectory.h"
 #include "ZipDirectory.h"
@@ -71,9 +62,6 @@
 #ifdef HAS_ZEROCONF
 #include "ZeroconfDirectory.h"
 #endif
-#ifdef HAS_FILESYSTEM_SFTP
-#include "SFTPDirectory.h"
-#endif
 #ifdef HAS_FILESYSTEM_NFS
 #include "NFSDirectory.h"
 #endif
@@ -81,14 +69,11 @@
 #include "BlurayDirectory.h"
 #endif
 #if defined(TARGET_ANDROID)
-#include "AndroidAppDirectory.h"
+#include "platform/android/filesystem/AndroidAppDirectory.h"
 #endif
 #include "ResourceDirectory.h"
 #include "ServiceBroker.h"
 #include "addons/VFSEntry.h"
-#ifdef TARGET_WINDOWS_STORE
-#include "filesystem/win10/WinLibraryDirectory.h"
-#endif
 
 using namespace ADDON;
 
@@ -148,6 +133,9 @@ IDirectory* CDirectoryFactory::Create(const CURL& url)
 #endif
   if (url.IsProtocol("resource")) return new CResourceDirectory();
   if (url.IsProtocol("events")) return new CEventsDirectory();
+#ifdef TARGET_WINDOWS_STORE
+  if (CWinLibraryDirectory::IsValid(url)) return new CWinLibraryDirectory();
+#endif
 
   bool networkAvailable = CServiceBroker::GetNetwork().IsAvailable();
   if (networkAvailable)
@@ -155,9 +143,6 @@ IDirectory* CDirectoryFactory::Create(const CURL& url)
     if (url.IsProtocol("ftp") || url.IsProtocol("ftps")) return new CFTPDirectory();
     if (url.IsProtocol("http") || url.IsProtocol("https")) return new CHTTPDirectory();
     if (url.IsProtocol("dav") || url.IsProtocol("davs")) return new CDAVDirectory();
-#ifdef HAS_FILESYSTEM_SFTP
-    if (url.IsProtocol("sftp") || url.IsProtocol("ssh")) return new CSFTPDirectory();
-#endif
 #ifdef HAS_FILESYSTEM_SMB
 #ifdef TARGET_WINDOWS
     if (url.IsProtocol("smb")) return new CWin32SMBDirectory();
@@ -169,17 +154,16 @@ IDirectory* CDirectoryFactory::Create(const CURL& url)
     if (url.IsProtocol("upnp")) return new CUPnPDirectory();
 #endif
     if (url.IsProtocol("rss") || url.IsProtocol("rsss")) return new CRSSDirectory();
-    if (url.IsProtocol("pvr")) return new CPVRDirectory();
 #ifdef HAS_ZEROCONF
     if (url.IsProtocol("zeroconf")) return new CZeroconfDirectory();
 #endif
 #ifdef HAS_FILESYSTEM_NFS
     if (url.IsProtocol("nfs")) return new CNFSDirectory();
 #endif
-#ifdef TARGET_WINDOWS_STORE
-    if (CWinLibraryDirectory::IsValid(url)) return new CWinLibraryDirectory();
-#endif
   }
+
+  if (url.IsProtocol("pvr"))
+    return new CPVRDirectory();
 
   if (!url.GetProtocol().empty() && CServiceBroker::IsBinaryAddonCacheUp())
   {

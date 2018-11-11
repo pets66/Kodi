@@ -30,7 +30,7 @@ if(ENABLE_INTERNAL_FMT)
 
   if(APPLE)
     set(EXTRA_ARGS "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
-  endif()  
+  endif()
 
   set(FMT_LIBRARY ${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}/lib/libfmt.a)
   set(FMT_INCLUDE_DIR ${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}/include)
@@ -40,6 +40,7 @@ if(ENABLE_INTERNAL_FMT)
                       PREFIX ${CORE_BUILD_DIR}/fmt
                       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}
                                  -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                                 -DCMAKE_INSTALL_LIBDIR=lib
                                  -DFMT_DOC=OFF
                                  -DFMT_TEST=OFF
                                  "${EXTRA_ARGS}"
@@ -90,14 +91,13 @@ if(FMT_FOUND)
   set(FMT_LIBRARIES ${FMT_LIBRARY})
   set(FMT_INCLUDE_DIRS ${FMT_INCLUDE_DIR})
 
-  if(NOT TARGET Fmt::Fmt)
-    add_library(Fmt::Fmt UNKNOWN IMPORTED)
-    set_target_properties(Fmt::Fmt PROPERTIES
-                                     IMPORTED_LOCATION "${FMT_LIBRARY}"
-                                     INTERFACE_INCLUDE_DIRECTORIES "${FMT_INCLUDE_DIR}")
+  if(NOT TARGET fmt)
+    add_library(fmt UNKNOWN IMPORTED)
+    set_target_properties(fmt PROPERTIES
+                               IMPORTED_LOCATION "${FMT_LIBRARY}"
+                               INTERFACE_INCLUDE_DIRECTORIES "${FMT_INCLUDE_DIR}")
   endif()
 endif()
 
-mark_as_advanced(FMT_INCLUDE_DIR FMT_LIBRARY)
-
 endif()
+mark_as_advanced(FMT_INCLUDE_DIR FMT_LIBRARY)

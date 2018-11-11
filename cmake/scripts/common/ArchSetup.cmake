@@ -55,7 +55,7 @@ macro(check_builtin func var)
 endmacro()
 
 
-# -------- Main script --------- 
+# -------- Main script ---------
 message(STATUS "System type: ${CMAKE_SYSTEM_NAME}")
 
 if(WITH_CPU)
@@ -157,7 +157,8 @@ if(PLATFORM_DEFINES)
   add_options(ALL_LANGUAGES ALL_BUILDS ${PLATFORM_DEFINES})
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_options (ALL_LANGUAGES DEBUG "-g" "-D_DEBUG" "-Wall")
+if(NOT MSVC)
+  add_options(ALL_LANGUAGES ALL_BUILDS "-Wall")
+  add_options(ALL_LANGUAGES DEBUG "-g" "-D_DEBUG")
 endif()
 

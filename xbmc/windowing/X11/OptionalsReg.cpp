@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "OptionalsReg.h"
@@ -183,56 +171,3 @@ void X11::VDPAURegister()
 }
 #endif
 
-//-----------------------------------------------------------------------------
-// ALSA
-//-----------------------------------------------------------------------------
-
-#ifdef HAS_ALSA
-#include "cores/AudioEngine/Sinks/AESinkALSA.h"
-bool X11::ALSARegister()
-{
-  CAESinkALSA::Register();
-  return true;
-}
-#else
-bool X11::ALSARegister()
-{
-  return false;
-}
-#endif
-
-//-----------------------------------------------------------------------------
-// PulseAudio
-//-----------------------------------------------------------------------------
-
-#ifdef HAS_PULSEAUDIO
-#include "cores/AudioEngine/Sinks/AESinkPULSE.h"
-bool X11::PulseAudioRegister()
-{
-  bool ret = CAESinkPULSE::Register();
-  return ret;
-}
-#else
-bool X11::PulseAudioRegister()
-{
-  return false;
-}
-#endif
-
-//-----------------------------------------------------------------------------
-// sndio
-//-----------------------------------------------------------------------------
-
-#ifdef HAS_SNDIO
-#include "cores/AudioEngine/Sinks/AESinkSNDIO.h"
-bool X11::SndioRegister()
-{
-  CAESinkSNDIO::Register();
-  return true;
-}
-#else
-bool X11::SndioRegister()
-{
-  return false;
-}
-#endif

@@ -1,34 +1,22 @@
-#pragma once
-
 /*
  *      SDL - Simple DirectMedia Layer
- *      Copyright (C) 1997-2009 Sam Lantinga
+ *  Copyright (C) 1997-2009 Sam Lantinga
  *      Sam Lantinga
  *      slouken@libsdl.org
- *  
- *      Copyright (C) 2005-2015 Team Kodi
- *      http://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Kodi; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 /* Include file for SDL event handling */
 
 #include "input/XBMC_keyboard.h"
-#include "guilib/Resolution.h"
+#include "Resolution.h"
 
 /* Event enumerations */
 typedef enum {
@@ -43,6 +31,7 @@ typedef enum {
        XBMC_VIDEOMOVE,          /* User moved the window */
        XBMC_MODECHANGE,         /* Video mode must be changed */
        XBMC_TOUCH,
+       XBMC_BUTTON,             /* Button (remote) pressed */
        XBMC_SETFOCUS,
        XBMC_USEREVENT,
 
@@ -114,6 +103,13 @@ typedef struct XBMC_SetFocusEvent {
 	int y;		/* y position */
 } XBMC_SetFocusEvent;
 
+/* Button event structure */
+typedef struct XBMC_ButtonEvent
+{
+  uint32_t button;
+  uint32_t holdtime;
+} XBMC_ButtonEvent;
+
 /* General event structure */
 typedef struct XBMC_Event {
   uint8_t type;
@@ -129,6 +125,7 @@ typedef struct XBMC_Event {
     XBMC_UserEvent user;
     XBMC_AppCommandEvent appcommand;
     XBMC_TouchEvent touch;
+    XBMC_ButtonEvent keybutton;
     XBMC_SetFocusEvent focus;
   };
 } XBMC_Event;

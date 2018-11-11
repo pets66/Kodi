@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowPVRBase.h"
@@ -25,6 +13,7 @@
 #include "addons/AddonManager.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
 #include "dialogs/GUIDialogSelect.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIMessage.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
@@ -39,8 +28,6 @@
 #include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroup.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
-#include "pvr/epg/Epg.h"
-#include "pvr/timers/PVRTimers.h"
 
 #define MAX_INVALIDATION_FREQUENCY 2000 // limit to one invalidation per X milliseconds
 
@@ -53,7 +40,6 @@ namespace PVR
 class CGUIPVRChannelGroupsSelector
 {
 public:
-  CGUIPVRChannelGroupsSelector() : m_control(nullptr) {};
   virtual ~CGUIPVRChannelGroupsSelector() = default;
 
   bool Initialize(CGUIWindow* parent, bool bRadio);
@@ -63,7 +49,7 @@ public:
   bool SelectChannelGroup(const CPVRChannelGroupPtr &newGroup);
 
 private:
-  CGUIControl *m_control;
+  CGUIControl *m_control = nullptr;
   std::vector<CPVRChannelGroupPtr> m_channelGroups;
 };
 
@@ -193,7 +179,10 @@ bool CGUIWindowPVRBase::OnAction(const CAction &action)
     case ACTION_NEXT_CHANNELGROUP:
     {
       // switch to next or previous group
-      SetChannelGroup(action.GetID() == ACTION_NEXT_CHANNELGROUP ? m_channelGroup->GetNextGroup() : m_channelGroup->GetPreviousGroup());
+      if (const CPVRChannelGroupPtr channelGroup = GetChannelGroup())
+      {
+        SetChannelGroup(action.GetID() == ACTION_NEXT_CHANNELGROUP ? channelGroup->GetNextGroup() : channelGroup->GetPreviousGroup());
+      }
       return true;
     }
     case ACTION_MOVE_RIGHT:
@@ -217,7 +206,7 @@ bool CGUIWindowPVRBase::OnBack(int actionID)
     // don't call CGUIMediaWindow as it will attempt to go to the parent folder which we don't want.
     if (GetPreviousWindow() != WINDOW_FULLSCREEN_VIDEO)
     {
-      g_windowManager.ActivateWindow(WINDOW_HOME);
+      CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_HOME);
       return true;
     }
     else
@@ -247,7 +236,7 @@ void CGUIWindowPVRBase::OnInitWindow(void)
     m_viewControl.SetSelectedItem(CServiceBroker::GetPVRManager().GUIActions()->GetSelectedItemPath(m_bRadio));
 
     // This has to be done after base class OnInitWindow to restore correct selection
-    m_channelGroupsSelector->SelectChannelGroup(m_channelGroup);
+    m_channelGroupsSelector->SelectChannelGroup(GetChannelGroup());
   }
   else
   {
@@ -301,7 +290,7 @@ bool CGUIWindowPVRBase::OnMessage(CGUIMessage& message)
           // late init
           InitChannelGroup();
           m_channelGroupsSelector->Initialize(this, m_bRadio);
-          m_channelGroupsSelector->SelectChannelGroup(m_channelGroup);
+          m_channelGroupsSelector->SelectChannelGroup(GetChannelGroup());
           RegisterObservers();
           HideProgressDialog();
           Refresh(true);
@@ -342,9 +331,9 @@ void CGUIWindowPVRBase::SetInvalid()
 {
   if (m_refreshTimeout.IsTimePast())
   {
-    VECFILEITEMS items = m_vecItems->GetList();
-    for (VECFILEITEMS::iterator it = items.begin(); it != items.end(); ++it)
-      (*it)->SetInvalid();
+    for (const auto& item : *m_vecItems)
+      item->SetInvalid();
+
     CGUIMediaWindow::SetInvalid();
     m_refreshTimeout.Set(MAX_INVALIDATION_FREQUENCY);
   }
@@ -364,7 +353,7 @@ bool CGUIWindowPVRBase::CanBeActivated() const
 
 bool CGUIWindowPVRBase::OpenChannelGroupSelectionDialog(void)
 {
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+  CGUIDialogSelect *dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (!dialog)
     return false;
 
@@ -375,7 +364,10 @@ bool CGUIWindowPVRBase::OpenChannelGroupSelectionDialog(void)
   dialog->SetHeading(CVariant{g_localizeStrings.Get(19146)});
   dialog->SetItems(options);
   dialog->SetMultiSelection(false);
-  dialog->SetSelected(m_channelGroup->GroupName());
+  if (const CPVRChannelGroupPtr channelGroup = GetChannelGroup())
+  {
+    dialog->SetSelected(channelGroup->GroupName());
+  }
   dialog->Open();
 
   if (!dialog->IsConfirmed())
@@ -392,14 +384,14 @@ bool CGUIWindowPVRBase::OpenChannelGroupSelectionDialog(void)
 
 bool CGUIWindowPVRBase::InitChannelGroup()
 {
-  const CPVRChannelGroupPtr group(CServiceBroker::GetPVRManager().GetPlayingGroup(m_bRadio));
+  CPVRChannelGroupPtr group(CServiceBroker::GetPVRManager().GetPlayingGroup(m_bRadio));
   if (group)
   {
     CSingleLock lock(m_critSection);
     if (m_channelGroup != group)
     {
       m_viewControl.SetSelectedItem(0);
-      SetChannelGroup(group, false);
+      SetChannelGroup(std::move(group), false);
     }
     // Path might have changed since last init. Set it always, not just on group change.
     m_vecItems->SetPath(GetDirectoryPath());
@@ -414,28 +406,29 @@ CPVRChannelGroupPtr CGUIWindowPVRBase::GetChannelGroup(void)
   return m_channelGroup;
 }
 
-void CGUIWindowPVRBase::SetChannelGroup(const CPVRChannelGroupPtr &group, bool bUpdate /* = true */)
+void CGUIWindowPVRBase::SetChannelGroup(CPVRChannelGroupPtr &&group, bool bUpdate /* = true */)
 {
   if (!group)
     return;
 
-  CPVRChannelGroupPtr channelGroup;
+  CPVRChannelGroupPtr updateChannelGroup;
   {
     CSingleLock lock(m_critSection);
     if (m_channelGroup != group)
     {
       if (m_channelGroup)
         m_channelGroup->UnregisterObserver(this);
-      m_channelGroup = group;
+      m_channelGroup = std::move(group);
       // we need to register the window to receive changes from the new group
       m_channelGroup->RegisterObserver(this);
-      channelGroup = m_channelGroup;
+      if (bUpdate)
+        updateChannelGroup = m_channelGroup;
     }
   }
 
-  if (bUpdate && channelGroup)
+  if (updateChannelGroup)
   {
-    CServiceBroker::GetPVRManager().SetPlayingGroup(channelGroup);
+    CServiceBroker::GetPVRManager().SetPlayingGroup(updateChannelGroup);
     Update(GetDirectoryPath());
   }
 }
@@ -476,18 +469,23 @@ void CGUIWindowPVRBase::UpdateButtons(void)
 {
   CGUIMediaWindow::UpdateButtons();
 
-  SET_CONTROL_LABEL(CONTROL_BTNCHANNELGROUPS, g_localizeStrings.Get(19141) + ": " + m_channelGroup->GroupName());
-  m_channelGroupsSelector->SelectChannelGroup(m_channelGroup);
+  const CPVRChannelGroupPtr channelGroup = GetChannelGroup();
+  if (channelGroup)
+  {
+    SET_CONTROL_LABEL(CONTROL_BTNCHANNELGROUPS, g_localizeStrings.Get(19141) + ": " + channelGroup->GroupName());
+  }
+
+  m_channelGroupsSelector->SelectChannelGroup(channelGroup);
 }
 
 void CGUIWindowPVRBase::ShowProgressDialog(const std::string &strText, int iProgress)
 {
   if (!m_progressHandle)
   {
-    CGUIDialogExtendedProgressBar *loadingProgressDialog = g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
+    CGUIDialogExtendedProgressBar *loadingProgressDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
     if (!loadingProgressDialog)
     {
-      CLog::Log(LOGERROR, "CGUIWindowPVRBase - %s - unable to get WINDOW_DIALOG_EXT_PROGRESS!", __FUNCTION__);
+      CLog::LogF(LOGERROR, "Unable to get WINDOW_DIALOG_EXT_PROGRESS!");
       return;
     }
     m_progressHandle = loadingProgressDialog->GetHandle(g_localizeStrings.Get(19235)); // PVR manager is starting up

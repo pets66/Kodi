@@ -1,22 +1,9 @@
 /*
- *      Copyright (C) 2012-2015 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
- *  http://www.gnu.org/copyleft/gpl.html
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 #include "FFmpegImage.h"
 #include "utils/log.h"
@@ -35,17 +22,7 @@ extern "C"
 #include "libavutil/pixdesc.h"
 }
 
-Frame::Frame() :
-  m_pImage(nullptr),
-  m_delay(0),
-  m_imageSize(0),
-  m_height(0),
-  m_width(0)
-{}
-
-
 Frame::Frame(const Frame& src) :
-  m_pImage(nullptr),
   m_delay(src.m_delay),
   m_imageSize(src.m_imageSize),
   m_height(src.m_height),
@@ -102,12 +79,12 @@ static int mem_file_read(void *h, uint8_t* buf, int size)
   MemBuffer* mbuf = static_cast<MemBuffer*>(h);
   int64_t unread = mbuf->size - mbuf->pos;
   if (unread <= 0)
-    return 0;
-  
+    return AVERROR_EOF;
+
   size_t tocopy = std::min((size_t)size, (size_t)unread);
   memcpy(buf, mbuf->data + mbuf->pos, tocopy);
   mbuf->pos += tocopy;
-  return tocopy;
+  return static_cast<int>(tocopy);
 }
 
 static int64_t mem_file_seek(void *h, int64_t pos, int whence)
@@ -161,7 +138,7 @@ CFFmpegImage::~CFFmpegImage()
 bool CFFmpegImage::LoadImageFromMemory(unsigned char* buffer, unsigned int bufSize,
                                       unsigned int width, unsigned int height)
 {
-    
+
   if (!Initialize(buffer, bufSize))
   {
     //log
@@ -174,7 +151,7 @@ bool CFFmpegImage::LoadImageFromMemory(unsigned char* buffer, unsigned int bufSi
   return !(m_pFrame == nullptr);
 }
 
-bool CFFmpegImage::Initialize(unsigned char* buffer, unsigned int bufSize)
+bool CFFmpegImage::Initialize(unsigned char* buffer, size_t bufSize)
 {
   int bufferSize = 4096;
   uint8_t* fbuffer = (uint8_t*)av_malloc(bufferSize + AV_INPUT_BUFFER_PADDING_SIZE);
@@ -196,6 +173,9 @@ bool CFFmpegImage::Initialize(unsigned char* buffer, unsigned int bufSize)
     CLog::LogF(LOGERROR, "Could not allocate AVIOContext");
     return false;
   }
+
+  // signal to ffmepg this is not streaming protocol
+  m_ioctx->max_packet_size = bufferSize;
 
   m_fctx = avformat_alloc_context();
   if (!m_fctx)
@@ -310,7 +290,7 @@ AVFrame* CFFmpegImage::ExtractFrame()
     return nullptr;
   }
   //we need milliseconds
-  av_frame_set_pkt_duration(frame, av_rescale_q(frame->pkt_duration, m_fctx->streams[0]->time_base, AVRational{ 1, 1000 }));
+  frame->pkt_duration = av_rescale_q(frame->pkt_duration, m_fctx->streams[0]->time_base, AVRational{ 1, 1000 });
   m_height = frame->height;
   m_width = frame->width;
   m_originalWidth = m_width;
@@ -320,7 +300,7 @@ AVFrame* CFFmpegImage::ExtractFrame()
   if (pixDescriptor && ((pixDescriptor->flags & (AV_PIX_FMT_FLAG_ALPHA | AV_PIX_FMT_FLAG_PAL)) != 0))
     m_hasAlpha = true;
 
-  AVDictionary* dic = av_frame_get_metadata(frame);
+  AVDictionary* dic = frame->metadata;
   AVDictionaryEntry* entry = NULL;
   if (dic)
   {
@@ -483,7 +463,7 @@ bool CFFmpegImage::DecodeFrame(AVFrame* frame, unsigned int width, unsigned int 
 
   // Especially jpeg formats are full range this we need to take care here
   // Input Formats like RGBA are handled correctly automatically
-  AVColorRange range = av_frame_get_color_range(frame);
+  AVColorRange range = frame->color_range;
   AVPixelFormat pixFormat = ConvertFormats(frame);
 
   // assumption quadratic maximums e.g. 2048x2048
@@ -696,9 +676,9 @@ bool CFFmpegImage::CreateThumbnailFromSurface(unsigned char* bufferin, unsigned 
   }
   tdm.frame_input->pts = 1;
   tdm.frame_input->quality = tdm.avOutctx->global_quality;
-  tdm.frame_input->data[0] = (uint8_t*) tdm.frame_temporary->data[0];
-  tdm.frame_input->data[1] = (uint8_t*) tdm.frame_temporary->data[1];
-  tdm.frame_input->data[2] = (uint8_t*) tdm.frame_temporary->data[2];
+  tdm.frame_input->data[0] = tdm.frame_temporary->data[0];
+  tdm.frame_input->data[1] = tdm.frame_temporary->data[1];
+  tdm.frame_input->data[2] = tdm.frame_temporary->data[2];
   tdm.frame_input->height = height;
   tdm.frame_input->width = width;
   tdm.frame_input->linesize[0] = tdm.frame_temporary->linesize[0];
@@ -759,7 +739,7 @@ std::shared_ptr<Frame> CFFmpegImage::ReadFrame()
   if (avframe == nullptr)
     return nullptr;
   std::shared_ptr<Frame> frame(new Frame());
-  frame->m_delay = (unsigned int)av_frame_get_pkt_duration(avframe);
+  frame->m_delay = (unsigned int)avframe->pkt_duration;
   frame->m_pitch = avframe->width * 4;
   frame->m_pImage = (unsigned char*) av_malloc(avframe->height * frame->m_pitch);
   DecodeFrame(avframe, avframe->width, avframe->height, frame->m_pitch, frame->m_pImage);

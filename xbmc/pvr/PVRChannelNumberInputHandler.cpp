@@ -1,35 +1,26 @@
 /*
- *      Copyright (C) 2012-2017 Team Kodi
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVRChannelNumberInputHandler.h"
 
+#include <algorithm>
 #include <cstdlib>
 
+#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 
 namespace PVR
 {
 
 CPVRChannelNumberInputHandler::CPVRChannelNumberInputHandler()
-: CPVRChannelNumberInputHandler(g_advancedSettings.m_iPVRNumericChannelSwitchTimeout, CHANNEL_NUMBER_INPUT_MAX_DIGITS)
+: CPVRChannelNumberInputHandler(CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iPVRNumericChannelSwitchTimeout, CHANNEL_NUMBER_INPUT_MAX_DIGITS)
 {
 }
 
@@ -42,11 +33,33 @@ CPVRChannelNumberInputHandler::CPVRChannelNumberInputHandler(int iDelay, int iMa
 
 void CPVRChannelNumberInputHandler::OnTimeout()
 {
-  // call the overridden worker method
-  OnInputDone();
+  if (m_inputBuffer.empty())
+  {
+    CSingleLock lock(m_mutex);
+    m_label.erase();
+  }
+  else
+  {
+    // call the overridden worker method
+    OnInputDone();
 
-  CSingleLock lock(m_mutex);
-  m_inputBuffer.erase();
+    CSingleLock lock(m_mutex);
+
+    // erase input buffer immediately , but...
+    m_inputBuffer.erase();
+
+    // ... display the label for another .5 secs if we stopped the timer before regular timeout.
+    if (m_timer.IsRunning())
+      m_label.erase();
+    else
+      m_timer.Start(500);
+  }
+}
+
+void CPVRChannelNumberInputHandler::ExecuteAction()
+{
+  m_timer.Stop();
+  OnTimeout();
 }
 
 bool CPVRChannelNumberInputHandler::CheckInputAndExecuteAction()
@@ -55,7 +68,7 @@ bool CPVRChannelNumberInputHandler::CheckInputAndExecuteAction()
   if (channelNumber.IsValid())
   {
     // we have a valid channel number; execute the associated action now.
-    OnTimeout();
+    ExecuteAction();
     return true;
   }
   return false;
@@ -80,9 +93,41 @@ void CPVRChannelNumberInputHandler::AppendChannelNumberCharacter(char cCharacter
   }
 
   if (m_inputBuffer.size() == static_cast<size_t>(m_iMaxDigits))
+  {
     m_inputBuffer.erase(m_inputBuffer.begin());
+    m_label = m_inputBuffer;
+  }
+  else if (m_inputBuffer.empty())
+  {
+    m_sortedChannelNumbers.clear();
+    GetChannelNumbers(m_sortedChannelNumbers);
+
+    std::sort(m_sortedChannelNumbers.begin(), m_sortedChannelNumbers.end());
+  }
 
   m_inputBuffer.append(&cCharacter, 1);
+  m_label = m_inputBuffer;
+
+  for (auto it = m_sortedChannelNumbers.begin(); it != m_sortedChannelNumbers.end();)
+  {
+    const std::string channel = *it;
+    ++it;
+
+    if (StringUtils::StartsWith(channel, m_inputBuffer))
+    {
+      if (it != m_sortedChannelNumbers.end() && StringUtils::StartsWith(*it, m_inputBuffer))
+      {
+        // there are alternative numbers; wait for more input
+        break;
+      }
+
+      // no alternatives; complete the number and fire immediately
+      m_inputBuffer = channel;
+      m_label = m_inputBuffer;
+      ExecuteAction();
+      return;
+    }
+  }
 
   if (!m_timer.IsRunning())
     m_timer.Start(m_iDelay);
@@ -122,10 +167,10 @@ bool CPVRChannelNumberInputHandler::HasChannelNumber() const
   return !m_inputBuffer.empty();
 }
 
-std::string CPVRChannelNumberInputHandler::GetChannelNumberAsString() const
+std::string CPVRChannelNumberInputHandler::GetChannelNumberLabel() const
 {
   CSingleLock lock(m_mutex);
-  return m_inputBuffer;
+  return m_label;
 }
 
 } // namespace PVR

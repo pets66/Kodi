@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <interface/mmal/util/mmal_util.h>
@@ -31,6 +19,7 @@
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
@@ -53,13 +42,13 @@ using namespace MMAL;
 
 CMMALBuffer::CMMALBuffer(int id) : CVideoBuffer(id)
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, static_cast<void*>(this));
 }
 
 CMMALBuffer::~CMMALBuffer()
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, static_cast<void*>(this));
 }
 
@@ -375,7 +364,7 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
                 __FUNCTION__, static_cast<void*>(m_mmal_pool), static_cast<void*>(omvb),
                 static_cast<void*>(buffer), timeout);
     }
-  else if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  else if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG,
               "%s::%s pool:%p omvb:%p mmal:%p gmem:%p new:%d id:%d to:%d %dx%d (%dx%d) size:%d "
@@ -400,7 +389,7 @@ void CMMALPool::Prime()
     return;
   while (omvb = GetBuffer(0), omvb)
   {
-    if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+    if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     {
       CLog::Log(
           LOGDEBUG, "%s::%s Send omvb:%p mmal:%p from pool %p to %s len:%d cmd:%x flags:%x pool:%p",
@@ -452,7 +441,7 @@ CRenderInfo CMMALRenderer::GetRenderInfo()
 
 void CMMALRenderer::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG, "%s::%s omvb:%p mmal:%p dts:%.3f pts:%.3f len:%d cmd:%x flags:%x",
               CLASSNAME, __func__, static_cast<void*>(buffer->user_data),
@@ -565,7 +554,7 @@ bool CMMALRenderer::CheckConfigurationVout(uint32_t width, uint32_t height, uint
       return false;
     }
 
-    if (!m_queue_render && !CServiceBroker::GetSettings().GetBool("videoplayer.usedisplayasclock"))
+    if (!m_queue_render && !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool("videoplayer.usedisplayasclock"))
     {
       m_queue_render = mmal_queue_create();
       CThread::Create();
@@ -636,7 +625,7 @@ void CMMALRenderer::Process()
   CLog::Log(LOGDEBUG, "%s::%s - starting", CLASSNAME, __func__);
   while (!bStop)
   {
-    double dfps = g_graphicsContext.GetFPS();
+    double dfps = CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();
     double fps = 0.0;
     double inc = 1.0;
     g_RBP.WaitVsync();
@@ -719,7 +708,7 @@ void CMMALRenderer::Run()
     bool kept = false;
 
     CMMALBuffer *omvb = (CMMALBuffer *)buffer->user_data;
-    if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+    if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     {
       CLog::Log(LOGDEBUG,
                 "%s::%s %s omvb:%p mmal:%p dts:%.3f pts:%.3f len:%d cmd:%x flags:%x enc:%.4s",
@@ -761,7 +750,7 @@ void CMMALRenderer::Run()
         }
 
         // we don't keep up when running at 60fps in the background so switch to half rate
-        if (!g_graphicsContext.IsFullScreenVideo())
+        if (!CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo())
         {
           if (interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED)
             interlace_method = VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF;
@@ -842,7 +831,7 @@ void CMMALRenderer::Run()
         if (m_queue_render)
         {
           mmal_queue_put(m_queue_render, buffer);
-          if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+          if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
             CLog::Log(LOGDEBUG, "%s::%s send %p to m_queue_render", CLASSNAME, __func__, static_cast<void*>(omvb));
           kept = true;
         }
@@ -851,7 +840,7 @@ void CMMALRenderer::Run()
           CheckConfigurationVout(omvb->Width(), omvb->Height(), omvb->AlignedWidth(), omvb->AlignedHeight(), omvb->Encoding());
           if (m_vout_input)
           {
-            if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+            if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
               CLog::Log(LOGDEBUG, "%s::%s send %p to m_vout_input", CLASSNAME, __func__, static_cast<void*>(omvb));
             MMAL_STATUS_T status = mmal_port_send_buffer(m_vout_input, buffer);
             if (status != MMAL_SUCCESS)
@@ -871,7 +860,7 @@ void CMMALRenderer::Run()
     }
     if (!kept)
     {
-      if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+      if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
       {
         CLog::Log(
             LOGDEBUG,
@@ -909,15 +898,15 @@ void CMMALRenderer::UpdateFramerateStats(double pts)
   }
   if (pts != DVD_NOPTS_VALUE)
     m_lastPts = pts;
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s pts:%.3f diff:%.3f m_frameInterval:%.6f m_frameIntervalDiff:%.6f", CLASSNAME, __func__, pts*1e-6, diff * 1e-6 , m_frameInterval * 1e-6, m_frameIntervalDiff *1e-6);
 }
 
-void CMMALRenderer::AddVideoPicture(const VideoPicture& pic, int id, double currentClock)
+void CMMALRenderer::AddVideoPicture(const VideoPicture& pic, int id)
 {
   CMMALBuffer *buffer = dynamic_cast<CMMALBuffer*>(pic.videoBuffer);
   assert(buffer);
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG, "%s::%s MMAL - %p (%p) %i", CLASSNAME, __func__, static_cast<void*>(buffer),
               static_cast<void*>(buffer->mmal_buffer), id);
@@ -969,7 +958,7 @@ void CMMALRenderer::ReleaseBuffer(int id)
 {
   CSingleLock lock(m_sharedSection);
   CMMALBuffer *omvb = m_buffers[id];
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG, "%s::%s - MMAL: source:%d omvb:%p mmal:%p", CLASSNAME, __func__, id,
               static_cast<void*>(omvb), omvb ? static_cast<void*>(omvb->mmal_buffer) : nullptr);
@@ -979,13 +968,15 @@ void CMMALRenderer::ReleaseBuffer(int id)
   m_buffers[id] = nullptr;
 }
 
-void CMMALRenderer::Flush()
+bool CMMALRenderer::Flush(bool saveBuffers)
 {
   CSingleLock lock(m_sharedSection);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   if (m_vout_input)
     mmal_port_flush(m_vout_input);
   ReleaseBuffers();
+
+  return false;
 }
 
 void CMMALRenderer::Update()
@@ -1008,7 +999,7 @@ void CMMALRenderer::RenderUpdate(int index, int index2, bool clear, unsigned int
 
   omvb = m_buffers[index];
 
-  if (g_graphicsContext.GetStereoView() != RENDER_STEREO_VIEW_RIGHT)
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoView() != RENDER_STEREO_VIEW_RIGHT)
   {
     ManageRenderArea();
     CRect view;
@@ -1030,7 +1021,7 @@ void CMMALRenderer::RenderUpdate(int index, int index2, bool clear, unsigned int
   if (omvb && omvb->m_state == MMALStateBypass)
   {
     // dummy buffer from omxplayer
-    if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+    if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     {
       CLog::Log(LOGDEBUG, "%s::%s - OMX: clear:%d flags:%x alpha:%d source:%d omvb:%p", CLASSNAME,
                 __func__, clear, flags, alpha, index, static_cast<void*>(omvb));
@@ -1079,7 +1070,7 @@ exit:
 
 void CMMALRenderer::ReleaseBuffers()
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   for (int i=0; i<NUM_BUFFERS; i++)
     ReleaseBuffer(i);
@@ -1186,7 +1177,7 @@ void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
   RENDER_STEREO_MODE video_stereo_mode = (m_iFlags & CONF_FLAGS_STEREO_MODE_SBS) ? RENDER_STEREO_MODE_SPLIT_VERTICAL :
                                          (m_iFlags & CONF_FLAGS_STEREO_MODE_TAB) ? RENDER_STEREO_MODE_SPLIT_HORIZONTAL : RENDER_STEREO_MODE_OFF;
   bool stereo_invert                   = (m_iFlags & CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT) ? true : false;
-  RENDER_STEREO_MODE display_stereo_mode = g_graphicsContext.GetStereoMode();
+  RENDER_STEREO_MODE display_stereo_mode = CServiceBroker::GetWinSystem()->GetGfxContext().GetStereoMode();
 
   // ignore video stereo mode when 3D display mode is disabled
   if (display_stereo_mode == RENDER_STEREO_MODE_OFF)
@@ -1238,7 +1229,7 @@ void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
 
   // might need to scale up m_dst_rect to display size as video decodes
   // to separate video plane that is at display size.
-  RESOLUTION res = g_graphicsContext.GetVideoResolution();
+  RESOLUTION res = CServiceBroker::GetWinSystem()->GetGfxContext().GetVideoResolution();
   CRect gui(0, 0, CDisplaySettings::GetInstance().GetResolutionInfo(res).iWidth, CDisplaySettings::GetInstance().GetResolutionInfo(res).iHeight);
   CRect display(0, 0, CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenWidth, CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenHeight);
 
@@ -1313,7 +1304,7 @@ void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
 
 void CMMALRenderer::deint_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG, "%s::%s omvb:%p mmal:%p dts:%.3f pts:%.3f len:%d cmd:%x flags:%x",
               CLASSNAME, __func__, static_cast<void*>(buffer->user_data),
@@ -1331,7 +1322,7 @@ static void deint_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
 
 void CMMALRenderer::deint_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+  if (VERBOSE && CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->CanLogComponent(LOGVIDEO))
   {
     CLog::Log(LOGDEBUG, "%s::%s omvb:%p mmal:%p dts:%.3f pts:%.3f len:%d cmd:%x flags:%x",
               CLASSNAME, __func__, static_cast<void*>(buffer->user_data),

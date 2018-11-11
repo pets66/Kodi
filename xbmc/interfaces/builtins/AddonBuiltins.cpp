@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "AddonBuiltins.h"
@@ -32,6 +20,7 @@
 #include "FileItem.h"
 #include "filesystem/PluginDirectory.h"
 #include "games/tags/GameInfoTag.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "interfaces/generic/ScriptInvocationManager.h"
@@ -40,6 +29,7 @@
 #include "utils/URIUtils.h"
 #include "Application.h"
 #include "PlayListPlayer.h"
+#include "ServiceBroker.h"
 
 #if defined(TARGET_DARWIN)
 #include "filesystem/SpecialProtocol.h"
@@ -249,7 +239,7 @@ static int OpenDefaultSettings(const std::vector<std::string>& params)
   {
     bool changed = CGUIDialogAddonSettings::ShowForAddon(addon);
     if (type == ADDON_VIZ && changed)
-      g_windowManager.SendMessage(GUI_MSG_VISUALISATION_RELOAD, 0, 0);
+      CServiceBroker::GetGUI()->GetWindowManager().SendMessage(GUI_MSG_VISUALISATION_RELOAD, 0, 0);
   }
 
   return 0;
@@ -267,12 +257,12 @@ static int SetDefaultAddon(const std::vector<std::string>& params)
   if (type == ADDON_VIZ)
     allowNone = true;
 
-  if (type != ADDON_UNKNOWN && 
+  if (type != ADDON_UNKNOWN &&
       CGUIWindowAddonBrowser::SelectAddonID(type,addonID,allowNone))
   {
     CAddonSystemSettings::GetInstance().SetActive(type, addonID);
     if (type == ADDON_VIZ)
-      g_windowManager.SendMessage(GUI_MSG_VISUALISATION_RELOAD, 0, 0);
+      CServiceBroker::GetGUI()->GetWindowManager().SendMessage(GUI_MSG_VISUALISATION_RELOAD, 0, 0);
   }
 
   return 0;
@@ -288,6 +278,15 @@ static int AddonSettings(const std::vector<std::string>& params)
   if (CServiceBroker::GetAddonMgr().GetAddon(params[0], addon))
     CGUIDialogAddonSettings::ShowForAddon(addon);
 
+  return 0;
+}
+
+/*! \brief Open the settings for a given add-on.
+*  \param params The parameters.
+*/
+static int InstallFromZip(const std::vector<std::string>& params)
+{
+  CGUIWindowAddonBrowser::InstallFromZip();
   return 0;
 }
 
@@ -333,7 +332,7 @@ static int UpdateLocals(const std::vector<std::string>& params)
 
 // Note: For new Texts with comma add a "\" before!!! Is used for table text.
 //
-/// \page page_List_of_built_in_functions List of build in functions
+/// \page page_List_of_built_in_functions List of built-in functions
 /// \section built_in_functions_1 Add-on built-in's
 ///
 /// -----------------------------------------------------------------------------
@@ -367,6 +366,11 @@ static int UpdateLocals(const std::vector<std::string>& params)
 ///     ,
 ///     Install the specified plugin/script
 ///     @param[in] id                    The add-on id
+///   }
+///   \table_row2_l{
+///     <b>`InstallFromZip`</b>
+///     ,
+///     Opens the "Install from zip" dialog if "Unknown sources" is enabled. Prompts the warning message if not.
 ///   }
 ///   \table_row2_l{
 ///     <b>`RunAddon(id[\,opt])`</b>
@@ -438,6 +442,7 @@ CBuiltins::CommandMap CAddonBuiltins::GetOperations() const
            {"addon.default.set",          {"Open a select dialog to allow choosing the default addon of the given type", 1, SetDefaultAddon}},
            {"addon.opensettings",         {"Open a settings dialog for the addon of the given id", 1, AddonSettings}},
            {"installaddon",               {"Install the specified plugin/script", 1, InstallAddon}},
+           {"installfromzip",             { "Open the install from zip dialog", 0, InstallFromZip}},
            {"runaddon",                   {"Run the specified plugin/script", 1, RunAddon}},
 #ifdef TARGET_DARWIN
            {"runapplescript",             {"Run the specified AppleScript command", 1, RunScript<true>}},

@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "GUIDialogAddonInfo.h"
@@ -28,25 +16,25 @@
 #include "ServiceBroker.h"
 #include "filesystem/Directory.h"
 #include "addons/settings/GUIDialogAddonSettings.h"
-#include "cores/AudioEngine/Engines/ActiveAE/AudioDSPAddons/ActiveAEDSP.h"
 #include "dialogs/GUIDialogContextMenu.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "games/GameUtils.h"
 #include "guilib/LocalizeStrings.h"
-#include "GUIUserMessages.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "pictures/GUIWindowSlideShow.h"
 #include "settings/Settings.h"
+#include "settings/SettingsComponent.h"
+#include "utils/Digest.h"
 #include "utils/JobManager.h"
-#include "utils/FileOperationJob.h"
 #include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
 #include "utils/log.h"
 #include "utils/Variant.h"
+#include "GUIPassword.h"
 #include "Util.h"
 #include "interfaces/builtins/Builtins.h"
 
@@ -70,8 +58,7 @@ using namespace KODI::MESSAGING;
 using KODI::MESSAGING::HELPERS::DialogResponse;
 
 CGUIDialogAddonInfo::CGUIDialogAddonInfo(void)
-  : CGUIDialog(WINDOW_DIALOG_ADDON_INFO, "DialogAddonInfo.xml"),
-  m_addonEnabled(false)
+  : CGUIDialog(WINDOW_DIALOG_ADDON_INFO, "DialogAddonInfo.xml")
 {
   m_item = CFileItemPtr(new CFileItem);
   m_loadType = KEEP_IN_MEMORY;
@@ -174,7 +161,7 @@ void CGUIDialogAddonInfo::UpdateControls()
   bool isInstalled = NULL != m_localAddon.get();
   m_addonEnabled = m_localAddon && !CServiceBroker::GetAddonMgr().IsAddonDisabled(m_localAddon->ID());
   bool canDisable = isInstalled && CServiceBroker::GetAddonMgr().CanAddonBeDisabled(m_localAddon->ID());
-  bool canInstall = !isInstalled && m_item->GetAddonInfo()->Broken().empty();
+  bool canInstall = !isInstalled && !m_item->GetAddonInfo()->IsBroken();
   bool canUninstall = m_localAddon && CServiceBroker::GetAddonMgr().CanUninstall(m_localAddon);
 
   CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_INSTALL, canInstall || canUninstall);
@@ -193,7 +180,7 @@ void CGUIDialogAddonInfo::UpdateControls()
 
   CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_UPDATE, isInstalled);
 
-  bool autoUpdatesOn = CServiceBroker::GetSettings().GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_ON;
+  bool autoUpdatesOn = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_ON;
   CONTROL_ENABLE_ON_CONDITION(CONTROL_BTN_AUTOUPDATE, isInstalled && autoUpdatesOn);
   SET_CONTROL_SELECTED(GetID(), CONTROL_BTN_AUTOUPDATE, isInstalled && autoUpdatesOn &&
       !CServiceBroker::GetAddonMgr().IsBlacklisted(m_localAddon->ID()));
@@ -224,7 +211,7 @@ static const std::string LOCAL_CACHE = "\\0_local_cache"; // \0 to give it the l
 
 int CGUIDialogAddonInfo::AskForVersion(std::vector<std::pair<AddonVersion, std::string>>& versions)
 {
-  auto dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+  auto dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   dialog->Reset();
   dialog->SetHeading(CVariant{21338});
   dialog->SetUseDetails(true);
@@ -283,8 +270,8 @@ void CGUIDialogAddonInfo::OnUpdate()
           std::string path(items[i]->GetPath());
           if (database.GetPackageHash(m_localAddon->ID(), items[i]->GetPath(), hash))
           {
-            std::string md5 = CUtil::GetFileMD5(path);
-            if (md5 == hash)
+            std::string md5 = CUtil::GetFileDigest(path, KODI::UTILITY::CDigest::Type::MD5);
+            if (StringUtils::EqualsNoCase(md5, hash))
               versions.push_back(std::make_pair(AddonVersion(versionString), LOCAL_CACHE));
           }
         }
@@ -480,7 +467,7 @@ void CGUIDialogAddonInfo::OnSettings()
 
 bool CGUIDialogAddonInfo::ShowDependencyList(const std::vector<ADDON::DependencyInfo>& deps, bool reactivate)
 {
-  auto pDialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
+  auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   CFileItemList items;
   for (auto& it : deps)
   {
@@ -509,7 +496,7 @@ bool CGUIDialogAddonInfo::ShowDependencyList(const std::vector<ADDON::Dependency
     else
     {
       CFileItemPtr item(new CFileItem(it.id));
-      item->SetLabel2(g_localizeStrings.Get(161));
+      item->SetLabel2(g_localizeStrings.Get(10005)); // Not available
       items.Add(item);
     }
   }
@@ -555,13 +542,13 @@ bool CGUIDialogAddonInfo::ShowForItem(const CFileItemPtr& item)
   if (!item)
     return false;
 
-  CGUIDialogAddonInfo* dialog = g_windowManager.GetWindow<CGUIDialogAddonInfo>(WINDOW_DIALOG_ADDON_INFO);
+  CGUIDialogAddonInfo* dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogAddonInfo>(WINDOW_DIALOG_ADDON_INFO);
   if (!dialog)
     return false;
   if (!dialog->SetItem(item))
     return false;
 
-  dialog->Open(); 
+  dialog->Open();
   return true;
 }
 

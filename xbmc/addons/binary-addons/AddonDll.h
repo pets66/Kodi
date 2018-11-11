@@ -1,23 +1,12 @@
-#pragma once
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
+
+#pragma once
 
 #include "BinaryAddonManager.h"
 #include "DllAddon.h"
@@ -28,6 +17,8 @@
 namespace ADDON
 {
 
+  typedef void* (*ADDON_GET_INTERFACE_FN)(const std::string &name, const std::string &version);
+
   class CAddonDll : public CAddon
   {
   public:
@@ -37,12 +28,13 @@ namespace ADDON
 
     virtual ADDON_STATUS GetStatus();
 
+    static void RegisterInterface(ADDON_GET_INTERFACE_FN fn);
+
     // Implementation of IAddon via CAddon
     std::string LibPath() const override;
 
     // addon settings
     void SaveSettings() override;
-    std::string GetSetting(const std::string& key) override;
 
     ADDON_STATUS Create(ADDON_TYPE type, void* funcTable, void* info);
     void Destroy();
@@ -110,6 +102,8 @@ namespace ADDON
 
     bool UpdateSettingInActiveDialog(const char* id, const std::string& value);
 
+    static std::vector<ADDON_GET_INTERFACE_FN> s_registeredInterfaces;
+
     /// addon to kodi basic callbacks below
     //@{
 
@@ -137,6 +131,7 @@ namespace ADDON
     static bool set_setting_string(void* kodiBase, const char* id, const char* value);
     static void free_string(void* kodiBase, char* str);
     static void free_string_array(void* kodiBase, char** arr, int numElements);
+    static void* get_interface(void* kodiBase, const char* name, const char *version);
     //@}
   };
 

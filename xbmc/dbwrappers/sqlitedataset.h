@@ -1,32 +1,16 @@
-#pragma once
+/*
+ *  Copyright (C) 2004, Leo Seib, Hannover
+ *
+ *  Project:SQLiteDataset C++ Dynamic Library
+ *  Module: SQLiteDataset class header file
+ *  Author: Leo Seib      E-Mail: leoseib@web.de
+ *  Begin: 5/04/2002
+ *
+ *  SPDX-License-Identifier: MIT
+ *  See LICENSES/README.md for more information.
+ */
 
-/**********************************************************************
- * Copyright (c) 2004, Leo Seib, Hannover
- *
- * Project:SQLiteDataset C++ Dynamic Library
- * Module: SQLiteDataset class header file
- * Author: Leo Seib      E-Mail: leoseib@web.de
- * Begin: 5/04/2002
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- **********************************************************************/
+#pragma once
 
 #include <stdio.h>
 #include "dataset.h"
@@ -51,7 +35,7 @@ public:
 /* destructor */
   ~SqliteDatabase() override;
 
-  Dataset *CreateDataset() const override; 
+  Dataset *CreateDataset() const override;
 
 /* func. returns connection handle with SQLite-server */
   sqlite3 *getHandle() {  return conn; }
@@ -94,7 +78,7 @@ public:
 /* virtual methods for formatting */
   std::string vprepare(const char *format, va_list args) override;
 
-  bool in_transaction() override {return _in_transaction;}; 	
+  bool in_transaction() override {return _in_transaction;};
 
 };
 
@@ -135,7 +119,7 @@ public:
 /* destructor */
   ~SqliteDataset() override;
 
-/* set autorefresh boolean value (if true - refresh the data after edit() 
+/* set autorefresh boolean value (if true - refresh the data after edit()
 or insert() operations default = false) */
   void set_autorefresh(bool val);
 

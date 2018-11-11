@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include <string>
@@ -608,7 +596,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddList(SettingGroup
   std::shared_ptr<CSettingString> settingDefinition = std::make_shared<CSettingString>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetOptionsFiller(filler, this);
 
   std::shared_ptr<CSettingList> setting = std::make_shared<CSettingList>(id, settingDefinition, label, GetSettingsManager());
@@ -644,7 +632,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddList(SettingGroup
   std::shared_ptr<CSettingInt> settingDefinition = std::make_shared<CSettingInt>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetTranslatableOptions(entries);
 
   std::shared_ptr<CSettingList> setting = std::make_shared<CSettingList>(id, settingDefinition, label, GetSettingsManager());
@@ -680,7 +668,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddList(SettingGroup
   std::shared_ptr<CSettingInt> settingDefinition = std::make_shared<CSettingInt>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetOptions(entries);
 
   std::shared_ptr<CSettingList> setting = std::make_shared<CSettingList>(id, settingDefinition, label, GetSettingsManager());
@@ -716,7 +704,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddList(SettingGroup
   std::shared_ptr<CSettingInt> settingDefinition = std::make_shared<CSettingInt>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetOptionsFiller(filler, this);
 
   std::shared_ptr<CSettingList> setting = std::make_shared<CSettingList>(id, settingDefinition, label, GetSettingsManager());
@@ -954,7 +942,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddRange(SettingGrou
   std::shared_ptr<CSettingInt> settingDefinition = std::make_shared<CSettingInt>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetMinimum(minimum);
   settingDefinition->SetStep(step);
   settingDefinition->SetMaximum(maximum);
@@ -971,7 +959,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddRange(SettingGrou
     return NULL;
   // setting the default will also set the actual value on an unchanged setting
   setting->SetDefault(settingValues);
-  
+
   setting->SetControl(GetRangeControl(format, delayed, formatLabel, valueFormatLabel, valueFormatString));
   setting->SetMinimumItems(2);
   setting->SetMaximumItems(2);
@@ -993,7 +981,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddRange(SettingGrou
   std::shared_ptr<CSettingNumber> settingDefinition = std::make_shared<CSettingNumber>(id, GetSettingsManager());
   if (settingDefinition == NULL)
     return NULL;
-  
+
   settingDefinition->SetMinimum(minimum);
   settingDefinition->SetStep(step);
   settingDefinition->SetMaximum(maximum);
@@ -1010,7 +998,7 @@ std::shared_ptr<CSettingList> CGUIDialogSettingsManualBase::AddRange(SettingGrou
     return NULL;
   // setting the default will also set the actual value on an unchanged setting
   setting->SetDefault(settingValues);
-  
+
   setting->SetControl(GetRangeControl(format, delayed, formatLabel, valueFormatLabel, valueFormatString));
   setting->SetMinimumItems(2);
   setting->SetMaximumItems(2);
@@ -1031,7 +1019,7 @@ void CGUIDialogSettingsManualBase::setSettingDetails(std::shared_ptr<CSetting> s
   else if (level > SettingLevel::Expert)
     level = SettingLevel::Expert;
 
-  setting->SetLevel(static_cast<SettingLevel>(level));
+  setting->SetLevel(level);
   setting->SetVisible(visible);
   if (help >= 0)
     setting->SetHelp(help);
@@ -1059,7 +1047,7 @@ std::shared_ptr<ISettingControl> CGUIDialogSettingsManualBase::GetEditControl(co
   std::shared_ptr<CSettingControlEdit> control = std::make_shared<CSettingControlEdit>();
   if (!control->SetFormat(format))
     return NULL;
-  
+
   control->SetDelayed(delayed);
   control->SetHidden(hidden);
   control->SetVerifyNewValue(verifyNewValue);
@@ -1074,7 +1062,7 @@ std::shared_ptr<ISettingControl> CGUIDialogSettingsManualBase::GetButtonControl(
   std::shared_ptr<CSettingControlButton> control = std::make_shared<CSettingControlButton>();
   if (!control->SetFormat(format))
     return NULL;
-  
+
   control->SetDelayed(delayed);
   control->SetHeading(heading);
   control->SetHideValue(hideValue);
@@ -1090,7 +1078,7 @@ std::shared_ptr<ISettingControl> CGUIDialogSettingsManualBase::GetSpinnerControl
   std::shared_ptr<CSettingControlSpinner> control = std::make_shared<CSettingControlSpinner>();
   if (!control->SetFormat(format))
     return NULL;
-  
+
   control->SetDelayed(delayed);
   if (formatLabel >= 0)
     control->SetFormatLabel(formatLabel);

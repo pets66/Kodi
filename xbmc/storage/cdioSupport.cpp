@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2015 Team XBMC
- *      http://kodi.tv/
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "cdioSupport.h"
@@ -197,7 +185,7 @@ char* CLibcdio::GetDeviceFileName()
 {
   CSingleLock lock(*this);
 
-  // If We don't have a DVD device initially present (Darwin or a USB DVD drive), 
+  // If We don't have a DVD device initially present (Darwin or a USB DVD drive),
   // We have to keep checking in case one appears.
   if (s_defaultDevice && strlen(s_defaultDevice) == 0)
   {
@@ -207,7 +195,7 @@ char* CLibcdio::GetDeviceFileName()
 
   if (s_defaultDevice == NULL)
   {
-    std::string strEnvDvd = CEnvironment::getenv("XBMC_DVD_DEVICE");
+    std::string strEnvDvd = CEnvironment::getenv("KODI_DVD_DEVICE");
     if (!strEnvDvd.empty())
       s_defaultDevice = strdup(strEnvDvd.c_str());
     else
@@ -230,11 +218,7 @@ char* CLibcdio::GetDeviceFileName()
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 CCdIoSupport::CCdIoSupport()
-: i(0),
-  j(0),
-  cdio(nullptr),
-  m_nNumTracks(CDIO_INVALID_TRACK),
-  m_nFirstTrackNum(CDIO_INVALID_TRACK)
+: cdio(nullptr)
 {
   m_cdio = CLibcdio::GetInstance();
   m_nFirstData = -1;        /* # of first data track */
@@ -642,13 +626,13 @@ void CCdIoSupport::GetCdTextInfo(xbmc_cdtext_t &xcdt, int trackNum)
 #else
   //! @todo - remove after Ubuntu 16.04 (Xenial) is EOL
   cdtext_t *pcdtext = (cdtext_t *)::cdio_get_cdtext(cdio, trackNum);
-#endif 
-  
+#endif
+
   if (pcdtext == NULL)
     return ;
 
 #if defined(LIBCDIO_VERSION_NUM) && (LIBCDIO_VERSION_NUM >= 84)
-  for (int i=0; i < MAX_CDTEXT_FIELDS; i++) 
+  for (int i=0; i < MAX_CDTEXT_FIELDS; i++)
     if (cdtext_get_const(pcdtext, (cdtext_field_t)i, trackNum))
       xcdt[(cdtext_field_t)i] = cdtext_field2str((cdtext_field_t)i);
 #else

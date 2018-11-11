@@ -1,21 +1,9 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2005-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "ZeroconfDirectory.h"
@@ -47,9 +35,9 @@ namespace
     else if(fcr_service_type == "_ftp._tcp.")
       return "FTP";
     else if(fcr_service_type == "_webdav._tcp.")
-      return "WebDAV";   
+      return "WebDAV";
     else if(fcr_service_type == "_nfs._tcp.")
-      return "NFS";   
+      return "NFS";
     else if(fcr_service_type == "_sftp-ssh._tcp.")
       return "SFTP";
     //fallback, just return the received type
@@ -64,7 +52,7 @@ namespace
     else if(fcr_service_type == "_webdav._tcp.")
       fr_protocol = "dav";
     else if(fcr_service_type == "_nfs._tcp.")
-      fr_protocol = "nfs";      
+      fr_protocol = "nfs";
     else if(fcr_service_type == "_sftp-ssh._tcp.")
       fr_protocol = "sftp";
     else
@@ -86,7 +74,7 @@ bool GetDirectoryFromTxtRecords(const CZeroconfBrowser::ZeroconfService& zerocon
     std::string path;
     std::string username;
     std::string password;
-  
+
     //search for a path key entry
     CZeroconfBrowser::ZeroconfService::tTxtRecordMap::iterator it = txtRecords.find(TXT_RECORD_PATH_KEY);
 
@@ -97,7 +85,7 @@ bool GetDirectoryFromTxtRecords(const CZeroconfBrowser::ZeroconfService& zerocon
       //a misconfigured zeroconf server.
       path=it->second;
     }
-    
+
     //search for a username key entry
     it = txtRecords.find(TXT_RECORD_USERNAME_KEY);
 
@@ -107,7 +95,7 @@ bool GetDirectoryFromTxtRecords(const CZeroconfBrowser::ZeroconfService& zerocon
       username=it->second;
       url.SetUserName(username);
     }
-    
+
     //search for a password key entry
     it = txtRecords.find(TXT_RECORD_PASSWORD_KEY);
 
@@ -117,7 +105,7 @@ bool GetDirectoryFromTxtRecords(const CZeroconfBrowser::ZeroconfService& zerocon
       password=it->second;
       url.SetPassword(password);
     }
-    
+
     //if we got a path - add a item - else at least we maybe have set username and password to theurl
     if( !path.empty())
     {
@@ -128,11 +116,11 @@ bool GetDirectoryFromTxtRecords(const CZeroconfBrowser::ZeroconfService& zerocon
       {
         URIUtils::RemoveSlashAtEnd(urlStr);//we don't need the slash at and of url then
       }
-      else//path doesn't start with slash - 
+      else//path doesn't start with slash -
       {//this is some kind of misconfiguration - we fix it by adding a slash to the url
         URIUtils::AddSlashAtEnd(urlStr);
       }
-      
+
       //add slash at end of path since it has to be a folder
       URIUtils::AddSlashAtEnd(path);
       //this is the full path includeing remote stuff (e.x. nfs://ip/path
@@ -188,7 +176,7 @@ bool CZeroconfDirectory::GetDirectory(const CURL& url, CFileItemList &items)
       }
     }
     return true;
-  } 
+  }
   else
   {
     //decode the path first
@@ -216,17 +204,17 @@ bool CZeroconfDirectory::GetDirectory(const CURL& url, CFileItemList &items)
           CLog::Log(LOGERROR, "CZeroconfDirectory::GetDirectory Unknown service type (%s), skipping; ", zeroconf_service.GetType().c_str());
           return false;
         }
-        
+
         service.SetProtocol(protocol);
-        
+
         //first try to show the txt-record defined path if any
         if(GetDirectoryFromTxtRecords(zeroconf_service, service, items))
         {
           return true;
         }
         else//no txt record path - so let the CDirectory handler show the folders
-        {          
-          return CDirectory::GetDirectory(service.Get(), items, "", DIR_FLAG_ALLOW_PROMPT); 
+        {
+          return CDirectory::GetDirectory(service.Get(), items, "", DIR_FLAG_ALLOW_PROMPT);
         }
       }
     } catch (std::runtime_error& e) {

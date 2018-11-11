@@ -1,28 +1,18 @@
 /*
- *      Copyright (C) 2017 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2017-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "MusicLibraryQueue.h"
 
 #include <utility>
 
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogProgress.h"
+#include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIUserMessages.h"
 #include "music/jobs/MusicLibraryCleaningJob.h"
@@ -35,10 +25,7 @@
 
 CMusicLibraryQueue::CMusicLibraryQueue()
   : CJobQueue(false, 1, CJob::PRIORITY_LOW),
-    m_jobs(),
-    m_modal(false),
-    m_exporting(false),
-    m_cleaning(false)
+    m_jobs()
 { }
 
 CMusicLibraryQueue::~CMusicLibraryQueue()
@@ -58,7 +45,7 @@ void CMusicLibraryQueue::ExportLibrary(const CLibExportSettings& settings, bool 
   CGUIDialogProgress* progress = NULL;
   if (showDialog)
   {
-    progress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
+    progress = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
     if (progress)
     {
       progress->SetHeading(CVariant{ 20196 }); //"Export music library"
@@ -71,10 +58,10 @@ void CMusicLibraryQueue::ExportLibrary(const CLibExportSettings& settings, bool 
 
   CMusicLibraryExportJob* exportJob = new CMusicLibraryExportJob(settings, progress);
   if (showDialog)
-  {    
+  {
     AddJob(exportJob);
 
-    // Wait for export to complete or be canceled, but render every 10ms so that the 
+    // Wait for export to complete or be canceled, but render every 10ms so that the
     // pointer movements work on dialog even when export is reporting progress infrequently
     if (progress)
       progress->Wait();
@@ -151,7 +138,7 @@ void CMusicLibraryQueue::CleanLibrary(bool showDialog /* = false */)
   CGUIDialogProgress* progress = NULL;
   if (showDialog)
   {
-    progress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
+    progress = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
     if (progress)
     {
       progress->SetHeading(CVariant{ 700 });
@@ -161,10 +148,10 @@ void CMusicLibraryQueue::CleanLibrary(bool showDialog /* = false */)
     }
   }
 
-  CMusicLibraryCleaningJob* cleaningJob = new CMusicLibraryCleaningJob(progress);  
+  CMusicLibraryCleaningJob* cleaningJob = new CMusicLibraryCleaningJob(progress);
   AddJob(cleaningJob);
 
-  // Wait for cleaning to complete or be canceled, but render every 20ms so that the 
+  // Wait for cleaning to complete or be canceled, but render every 20ms so that the
   // pointer movements work on dialog even when cleaning is reporting progress infrequently
   if (progress)
     progress->Wait(20);
@@ -177,7 +164,7 @@ void CMusicLibraryQueue::CleanLibraryModal()
     return;
 
   CGUIDialogProgress* progress = nullptr;
-  progress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
+  progress = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
   if (progress)
   {
     progress->SetHeading(CVariant{ 700 });
@@ -260,7 +247,7 @@ void CMusicLibraryQueue::Refresh()
 {
   CUtil::DeleteMusicDatabaseDirectoryCache();
   CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE);
-  g_windowManager.SendThreadMessage(msg);
+  CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(msg);
 }
 
 void CMusicLibraryQueue::OnJobComplete(unsigned int jobID, bool success, CJob *job)

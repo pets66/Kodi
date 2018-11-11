@@ -1,36 +1,25 @@
 /*
- *      Copyright (C) 2012-2013 Team XBMC
- *      http://kodi.tv
+ *  Copyright (C) 2012-2018 Team Kodi
+ *  This file is part of Kodi - https://kodi.tv
  *
- *  This Program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- *  This Program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with XBMC; see the file COPYING.  If not, see
- *  <http://www.gnu.org/licenses/>.
- *
+ *  SPDX-License-Identifier: GPL-2.0-or-later
+ *  See LICENSES/README.md for more information.
  */
 
 #include "PVRRecording.h"
 
 #include "ServiceBroker.h"
+#include "addons/PVRClient.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
 #include "video/VideoDatabase.h"
 
 #include "pvr/PVRManager.h"
-#include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/epg/Epg.h"
 #include "pvr/epg/EpgContainer.h"
@@ -88,7 +77,7 @@ CPVRRecording::CPVRRecording(const PVR_RECORDING &recording, unsigned int iClien
   if (recording.iYear > 0)
     SetYear(recording.iYear);
   m_iClientId                      = iClientId;
-  m_recordingTime                  = recording.recordingTime + g_advancedSettings.m_iPVRTimeCorrection;
+  m_recordingTime                  = recording.recordingTime + CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_iPVRTimeCorrection;
   m_iPriority                      = recording.iPriority;
   m_iLifetime                      = recording.iLifetime;
   // Deleted recording is placed at the root of the deleted view
@@ -105,7 +94,7 @@ CPVRRecording::CPVRRecording(const PVR_RECORDING &recording, unsigned int iClien
 
   SetGenre(recording.iGenreType, recording.iGenreSubType, recording.strGenreDescription);
   CVideoInfoTag::SetPlayCount(recording.iPlayCount);
-  CVideoInfoTag::SetResumePoint(recording.iLastPlayedPosition, recording.iDuration);
+  CVideoInfoTag::SetResumePoint(recording.iLastPlayedPosition, recording.iDuration, "");
   SetDuration(recording.iDuration);
 
   //  As the channel a recording was done on (probably long time ago) might no longer be
@@ -123,10 +112,11 @@ CPVRRecording::CPVRRecording(const PVR_RECORDING &recording, unsigned int iClien
     }
     else
     {
-      bool bSupportsRadio(CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRadio());
-      if (bSupportsRadio && CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsTV())
+      const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+      bool bSupportsRadio = client && client->GetClientCapabilities().SupportsRadio();
+      if (bSupportsRadio && client && client->GetClientCapabilities().SupportsTV())
       {
-        CLog::Log(LOGWARNING,"CPVRRecording::CPVRRecording - unable to determine channel type. Defaulting to TV.");
+        CLog::Log(LOGWARNING, "Unable to determine channel type. Defaulting to TV.");
         m_bRadio = false; // Assume TV.
       }
       else
@@ -163,7 +153,10 @@ bool CPVRRecording::operator ==(const CPVRRecording& right) const
        m_bIsDeleted         == right.m_bIsDeleted &&
        m_iEpgEventId        == right.m_iEpgEventId &&
        m_iChannelUid        == right.m_iChannelUid &&
-       m_bRadio             == right.m_bRadio);
+       m_bRadio             == right.m_bRadio &&
+       m_genre              == right.m_genre &&
+       m_iGenreType         == right.m_iGenreType &&
+       m_iGenreSubType      == right.m_iGenreSubType);
 }
 
 bool CPVRRecording::operator !=(const CPVRRecording& right) const
@@ -186,6 +179,7 @@ void CPVRRecording::Serialize(CVariant& value) const
   value["epgeventid"] = m_iEpgEventId;
   value["channeluid"] = m_iChannelUid;
   value["radio"] = m_bRadio;
+  value["genre"] = m_genre;
 
   if (!value.isMember("art"))
     value["art"] = CVariant(CVariant::VariantTypeObject);
@@ -222,8 +216,8 @@ void CPVRRecording::Reset(void)
 
 bool CPVRRecording::Delete(void)
 {
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->DeleteRecording(*this);
-  if (error != PVR_ERROR_NO_ERROR)
+  CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (!client || client->DeleteRecording(*this) != PVR_ERROR_NO_ERROR)
     return false;
 
   OnDelete();
@@ -246,68 +240,73 @@ void CPVRRecording::OnDelete(void)
 
 bool CPVRRecording::Undelete(void)
 {
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->UndeleteRecording(*this);
-  if (error != PVR_ERROR_NO_ERROR)
-    return false;
-
-  return true;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  return client && (client->UndeleteRecording(*this) == PVR_ERROR_NO_ERROR);
 }
 
 bool CPVRRecording::Rename(const std::string &strNewName)
 {
   m_strTitle = strNewName;
-  PVR_ERROR error = CServiceBroker::GetPVRManager().Clients()->RenameRecording(*this);
-  if (error != PVR_ERROR_NO_ERROR)
-    return false;
-
-  return true;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  return client && (client->RenameRecording(*this) == PVR_ERROR_NO_ERROR);
 }
 
 bool CPVRRecording::SetPlayCount(int count)
 {
-  PVR_ERROR error;
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsPlayCount() &&
-      !CServiceBroker::GetPVRManager().Clients()->SetRecordingPlayCount(*this, count, &error))
-    return false;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsPlayCount())
+  {
+    if (client->SetRecordingPlayCount(*this, count) != PVR_ERROR_NO_ERROR)
+      return false;
+  }
 
   return CVideoInfoTag::SetPlayCount(count);
 }
 
 bool CPVRRecording::IncrementPlayCount()
 {
-  PVR_ERROR error;
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsPlayCount() &&
-      !CServiceBroker::GetPVRManager().Clients()->SetRecordingPlayCount(*this, CVideoInfoTag::GetPlayCount() + 1, &error))
-    return false;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsPlayCount())
+  {
+    if (client->SetRecordingPlayCount(*this, CVideoInfoTag::GetPlayCount() + 1) != PVR_ERROR_NO_ERROR)
+      return false;
+  }
 
   return CVideoInfoTag::IncrementPlayCount();
 }
 
 bool CPVRRecording::SetResumePoint(const CBookmark &resumePoint)
 {
-  PVR_ERROR error;
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsLastPlayedPosition() &&
-      !CServiceBroker::GetPVRManager().Clients()->SetRecordingLastPlayedPosition(*this, lrint(resumePoint.timeInSeconds), &error))
-    return false;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsLastPlayedPosition())
+  {
+    if (client->SetRecordingLastPlayedPosition(*this, lrint(resumePoint.timeInSeconds)) != PVR_ERROR_NO_ERROR)
+      return false;
+  }
 
   return CVideoInfoTag::SetResumePoint(resumePoint);
 }
 
 bool CPVRRecording::SetResumePoint(double timeInSeconds, double totalTimeInSeconds, const std::string &playerState /* = "" */)
 {
-  PVR_ERROR error;
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsLastPlayedPosition() &&
-      !CServiceBroker::GetPVRManager().Clients()->SetRecordingLastPlayedPosition(*this, lrint(timeInSeconds), &error))
-    return false;
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsLastPlayedPosition())
+  {
+    if (client->SetRecordingLastPlayedPosition(*this, lrint(timeInSeconds)) != PVR_ERROR_NO_ERROR)
+      return false;
+  }
 
   return CVideoInfoTag::SetResumePoint(timeInSeconds, totalTimeInSeconds, playerState);
 }
 
 CBookmark CPVRRecording::GetResumePoint() const
 {
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsLastPlayedPosition())
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsLastPlayedPosition())
   {
-    int pos = CServiceBroker::GetPVRManager().Clients()->GetRecordingLastPlayedPosition(*this);
+    int pos = -1;
+    client->GetRecordingLastPlayedPosition(*this, pos);
+
     if (pos >= 0)
     {
       CBookmark resumePoint(CVideoInfoTag::GetResumePoint());
@@ -324,12 +323,12 @@ void CPVRRecording::UpdateMetadata(CVideoDatabase &db)
   if (m_bGotMetaData || !db.IsOpen())
     return;
 
-  if (!CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsPlayCount())
-  {
-    CVideoInfoTag::SetPlayCount(db.GetPlayCount(m_strFileNameAndPath));
-  }
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
 
-  if (!CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsLastPlayedPosition())
+  if (!client || !client->GetClientCapabilities().SupportsRecordingsPlayCount())
+    CVideoInfoTag::SetPlayCount(db.GetPlayCount(m_strFileNameAndPath));
+
+  if (!client || !client->GetClientCapabilities().SupportsRecordingsLastPlayedPosition())
   {
     CBookmark resumePoint;
     if (db.GetResumeBookMark(m_strFileNameAndPath, resumePoint))
@@ -341,11 +340,13 @@ void CPVRRecording::UpdateMetadata(CVideoDatabase &db)
 
 std::vector<PVR_EDL_ENTRY> CPVRRecording::GetEdl() const
 {
-  if (CServiceBroker::GetPVRManager().Clients()->GetClientCapabilities(m_iClientId).SupportsRecordingsEdl())
-  {
-    return CServiceBroker::GetPVRManager().Clients()->GetRecordingEdl(*this);
-  }
-  return std::vector<PVR_EDL_ENTRY>();
+  std::vector<PVR_EDL_ENTRY> edls;
+
+  const CPVRClientPtr client = CServiceBroker::GetPVRManager().GetClient(m_iClientId);
+  if (client && client->GetClientCapabilities().SupportsRecordingsEdl())
+    client->GetRecordingEdl(*this, edls);
+
+  return edls;
 }
 
 void CPVRRecording::Update(const CPVRRecording &tag)
@@ -377,11 +378,22 @@ void CPVRRecording::Update(const CPVRRecording &tag)
   CVideoInfoTag::SetResumePoint(tag.GetLocalResumePoint());
   SetDuration(tag.GetDuration());
 
+  if (m_iGenreType == EPG_GENRE_USE_STRING)
+  {
+    /* No type/subtype. Use the provided description */
+    m_genre = tag.m_genre;
+  }
+  else
+  {
+    /* Determine genre description by type/subtype */
+    m_genre = StringUtils::Split(CPVREpg::ConvertGenreIdToString(tag.m_iGenreType, tag.m_iGenreSubType), CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoItemSeparator);
+  }
+
   //Old Method of identifying TV show title and subtitle using m_strDirectory and strPlotOutline (deprecated)
   std::string strShow = StringUtils::Format("%s - ", g_localizeStrings.Get(20364).c_str());
   if (StringUtils::StartsWithNoCase(m_strPlotOutline, strShow))
   {
-    CLog::Log(LOGDEBUG,"CPVRRecording::Update - PVR addon provides episode name in strPlotOutline which is deprecated");
+    CLog::Log(LOGWARNING, "PVR addon provides episode name in strPlotOutline which is deprecated");
     std::string strEpisode = m_strPlotOutline;
     std::string strTitle = m_strDirectory;
 
@@ -478,14 +490,22 @@ bool CPVRRecording::IsInProgress() const
 
 void CPVRRecording::SetGenre(int iGenreType, int iGenreSubType, const std::string &strGenre)
 {
+  m_iGenreType = iGenreType;
+  m_iGenreSubType = iGenreSubType;
+
   if ((iGenreType == EPG_GENRE_USE_STRING) && !strGenre.empty())
   {
     /* Type and sub type are not given. Use the provided genre description if available. */
-    m_genre = StringUtils::Split(strGenre, g_advancedSettings.m_videoItemSeparator);
+    m_genre = StringUtils::Split(strGenre, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoItemSeparator);
   }
   else
   {
     /* Determine the genre description from the type and subtype IDs */
-    m_genre = StringUtils::Split(CPVREpg::ConvertGenreIdToString(iGenreType, iGenreSubType), g_advancedSettings.m_videoItemSeparator);
+    m_genre = StringUtils::Split(CPVREpg::ConvertGenreIdToString(iGenreType, iGenreSubType), CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoItemSeparator);
   }
+}
+
+const std::string CPVRRecording::GetGenresLabel() const
+{
+  return StringUtils::Join(m_genre, CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_videoItemSeparator);
 }

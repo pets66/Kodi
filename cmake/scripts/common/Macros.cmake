@@ -72,11 +72,7 @@ function(core_add_library name)
     add_library(${name} STATIC ${SOURCES} ${HEADERS} ${OTHERS})
     set_target_properties(${name} PROPERTIES PREFIX "")
     set(core_DEPENDS ${name} ${core_DEPENDS} CACHE STRING "" FORCE)
-    set(lib_DEPS libcpluff ffmpeg crossguid ${PLATFORM_GLOBAL_TARGET_DEPS})
-    if(NOT CORE_SYSTEM_NAME STREQUAL windowsstore)
-      list(APPEND lib_DEPS dvdnav)
-    endif()
-    add_dependencies(${name} ${lib_DEPS})
+    add_dependencies(${name} ${GLOBAL_TARGET_DEPS})
     set(CORE_LIBRARY ${name} PARENT_SCOPE)
 
     # Add precompiled headers to Kodi main libraries
@@ -106,11 +102,7 @@ function(core_add_test_library name)
     set_target_properties(${name} PROPERTIES PREFIX ""
                                              EXCLUDE_FROM_ALL 1
                                              FOLDER "Build Utilities/tests")
-    set(lib_DEPS libcpluff ffmpeg crossguid ${PLATFORM_GLOBAL_TARGET_DEPS})
-    if(NOT CORE_SYSTEM_NAME STREQUAL windowsstore)
-      list(APPEND lib_DEPS dvdnav)
-    endif()
-    add_dependencies(${name} ${lib_DEPS})
+    add_dependencies(${name} ${GLOBAL_TARGET_DEPS})
     set(test_archives ${test_archives} ${name} CACHE STRING "" FORCE)
   endif()
   foreach(src IN LISTS SOURCES SUPPORTED_SOURCES HEADERS OTHERS)
@@ -468,7 +460,7 @@ function(core_optional_dyload_dep)
   foreach(depspec ${ARGN})
     set(_required False)
     split_dependency_specification(${depspec} dep version)
-    setup_enable_switch()    
+    setup_enable_switch()
     if(${enable_switch} STREQUAL AUTO)
       find_package_with_ver(${dep} ${version})
     elseif(${${enable_switch}})
@@ -662,7 +654,11 @@ function(core_find_git_rev stamp)
       string(REPLACE "\"" "" DATE ${DATE})
       string(REPLACE "-" "" DATE ${DATE})
     else()
-      string(TIMESTAMP DATE "%Y%m%d" UTC)
+      if(EXISTS ${CMAKE_SOURCE_DIR}/BUILDDATE)
+        file(STRINGS ${CMAKE_SOURCE_DIR}/BUILDDATE DATE LIMIT_INPUT 8)
+      else()
+        string(TIMESTAMP DATE "%Y%m%d" UTC)
+      endif()
       if(EXISTS ${CMAKE_SOURCE_DIR}/VERSION)
         file(STRINGS ${CMAKE_SOURCE_DIR}/VERSION HASH LIMIT_INPUT 16)
       else()
@@ -687,6 +683,7 @@ endfunction()
 #   APP_NAME_UC - uppercased app name
 #   APP_PACKAGE - Android full package name
 #   COMPANY_NAME - company name
+#   APP_WEBSITE - site url
 #   APP_VERSION_MAJOR - the app version major
 #   APP_VERSION_MINOR - the app version minor
 #   APP_VERSION_TAG - the app version tag
@@ -711,11 +708,12 @@ macro(core_find_versions)
   core_file_read_filtered(version_list ${CORE_SOURCE_DIR}/version.txt)
   core_file_read_filtered(json_version ${CORE_SOURCE_DIR}/xbmc/interfaces/json-rpc/schema/version.txt)
   string(REGEX REPLACE "([^ ;]*) ([^;]*)" "\\1;\\2" version_list "${version_list};${json_version}")
-  set(version_props 
+  set(version_props
     ADDON_API
     APP_NAME
     APP_PACKAGE
     COMPANY_NAME
+    COPYRIGHT_YEARS
     JSONRPC_VERSION
     PACKAGE_DESCRIPTION
     PACKAGE_IDENTITY
@@ -761,6 +759,9 @@ macro(core_find_versions)
   # unset variables not used anywhere else
   unset(version_list)
   unset(APP_APP_NAME)
+  unset(APP_COMPANY_NAME)
+  unset(APP_APP_PACKAGE)
+  unset(APP_JSONRPC_VERSION)
   unset(BIN_ADDON_PARTS)
 
   # bail if we can't parse version.txt

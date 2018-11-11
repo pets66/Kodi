@@ -57,6 +57,8 @@ if(UNIX)
   option(ENABLE_INTERNAL_CROSSGUID "Enable internal crossguid?" ON)
   option(ENABLE_INTERNAL_RapidJSON "Enable internal rapidjson?" OFF)
   option(ENABLE_INTERNAL_FMT "Enable internal fmt?" OFF)
+  option(ENABLE_INTERNAL_FSTRCMP "Enable internal fstrcmp?" OFF)
+  option(ENABLE_INTERNAL_FLATBUFFERS "Enable internal flatbuffers?" OFF)
 endif()
 # System options
 if(NOT WIN32)
@@ -64,7 +66,6 @@ if(NOT WIN32)
   option(WITH_CPU               "build with given cpu" OFF)
 endif()
 if(CORE_SYSTEM_NAME STREQUAL linux)
-  option(ENABLE_LIRC            "Enable LIRC support?" ON)
   option(ENABLE_EVENTCLIENTS    "Enable event clients support?" OFF)
 endif()
 
@@ -106,18 +107,24 @@ foreach(depspec ${PLATFORM_REQUIRED_DEPS})
   # optional subdirectory for the specified platform to get built.
   split_dependency_specification(${depspec} dep version)
   string(TOUPPER ${dep} depup)
+  if(NOT ${ENABLE_${depup}} STREQUAL AUTO AND NOT ${ENABLE_${depup}})
+    message(WARNING "Your request to disable the dependency ${dep} required on platform ${CORE_PLATFORM_NAME} was ignored. Please choose another platform or add \"-DENABLE_${depup}=ON\" to your CMake command line to resolve this warning.")
+  endif()
   set(ENABLE_${depup} "ON" CACHE BOOL "Force enabling required ${depup} support" FORCE)
 endforeach()
 
 # Required dependencies. Keep in alphabetical order please
-set(required_deps Cdio
+set(required_deps ASS
+                  Cdio
                   Cpluff
                   CrossGUID
                   Curl
                   FFMPEG
+                  FlatBuffers
                   Fmt
                   FreeType
                   FriBidi
+                  fstrcmp
                   Iconv
                   LibDvd
                   Lzo2
@@ -136,47 +143,40 @@ endif()
 if(CORE_SYSTEM_NAME STREQUAL android)
   list(APPEND required_deps Zip)
 endif()
-if(CORE_SYSTEM_NAME STREQUAL windowsstore)
-  #uses header only version of Fmt
-  list(REMOVE_ITEM required_deps Fmt)
-endif()
 
 # Optional dependencies. Keep in alphabetical order please
 set(optional_deps Alsa
                   Avahi
                   Bluetooth
+                  Bluray
                   CAP
                   CCache
+                  CEC
                   DBus
                   LCMS2
+                  LircClient
                   MDNS
                   MicroHttpd
+                  NFS
                   PulseAudio
                   Python
                   SmbClient
                   Sndio
-                  SSH
                   UDEV
                   XSLT
                   ${PLATFORM_OPTIONAL_DEPS})
 
-# Required, dyloaded deps. Keep in alphabetical order please
-set(required_dyload ASS)
-
 # Optional, dyloaded deps. Keep in alphabetical order please
-set(dyload_optional Bluray
-                    CEC
-                    NFS
-                    Plist)
+set(dyload_optional Plist)
 
 # Required tools
 find_package(TexturePacker REQUIRED)
 find_package(JsonSchemaBuilder REQUIRED)
 
-core_require_dep(${required_deps})
+# Check optional deps first, since their availability can influence required ones, e.g. ffmpeg
 core_optional_dep(${optional_deps})
-core_require_dyload_dep(${required_dyload})
 core_optional_dyload_dep(${dyload_optional})
+core_require_dep(${required_deps})
 
 if(ENABLE_MARIADBCLIENT AND NOT ENABLE_MARIADBCLIENT STREQUAL AUTO AND ENABLE_MYSQLCLIENT AND NOT ENABLE_MYSQLCLIENT STREQUAL AUTO)
   MESSAGE(FATAL_ERROR "You can not use MySql and MariaDB at the same time. Disable one by adding -DENABLE_MYSQLCLIENT=OFF or -DENABLE_MARIADBCLIENT=OFF.")
@@ -199,11 +199,6 @@ endif()
 
 if(ENABLE_OPTICAL)
   list(APPEND DEP_DEFINES -DHAS_DVD_DRIVE -DHAS_CDDA_RIPPER)
-endif()
-
-if(ENABLE_LIRC)
-  set(LIRC_DEVICE /dev/lircd CACHE STRING "LIRC device to use")
-  list(APPEND DEP_DEFINES -DLIRC_DEVICE="${LIRC_DEVICE}" -DHAS_LIRC=1)
 endif()
 
 if(ENABLE_AIRTUNES)
@@ -231,6 +226,7 @@ add_custom_command(OUTPUT ${CORE_BUILD_DIR}/xbmc/CompileInfo.cpp
                                             -DCMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
                                             -DARCH_DEFINES="${ARCH_DEFINES}"
                                             -DAPP_SCMID=${APP_SCMID}
+                                            -DAPP_COPYRIGHT_YEARS=${APP_COPYRIGHT_YEARS}
                                             -Dprefix=${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}
                                             -P ${CMAKE_SOURCE_DIR}/cmake/scripts/common/GenerateVersionedFiles.cmake
                    DEPENDS ${CMAKE_SOURCE_DIR}/version.txt
@@ -250,6 +246,9 @@ if(WIN32)
   target_include_directories(resources PRIVATE ${CMAKE_SOURCE_DIR}/tools/windows/packaging/media)
   set(RESOURCES $<TARGET_OBJECTS:resources>)
 endif()
+
+# Generate messages
+core_add_subdirs_from_filelist(${CMAKE_SOURCE_DIR}/cmake/messages/flatbuffers/*.txt)
 
 include_directories(${INCLUDES} ${SYSTEM_INCLUDES})
 add_compile_options(${ARCH_DEFINES} "${SYSTEM_DEFINES}" ${DEP_DEFINES} ${PATH_DEFINES})
@@ -294,9 +293,11 @@ elseif(CORE_SYSTEM_NAME STREQUAL android)
                  ${CORE_BUILD_DIR}/DllPaths_generated_android.h @ONLY)
 endif()
 
+set(GLOBAL_TARGET_DEPS libcpluff ffmpeg dvdnav crossguid fmt fstrcmp flatbuffers ${PLATFORM_GLOBAL_TARGET_DEPS})
+
 # main library (used for main binary and tests)
 add_library(lib${APP_NAME_LC} STATIC $<TARGET_OBJECTS:compileinfo>)
-add_dependencies(lib${APP_NAME_LC} libcpluff ffmpeg dvdnav crossguid ${PLATFORM_GLOBAL_TARGET_DEPS})
+add_dependencies(lib${APP_NAME_LC} ${GLOBAL_TARGET_DEPS})
 set_target_properties(lib${APP_NAME_LC} PROPERTIES PREFIX "")
 
 # Other files (IDE)
@@ -397,9 +398,9 @@ if(CORE_HOST_IS_TARGET)
   find_package(Doxygen)
   if(DOXYGEN_FOUND)
     add_custom_target(doc
-                      COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/doxygen_resources/Doxyfile.doxy
+                      COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/docs/doxygen/Doxyfile.doxy
                       COMMAND ${CMAKE_COMMAND} -E echo "Documentation built to: file://${CMAKE_SOURCE_DIR}/docs/html/index.html"
-                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/doxygen_resources
+                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/docs/doxygen
                       COMMENT "Generating Doxygen documentation" VERBATIM)
   endif()
 endif()
