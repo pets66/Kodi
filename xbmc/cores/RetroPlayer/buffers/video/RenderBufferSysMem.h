@@ -14,7 +14,7 @@
 #include <vector>
 
 extern "C" {
-#include "libavutil/pixfmt.h"
+#include <libavutil/pixfmt.h>
 }
 
 namespace KODI
@@ -25,7 +25,7 @@ namespace RETRO
   {
   public:
     CRenderBufferSysMem() = default;
-    virtual ~CRenderBufferSysMem() = default;
+    ~CRenderBufferSysMem() override = default;
 
     // implementation of IRenderBuffer
     bool Allocate(AVPixelFormat format, unsigned int width, unsigned int height) override;

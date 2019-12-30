@@ -16,7 +16,7 @@
 #include <atomic>
 
 extern "C" {
-#include "libavcodec/avcodec.h"
+#include <libavcodec/avcodec.h>
 }
 
 typedef struct stDVDAudioFrame DVDAudioFrame;
@@ -28,7 +28,7 @@ class CAudioSinkAE : IAEClockCallback
 {
 public:
   explicit CAudioSinkAE(CDVDClock *clock);
-  ~CAudioSinkAE();
+  ~CAudioSinkAE() override;
 
   void SetVolume(float fVolume);
   void SetDynamicRangeCompression(long drc);
@@ -59,7 +59,7 @@ public:
   double GetClock() override;
   double GetClockSpeed() override;
 
-  CAEStreamInfo::DataType GetPassthroughStreamType(AVCodecID codecId, int samplerate);
+  CAEStreamInfo::DataType GetPassthroughStreamType(AVCodecID codecId, int samplerate, int profile);
 
 protected:
 

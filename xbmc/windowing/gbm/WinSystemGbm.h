@@ -8,15 +8,17 @@
 
 #pragma once
 
-#include <gbm.h>
-#include <EGL/egl.h>
-
-#include "platform/linux/input/LibInputHandler.h"
-#include "platform/linux/OptionalsReg.h"
-#include "threads/CriticalSection.h"
-#include "windowing/WinSystem.h"
 #include "DRMUtils.h"
 #include "VideoLayerBridge.h"
+#include "threads/CriticalSection.h"
+#include "windowing/WinSystem.h"
+
+#include "platform/freebsd/OptionalsReg.h"
+#include "platform/linux/OptionalsReg.h"
+#include "platform/linux/input/LibInputHandler.h"
+
+#include <EGL/egl.h>
+#include <gbm.h>
 
 class IDispResource;
 
@@ -31,7 +33,7 @@ class CWinSystemGbm : public CWinSystemBase
 {
 public:
   CWinSystemGbm();
-  virtual ~CWinSystemGbm() = default;
+  ~CWinSystemGbm() override = default;
 
   bool InitWindowSystem() override;
   bool DestroyWindowSystem() override;
@@ -48,8 +50,8 @@ public:
 
   bool Hide() override;
   bool Show(bool raise = true) override;
-  virtual void Register(IDispResource *resource);
-  virtual void Unregister(IDispResource *resource);
+  void Register(IDispResource* resource) override;
+  void Unregister(IDispResource* resource) override;
 
   std::shared_ptr<CVideoLayerBridge> GetVideoLayerBridge() const { return m_videoLayerBridge; };
   void RegisterVideoLayerBridge(std::shared_ptr<CVideoLayerBridge> bridge) { m_videoLayerBridge = bridge; };
@@ -68,7 +70,7 @@ protected:
   CCriticalSection m_resourceSection;
   std::vector<IDispResource*>  m_resources;
 
-  bool m_delayDispReset = false;
+  bool m_dispReset = false;
   XbmcThreads::EndTime m_dispResetTimer;
   std::unique_ptr<OPTIONALS::CLircContainer, OPTIONALS::delete_CLircContainer> m_lirc;
   std::unique_ptr<CLibInputHandler> m_libinput;

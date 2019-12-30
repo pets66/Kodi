@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "addons/kodi-addon-dev-kit/include/kodi/addon-instance/Visualization.h"
 #include "addons/binary-addons/AddonInstanceHandler.h"
+#include "addons/kodi-addon-dev-kit/include/kodi/addon-instance/Visualization.h"
 
 namespace ADDON
 {
@@ -43,6 +43,7 @@ private:
 
   // Static function to transfer data from add-on to kodi
   static void transfer_preset(void* kodiInstance, const char* preset);
+  static void clear_presets(void* kodiInstance);
 };
 
 } /* namespace ADDON */

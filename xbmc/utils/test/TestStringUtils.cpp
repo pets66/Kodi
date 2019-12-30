@@ -7,9 +7,10 @@
  */
 
 #include "utils/StringUtils.h"
+
 #include <algorithm>
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 TEST(TestStringUtils, Format)
 {
@@ -226,13 +227,13 @@ TEST(TestStringUtils, Join)
   std::string refstr, varstr;
   std::vector<std::string> strarray;
 
-  strarray.push_back("a");
-  strarray.push_back("b");
-  strarray.push_back("c");
-  strarray.push_back("de");
-  strarray.push_back(",");
-  strarray.push_back("fg");
-  strarray.push_back(",");
+  strarray.emplace_back("a");
+  strarray.emplace_back("b");
+  strarray.emplace_back("c");
+  strarray.emplace_back("de");
+  strarray.emplace_back(",");
+  strarray.emplace_back("fg");
+  strarray.emplace_back(",");
   refstr = "a,b,c,de,,,fg,,";
   varstr = StringUtils::Join(strarray, ",");
   EXPECT_STREQ(refstr.c_str(), varstr.c_str());
@@ -329,7 +330,7 @@ TEST(TestStringUtils, RemoveCRLF)
 
 TEST(TestStringUtils, utf8_strlen)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 9;
   var = StringUtils::utf8_strlen("ｔｅｓｔ＿ＵＴＦ８");
@@ -391,7 +392,7 @@ TEST(TestStringUtils, EmptyString)
 
 TEST(TestStringUtils, FindWords)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 5;
   var = StringUtils::FindWords("test string", "string");
@@ -413,7 +414,7 @@ TEST(TestStringUtils, FindWords)
 
 TEST(TestStringUtils, FindWords_NonAscii)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 6;
   var = StringUtils::FindWords("我的视频", "视频");
@@ -482,11 +483,11 @@ TEST(TestStringUtils, FindBestMatch)
 
   refint = 3;
   refdouble = 0.5625f;
-  strarray.push_back("");
-  strarray.push_back("a");
-  strarray.push_back("e");
-  strarray.push_back("es");
-  strarray.push_back("t");
+  strarray.emplace_back("");
+  strarray.emplace_back("a");
+  strarray.emplace_back("e");
+  strarray.emplace_back("es");
+  strarray.emplace_back("t");
   varint = StringUtils::FindBestMatch("test", strarray, vardouble);
   EXPECT_EQ(refint, varint);
   EXPECT_EQ(refdouble, vardouble);
@@ -504,9 +505,9 @@ TEST(TestStringUtils, Paramify)
 TEST(TestStringUtils, sortstringbyname)
 {
   std::vector<std::string> strarray;
-  strarray.push_back("B");
-  strarray.push_back("c");
-  strarray.push_back("a");
+  strarray.emplace_back("B");
+  strarray.emplace_back("c");
+  strarray.emplace_back("a");
   std::sort(strarray.begin(), strarray.end(), sortstringbyname());
 
   EXPECT_STREQ("a", strarray[0].c_str());

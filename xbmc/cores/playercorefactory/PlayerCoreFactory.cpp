@@ -7,22 +7,24 @@
  */
 
 #include "PlayerCoreFactory.h"
-#include "threads/SingleLock.h"
-#include "cores/paplayer/PAPlayer.h"
-#include "cores/IPlayerCallback.h"
-#include "dialogs/GUIDialogContextMenu.h"
-#include "URL.h"
+
 #include "FileItem.h"
+#include "PlayerCoreConfig.h"
+#include "PlayerSelectionRule.h"
+#include "URL.h"
+#include "cores/IPlayerCallback.h"
+#include "cores/paplayer/PAPlayer.h"
+#include "dialogs/GUIDialogContextMenu.h"
+#include "guilib/LocalizeStrings.h"
 #include "profiles/ProfileManager.h"
-#include "settings/lib/SettingsManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "PlayerCoreConfig.h"
-#include "PlayerSelectionRule.h"
-#include "guilib/LocalizeStrings.h"
+#include "settings/lib/SettingsManager.h"
+#include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
 #include "utils/XMLUtils.h"
+
 #include <sstream>
 
 #define PLAYERCOREFACTORY_XML "playercorefactory.xml"
@@ -144,7 +146,7 @@ void CPlayerCoreFactory::GetPlayers(const CFileItem& item, std::vector<std::stri
   if (item.IsGame())
   {
     CLog::Log(LOGDEBUG, "CPlayerCoreFactory::GetPlayers: adding retroplayer");
-    players.push_back("RetroPlayer");
+    players.emplace_back("RetroPlayer");
   }
 
   CLog::Log(LOGDEBUG, "CPlayerCoreFactory::GetPlayers: added {0} players", players.size());

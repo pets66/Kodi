@@ -8,16 +8,18 @@
 
 #pragma once
 
-#include <drm_fourcc.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <gbm.h>
+#include "GBMUtils.h"
+#include "windowing/Resolution.h"
+
+#include "platform/posix/utils/FileHandle.h"
+
 #include <map>
 #include <vector>
 
-#include "windowing/Resolution.h"
-#include "GBMUtils.h"
-#include "platform/posix/utils/FileHandle.h"
+#include <drm_fourcc.h>
+#include <gbm.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 namespace KODI
 {
@@ -104,11 +106,12 @@ public:
   std::string GetModule() const { return m_module; }
   int GetFileDescriptor() const { return m_fd; }
   int GetRenderNodeFileDescriptor() const { return m_renderFd; }
-  struct plane* GetPrimaryPlane() const { return m_primary_plane; }
-  struct plane* GetOverlayPlane() const { return m_overlay_plane; }
-  std::vector<uint64_t> *GetPrimaryPlaneModifiersForFormat(uint32_t format) { return &m_primary_plane->modifiers_map[format]; }
-  std::vector<uint64_t> *GetOverlayPlaneModifiersForFormat(uint32_t format) { return &m_overlay_plane->modifiers_map[format]; }
+  struct plane* GetVideoPlane() const { return m_video_plane; }
+  struct plane* GetGuiPlane() const { return m_gui_plane; }
+  std::vector<uint64_t> *GetVideoPlaneModifiersForFormat(uint32_t format) { return &m_video_plane->modifiers_map[format]; }
+  std::vector<uint64_t> *GetGuiPlaneModifiersForFormat(uint32_t format) { return &m_gui_plane->modifiers_map[format]; }
   struct crtc* GetCrtc() const { return m_crtc; }
+  struct connector* GetConnector() const { return m_connector; }
 
   virtual RESOLUTION_INFO GetCurrentMode();
   virtual std::vector<RESOLUTION_INFO> GetModes();
@@ -132,8 +135,8 @@ protected:
   struct connector *m_connector = nullptr;
   struct encoder *m_encoder = nullptr;
   struct crtc *m_crtc = nullptr;
-  struct plane *m_primary_plane = nullptr;
-  struct plane *m_overlay_plane = nullptr;
+  struct plane *m_video_plane = nullptr;
+  struct plane *m_gui_plane = nullptr;
   drmModeModeInfo *m_mode = nullptr;
 
   int m_width = 0;

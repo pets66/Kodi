@@ -8,14 +8,14 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include <set>
-
 #include "input/touch/ITouchInputHandler.h"
 #include "input/touch/TouchTypes.h"
 #include "threads/CriticalSection.h"
 #include "threads/Timer.h"
+
+#include <array>
+#include <memory>
+#include <set>
 
 class IGenericTouchGestureDetector;
 
@@ -47,7 +47,7 @@ public:
 private:
   // private construction, and no assignments; use the provided singleton methods
   CGenericTouchInputHandler();
-  ~CGenericTouchInputHandler();
+  ~CGenericTouchInputHandler() override;
   CGenericTouchInputHandler(const CGenericTouchInputHandler&) = delete;
   CGenericTouchInputHandler const& operator=(CGenericTouchInputHandler const&) = delete;
 

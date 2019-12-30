@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "input/joysticks/interfaces/IInputReceiver.h"
 #include "input/joysticks/JoystickTypes.h"
+#include "input/joysticks/interfaces/IInputReceiver.h"
 
 #include <map>
 
@@ -33,10 +33,10 @@ namespace JOYSTICK
   public:
     CDriverReceiving(IDriverReceiver* receiver, IButtonMap* buttonMap);
 
-    virtual ~CDriverReceiving() = default;
+    ~CDriverReceiving() override = default;
 
     // implementation of IInputReceiver
-    virtual bool SetRumbleState(const FeatureName& feature, float magnitude) override;
+    bool SetRumbleState(const FeatureName& feature, float magnitude) override;
 
   private:
     IDriverReceiver* const m_receiver;

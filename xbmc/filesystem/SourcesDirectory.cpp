@@ -6,17 +6,18 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "ServiceBroker.h"
 #include "SourcesDirectory.h"
-#include "utils/URIUtils.h"
+
+#include "File.h"
+#include "FileItem.h"
+#include "ServiceBroker.h"
 #include "URL.h"
 #include "Util.h"
-#include "FileItem.h"
-#include "File.h"
+#include "guilib/TextureManager.h"
 #include "profiles/ProfileManager.h"
 #include "settings/MediaSourceSettings.h"
-#include "guilib/TextureManager.h"
 #include "storage/MediaManager.h"
+#include "utils/URIUtils.h"
 
 using namespace XFILE;
 
@@ -37,7 +38,7 @@ bool CSourcesDirectory::GetDirectory(const CURL& url, CFileItemList &items)
     return false;
 
   sources = *sourcesFromType;
-  g_mediaManager.GetRemovableDrives(sources);
+  CServiceBroker::GetMediaManager().GetRemovableDrives(sources);
 
   return GetDirectory(sources, items);
 }
@@ -86,7 +87,7 @@ bool CSourcesDirectory::GetDirectory(const VECSOURCES &sources, CFileItemList &i
     else
       strIcon = "DefaultHardDisk.png";
 
-    pItem->SetIconImage(strIcon);
+    pItem->SetArt("icon", strIcon);
     if (share.m_iHasLock == 2 && m_profileManager->GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE)
       pItem->SetOverlayImage(CGUIListItem::ICON_OVERLAY_LOCKED);
     else

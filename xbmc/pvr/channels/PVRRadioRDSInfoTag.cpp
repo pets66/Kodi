@@ -13,14 +13,19 @@
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIMessage.h"
 #include "guilib/GUIWindowManager.h"
+#include "threads/SingleLock.h"
 #include "utils/Archive.h"
 #include "utils/CharsetConverter.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 
+#include <algorithm>
+#include <string>
+#include <utility>
+
 using namespace PVR;
 
-CPVRRadioRDSInfoTag::CPVRRadioRDSInfoTag(void)
+CPVRRadioRDSInfoTag::CPVRRadioRDSInfoTag()
 {
   Clear();
 }
@@ -106,7 +111,7 @@ void CPVRRadioRDSInfoTag::Archive(CArchive& ar)
   }
 }
 
-bool CPVRRadioRDSInfoTag::operator==(const CPVRRadioRDSInfoTag &right) const
+bool CPVRRadioRDSInfoTag::operator==(const CPVRRadioRDSInfoTag& right) const
 {
   if (this == &right)
     return true;
@@ -635,7 +640,7 @@ bool CPVRRadioRDSInfoTag::IsPlayingRadiotextPlus() const
   return m_bHaveRadiotextPlus;
 }
 
-std::string CPVRRadioRDSInfoTag::Trim(const std::string &value)
+std::string CPVRRadioRDSInfoTag::Trim(const std::string& value)
 {
   std::string trimmedValue(value);
   StringUtils::TrimLeft(trimmedValue);
@@ -643,7 +648,7 @@ std::string CPVRRadioRDSInfoTag::Trim(const std::string &value)
   return trimmedValue;
 }
 
-bool CPVRRadioRDSInfoTag::Info::operator==(const CPVRRadioRDSInfoTag::Info &right) const
+bool CPVRRadioRDSInfoTag::Info::operator==(const CPVRRadioRDSInfoTag::Info& right) const
 {
   if (this == &right)
     return true;

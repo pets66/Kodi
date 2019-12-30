@@ -6,23 +6,20 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <sstream>
-
 #include "ActiveAESink.h"
-#include "cores/AudioEngine/Utils/AEUtil.h"
-#include "cores/AudioEngine/Utils/AEStreamInfo.h"
-#include "cores/AudioEngine/Utils/AEBitstreamPacker.h"
-#include "utils/EndianSwap.h"
+
 #include "ActiveAE.h"
 #include "cores/AudioEngine/AEResampleFactory.h"
+#include "cores/AudioEngine/Utils/AEBitstreamPacker.h"
+#include "cores/AudioEngine/Utils/AEStreamInfo.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
+#include "utils/EndianSwap.h"
+#include "utils/MemUtils.h"
 #include "utils/log.h"
 
-#include <new> // for std::bad_alloc
 #include <algorithm>
-
-#ifdef TARGET_POSIX
-#include "platform/linux/XMemUtils.h"
-#endif
+#include <new> // for std::bad_alloc
+#include <sstream>
 
 using namespace AE;
 using namespace ActiveAE;
@@ -172,10 +169,7 @@ bool CActiveAESink::SupportsFormat(const std::string &device, AEAudioFormat &for
           {
             AESampleRateList::iterator itt4;
             itt4 = find(info.m_sampleRates.begin(), info.m_sampleRates.end(), samplerate);
-            if (itt4 != info.m_sampleRates.end())
-              return true;
-            else
-              return false;
+            return itt4 != info.m_sampleRates.end();
           }
           else // format is not existent
           {
@@ -209,6 +203,26 @@ bool CActiveAESink::NeedIECPacking()
     }
   }
   return true;
+}
+
+bool CActiveAESink::DeviceExist(std::string driver, std::string device)
+{
+  if (driver.empty() && m_sink)
+    driver = m_sink->GetName();
+
+  for (const auto& itt : m_sinkInfoList)
+  {
+    if (itt.m_sinkName != driver)
+      continue;
+
+    for (auto itt2 : itt.m_deviceInfoList)
+    {
+      CAEDeviceInfo& info = itt2;
+      if (info.m_deviceName == device)
+        return true;
+    }
+  }
+  return false;
 }
 
 enum SINK_STATES
@@ -667,7 +681,7 @@ void CActiveAESink::Process()
   }
 }
 
-void CActiveAESink::EnumerateSinkList(bool force)
+void CActiveAESink::EnumerateSinkList(bool force, std::string driver)
 {
   if (!m_sinkInfoList.empty() && !force)
     return;
@@ -675,25 +689,40 @@ void CActiveAESink::EnumerateSinkList(bool force)
   if (!CAESinkFactory::HasSinks())
     return;
 
+  std::vector<AE::AESinkInfo> tmpList(m_sinkInfoList);
+
   unsigned int c_retry = 4;
   m_sinkInfoList.clear();
-  CAESinkFactory::EnumerateEx(m_sinkInfoList, false);
+
+  if (!driver.empty())
+  {
+    for (auto const& info : tmpList)
+    {
+      if (info.m_sinkName != driver)
+        m_sinkInfoList.push_back(info);
+    }
+  }
+
+  CAESinkFactory::EnumerateEx(m_sinkInfoList, false, driver);
   while (m_sinkInfoList.empty() && c_retry > 0)
   {
     CLog::Log(LOGNOTICE, "No Devices found - retry: %d", c_retry);
     Sleep(1500);
     c_retry--;
     // retry the enumeration
-    CAESinkFactory::EnumerateEx(m_sinkInfoList, true);
+    CAESinkFactory::EnumerateEx(m_sinkInfoList, true, driver);
   }
   CLog::Log(LOGNOTICE, "Found %lu Lists of Devices", m_sinkInfoList.size());
-  PrintSinks();
+  PrintSinks(driver);
 }
 
-void CActiveAESink::PrintSinks()
+void CActiveAESink::PrintSinks(std::string& driver)
 {
   for (auto itt = m_sinkInfoList.begin(); itt != m_sinkInfoList.end(); ++itt)
   {
+    if (!driver.empty() && itt->m_sinkName != driver)
+      continue;
+
     CLog::Log(LOGNOTICE, "Enumerated %s devices:", itt->m_sinkName.c_str());
     int count = 0;
     for (auto itt2 = itt->m_deviceInfoList.begin(); itt2 != itt->m_deviceInfoList.end(); ++itt2)
@@ -710,7 +739,7 @@ void CActiveAESink::PrintSinks()
 
 void CActiveAESink::EnumerateOutputDevices(AEDeviceList &devices, bool passthrough)
 {
-  EnumerateSinkList(false);
+  EnumerateSinkList(false, "");
 
   for (auto itt = m_sinkInfoList.begin(); itt != m_sinkInfoList.end(); ++itt)
   {
@@ -755,7 +784,6 @@ void CActiveAESink::GetDeviceFriendlyName(std::string &device)
       }
     }
   }
-  return;
 }
 
 void CActiveAESink::OpenSink()
@@ -1060,7 +1088,7 @@ void CActiveAESink::GenerateNoise()
   nb_floats *= m_sampleOfSilence.pkt->config.channels;
   size_t size = nb_floats*sizeof(float);
 
-  float *noise = (float*)_aligned_malloc(size, 32);
+  float *noise = static_cast<float*>(KODI::MEMORY::AlignedMalloc(size, 32));
   if (!noise)
     throw std::bad_alloc();
 
@@ -1106,7 +1134,7 @@ void CActiveAESink::GenerateNoise()
   resampler->Resample(m_sampleOfSilence.pkt->data, m_sampleOfSilence.pkt->max_nb_samples,
                      (uint8_t**)&noise, m_sampleOfSilence.pkt->max_nb_samples, 1.0);
 
-  _aligned_free(noise);
+  KODI::MEMORY::AlignedFree(noise);
   delete resampler;
 }
 

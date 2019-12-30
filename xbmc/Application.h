@@ -48,7 +48,6 @@ class CFileItemList;
 class CKey;
 class CSeekHandler;
 class CInertialScrollingHandler;
-class DPMSSupport;
 class CSplash;
 class CBookmark;
 class IActionListener;
@@ -150,7 +149,6 @@ public:
 
   bool CreateGUI();
   bool InitWindow(RESOLUTION res = RES_INVALID);
-  bool DestroyWindow();
   void StartServices();
   void StopServices();
 
@@ -201,6 +199,8 @@ public:
   void CheckShutdown();
   void InhibitIdleShutdown(bool inhibit);
   bool IsIdleShutdownInhibited() const;
+  void InhibitScreenSaver(bool inhibit);
+  bool IsScreenSaverInhibited() const;
   // Checks whether the screensaver and / or DPMS should become active.
   void CheckScreenSaverAndDPMS();
   void ActivateScreenSaver(bool forceType = false);
@@ -210,7 +210,8 @@ public:
   void Process() override;
   void ProcessSlow();
   void ResetScreenSaver();
-  float GetVolume(bool percentage = true) const;
+  float GetVolumePercent() const;
+  float GetVolumeRatio() const;
   void SetVolume(float iValue, bool isPercentage = true);
   bool IsMuted() const;
   bool IsMutedInternal() const { return m_muted; }
@@ -319,7 +320,7 @@ public:
 
   bool SwitchToFullScreen(bool force = false);
 
-  bool GetRenderGUI() const { return m_renderGUI; };
+  bool GetRenderGUI() const override { return m_renderGUI; };
 
   bool SetLanguage(const std::string &strLanguage);
   bool LoadLanguage(bool reload);
@@ -422,15 +423,15 @@ protected:
   XbmcThreads::EndTime m_guiRefreshTimer;
 
   bool m_bInhibitIdleShutdown = false;
+  bool m_bInhibitScreenSaver = false;
 
-  std::unique_ptr<DPMSSupport> m_dpms;
   bool m_dpmsIsActive = false;
   bool m_dpmsIsManual = false;
 
   CFileItemPtr m_itemCurrentFile;
 
   std::string m_prevMedia;
-  ThreadIdentifier m_threadID = 0;       // application thread ID.  Used in applicationMessenger to know where we are firing a thread with delay from.
+  std::thread::id m_threadID;       // application thread ID.  Used in applicationMessenger to know where we are firing a thread with delay from.
   bool m_bInitializing = true;
   bool m_bPlatformDirectories = true;
 

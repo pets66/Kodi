@@ -7,33 +7,34 @@
  */
 
 #include "GUIDialogContextMenu.h"
-#include "guilib/GUIComponent.h"
-#include "guilib/GUIButtonControl.h"
-#include "guilib/GUIControlGroupList.h"
+
+#include "FileItem.h"
 #include "GUIDialogFileBrowser.h"
-#include "GUIUserMessages.h"
+#include "GUIDialogMediaSource.h"
+#include "GUIDialogYesNo.h"
 #include "GUIPassword.h"
+#include "GUIUserMessages.h"
 #include "ServiceBroker.h"
+#include "TextureCache.h"
+#include "URL.h"
 #include "Util.h"
-#include "utils/URIUtils.h"
+#include "addons/Scraper.h"
+#include "filesystem/File.h"
+#include "guilib/GUIButtonControl.h"
+#include "guilib/GUIComponent.h"
+#include "guilib/GUIControlGroupList.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
+#include "input/Key.h"
+#include "profiles/ProfileManager.h"
+#include "profiles/dialogs/GUIDialogLockSettings.h"
 #include "settings/MediaSourceSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "GUIDialogMediaSource.h"
-#include "profiles/ProfileManager.h"
-#include "profiles/dialogs/GUIDialogLockSettings.h"
 #include "storage/MediaManager.h"
-#include "guilib/GUIWindowManager.h"
-#include "input/Key.h"
-#include "GUIDialogYesNo.h"
-#include "FileItem.h"
-#include "filesystem/File.h"
-#include "guilib/LocalizeStrings.h"
-#include "TextureCache.h"
-#include "URL.h"
 #include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
 #include "utils/Variant.h"
-#include "addons/Scraper.h"
 
 #define BACKGROUND_IMAGE       999
 #define GROUP_LIST             996
@@ -43,16 +44,16 @@
 
 void CContextButtons::Add(unsigned int button, const std::string &label)
 {
-  for (const_iterator i = begin(); i != end(); ++i)
-    if (i->first == button)
+  for (const auto& i : *this)
+    if (i.first == button)
       return; // already have this button
   push_back(std::pair<unsigned int, std::string>(button, label));
 }
 
 void CContextButtons::Add(unsigned int button, int label)
 {
-  for (const_iterator i = begin(); i != end(); ++i)
-    if (i->first == button)
+  for (const auto& i : *this)
+    if (i.first == button)
       return; // already have added this button
   push_back(std::pair<unsigned int, std::string>(button, g_localizeStrings.Get(label)));
 }
@@ -97,7 +98,7 @@ void CGUIDialogContextMenu::OnInitWindow()
 {
   m_clickedButton = -1;
   // set initial control focus
-  m_lastControlID = BUTTON_START;
+  m_lastControlID = m_initiallyFocusedButtonIdx + BUTTON_START;
   CGUIDialog::OnInitWindow();
 }
 
@@ -279,10 +280,11 @@ bool CGUIDialogContextMenu::OnContextButton(const std::string &type, const CFile
   switch (button)
   {
     case CONTEXT_BUTTON_EJECT_DRIVE:
-      return g_mediaManager.Eject(item->GetPath());
+      return CServiceBroker::GetMediaManager().Eject(item->GetPath());
 #ifdef HAS_DVD_DRIVE
     case CONTEXT_BUTTON_EJECT_DISC:
-      g_mediaManager.ToggleTray(g_mediaManager.TranslateDevicePath(item->GetPath())[0]);
+      CServiceBroker::GetMediaManager().ToggleTray(
+          CServiceBroker::GetMediaManager().TranslateDevicePath(item->GetPath())[0]);
 #endif
       return true;
     default:
@@ -390,13 +392,13 @@ bool CGUIDialogContextMenu::OnContextButton(const std::string &type, const CFile
       }
       // and add a "no thumb" entry as well
       CFileItemPtr nothumb(new CFileItem("thumb://None", false));
-      nothumb->SetIconImage(item->GetIconImage());
+      nothumb->SetArt("icon", item->GetArt("icon"));
       nothumb->SetLabel(g_localizeStrings.Get(20018));
       items.Add(nothumb);
 
       std::string strThumb;
       VECSOURCES shares;
-      g_mediaManager.GetLocalDrives(shares);
+      CServiceBroker::GetMediaManager().GetLocalDrives(shares);
       if (!CGUIDialogFileBrowser::ShowAndGetImage(items, shares, g_localizeStrings.Get(1030), strThumb))
         return false;
 
@@ -573,6 +575,7 @@ void CGUIDialogContextMenu::OnDeinitWindow(int nextWindowID)
   }
 
   m_buttons.clear();
+  m_initiallyFocusedButtonIdx = 0;
   CGUIDialog::OnDeinitWindow(nextWindowID);
 }
 
@@ -623,7 +626,7 @@ void CGUIDialogContextMenu::SwitchMedia(const std::string& strType, const std::s
   }
 }
 
-int CGUIDialogContextMenu::Show(const CContextButtons& choices)
+int CGUIDialogContextMenu::Show(const CContextButtons& choices, int focusedButtonIdx /* = 0 */)
 {
   auto dialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogContextMenu>(WINDOW_DIALOG_CONTEXT_MENU);
   if (!dialog)
@@ -634,6 +637,7 @@ int CGUIDialogContextMenu::Show(const CContextButtons& choices)
   dialog->SetInitialVisibility();
   dialog->SetupButtons();
   dialog->PositionAtCurrentFocus();
+  dialog->m_initiallyFocusedButtonIdx = focusedButtonIdx;
   dialog->Open();
   return dialog->m_clickedButton;
 }

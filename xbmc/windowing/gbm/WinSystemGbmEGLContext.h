@@ -8,8 +8,9 @@
 
 #pragma once
 
-#include "utils/EGLUtils.h"
 #include "WinSystemGbm.h"
+#include "utils/EGLUtils.h"
+
 #include <memory>
 
 namespace KODI
@@ -24,7 +25,7 @@ class CVaapiProxy;
 class CWinSystemGbmEGLContext : public CWinSystemGbm
 {
 public:
-  virtual ~CWinSystemGbmEGLContext() = default;
+  ~CWinSystemGbmEGLContext() override = default;
 
   bool DestroyWindowSystem() override;
   bool CreateNewWindow(const std::string& name,

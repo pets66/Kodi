@@ -1,4 +1,4 @@
- /*
+/*
  *  Copyright (C) 2005-2018 Team Kodi
  *  This file is part of Kodi - https://kodi.tv
  *
@@ -8,13 +8,13 @@
 
 #pragma once
 
+#include "Window.h"
+#include "WindowDialogMixin.h"
+#include "swighelper.h"
+#include "windows/GUIMediaWindow.h"
+
 #include <limits.h>
 #include <vector>
-
-#include "Window.h"
-#include "windows/GUIMediaWindow.h"
-#include "swighelper.h"
-#include "WindowDialogMixin.h"
 
 namespace XBMCAddon
 {
@@ -44,7 +44,7 @@ namespace XBMCAddon
     ///                             skins path to look in for the xml.
     ///                             (default='Default')
     /// @param defaultRes           [opt] string - default skins resolution.
-    ///                             (default='720p')
+    ///                             (1080i, 720p, ntsc16x9, ntsc, pal16x9 or pal. default='720p')
     /// @param isMedia              [opt] bool - if False, create a regular window.
     ///                             if True, create a mediawindow.
     ///                             (default=False)
@@ -62,7 +62,7 @@ namespace XBMCAddon
     /// **Example:**
     /// ~~~~~~~~~~~~~{.py}
     /// ..
-    /// win = xbmcgui.WindowXML('script-Lyrics-main.xml', xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'), 'default', '1080p', False)
+    /// win = xbmcgui.WindowXML('script-Lyrics-main.xml', xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'), 'default', '1080i', False)
     /// win.doModal()
     /// del win
     /// ..
@@ -416,15 +416,19 @@ namespace XBMCAddon
 
 #ifndef SWIG
       // CGUIWindow
-      SWIGHIDDENVIRTUAL bool OnMessage(CGUIMessage& message) override;
-      SWIGHIDDENVIRTUAL bool OnAction(const CAction &action) override;
+      bool OnMessage(CGUIMessage& message) override;
+      bool OnAction(const CAction& action) override;
       SWIGHIDDENVIRTUAL void AllocResources(bool forceLoad = false);
       SWIGHIDDENVIRTUAL void FreeResources(bool forceUnLoad = false);
       SWIGHIDDENVIRTUAL bool OnClick(int iItem);
       SWIGHIDDENVIRTUAL bool OnDoubleClick(int iItem);
       SWIGHIDDENVIRTUAL void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
 
-      SWIGHIDDENVIRTUAL bool IsMediaWindow() const override { XBMC_TRACE; return m_isMedia; };
+      bool IsMediaWindow() const override
+      {
+        XBMC_TRACE;
+        return m_isMedia;
+      };
 
       // This method is identical to the Window::OnDeinitWindow method
       //  except it passes the message on to their respective parents.
@@ -483,7 +487,7 @@ namespace XBMCAddon
     ///                                 skins path to look in for the xml.
     ///                                 (default='Default')
     /// @param defaultRes               [opt] string - default skins resolution.
-    ///                                 (default='720p')
+    ///                                 (1080i, 720p, ntsc16x9, ntsc, pal16x9 or pal. default='720p')
     /// @throws Exception               if more then 200 windows are created.
     ///
     /// @note Skin folder structure is e.g. **resources/skins/Default/720p**
@@ -494,7 +498,7 @@ namespace XBMCAddon
     /// **Example:**
     /// ~~~~~~~~~~~~~{.py}
     /// ..
-    /// dialog = xbmcgui.WindowXMLDialog('script-Lyrics-main.xml', xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'), 'default', '1080p')
+    /// dialog = xbmcgui.WindowXMLDialog('script-Lyrics-main.xml', xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'), 'default', '1080i')
     /// dialog.doModal()
     /// del dialog
     /// ..
@@ -529,18 +533,42 @@ namespace XBMCAddon
       ~WindowXMLDialog() override;
 
 #ifndef SWIG
-      SWIGHIDDENVIRTUAL bool OnMessage(CGUIMessage &message) override;
-      SWIGHIDDENVIRTUAL bool IsDialogRunning() const override { XBMC_TRACE; return WindowDialogMixin::IsDialogRunning(); }
-      SWIGHIDDENVIRTUAL bool IsDialog() const override { XBMC_TRACE; return true;};
-      SWIGHIDDENVIRTUAL bool IsModalDialog() const override { XBMC_TRACE; return true; };
-      SWIGHIDDENVIRTUAL bool IsMediaWindow() const override { XBMC_TRACE; return false; };
-      SWIGHIDDENVIRTUAL bool OnAction(const CAction &action) override;
-      SWIGHIDDENVIRTUAL void OnDeinitWindow(int nextWindowID) override;
+      bool OnMessage(CGUIMessage& message) override;
+      bool IsDialogRunning() const override
+      {
+        XBMC_TRACE;
+        return WindowDialogMixin::IsDialogRunning();
+      }
+      bool IsDialog() const override
+      {
+        XBMC_TRACE;
+        return true;
+      };
+      bool IsModalDialog() const override
+      {
+        XBMC_TRACE;
+        return true;
+      };
+      bool IsMediaWindow() const override
+      {
+        XBMC_TRACE;
+        return false;
+      };
+      bool OnAction(const CAction& action) override;
+      void OnDeinitWindow(int nextWindowID) override;
 
-      SWIGHIDDENVIRTUAL bool LoadXML(const String &strPath, const String &strPathLower) override;
+      bool LoadXML(const String& strPath, const String& strPathLower) override;
 
-      SWIGHIDDENVIRTUAL inline void show() override { XBMC_TRACE; WindowDialogMixin::show(); }
-      SWIGHIDDENVIRTUAL inline void close() override { XBMC_TRACE; WindowDialogMixin::close(); }
+      inline void show() override
+      {
+        XBMC_TRACE;
+        WindowDialogMixin::show();
+      }
+      inline void close() override
+      {
+        XBMC_TRACE;
+        WindowDialogMixin::close();
+      }
 
       friend class DialogJumper;
 #endif

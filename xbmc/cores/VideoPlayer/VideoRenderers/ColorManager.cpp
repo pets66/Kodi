@@ -6,17 +6,18 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <math.h>
-#include <vector>
-
 #include "ColorManager.h"
+
 #include "ServiceBroker.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "filesystem/File.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "utils/log.h"
 #include "utils/TimeUtils.h"
+#include "utils/log.h"
+
+#include <math.h>
+#include <vector>
 
 using namespace XFILE;
 
@@ -33,16 +34,18 @@ CColorManager::CColorManager()
 #endif  //defined(HAVE_LCMS2)
 }
 
+#if defined(HAVE_LCMS2)
 CColorManager::~CColorManager()
 {
-#if defined(HAVE_LCMS2)
   if (m_hProfile)
   {
     cmsCloseProfile(m_hProfile);
     m_hProfile = nullptr;
   }
-#endif  //defined(HAVE_LCMS2)
 }
+#else
+CColorManager::~CColorManager() = default;
+#endif //defined(HAVE_LCMS2)
 
 bool CColorManager::IsEnabled() const
 {
@@ -208,10 +211,12 @@ bool CColorManager::GetVideo3dLut(int videoFlags, int *cmsToken, CMS_DATA_FORMAT
       cmsHTRANSFORM deviceLink =  cmsCreateTransform(sourceProfile, fmt, m_hProfile, fmt, INTENT_ABSOLUTE_COLORIMETRIC, 0);
 
       // sample the transformation
-      Create3dLut(deviceLink, format, clutSize, clutData);
+      if (deviceLink)
+        Create3dLut(deviceLink, format, clutSize, clutData);
 
       // free gamma curve, source profile and transformation
-      cmsDeleteTransform(deviceLink);
+      if (deviceLink)
+        cmsDeleteTransform(deviceLink);
       cmsCloseProfile(sourceProfile);
       cmsFreeToneCurve(gammaCurve);
     }

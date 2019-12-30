@@ -7,6 +7,7 @@
  */
 
 #include "GUIFadeLabelControl.h"
+
 #include "GUIMessage.h"
 #include "utils/Random.h"
 
@@ -58,7 +59,7 @@ void CGUIFadeLabelControl::SetInfo(const std::vector<GUIINFO::CGUIInfoLabel> &in
 
 void CGUIFadeLabelControl::AddLabel(const std::string &label)
 {
-  m_infoLabels.push_back(GUIINFO::CGUIInfoLabel(label, "", GetParentID()));
+  m_infoLabels.emplace_back(label, "", GetParentID());
 }
 
 void CGUIFadeLabelControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
@@ -87,12 +88,14 @@ void CGUIFadeLabelControl::Process(unsigned int currentTime, CDirtyRegionList &d
       m_scrollInfo.Reset();
       m_fadeAnim.ResetAnimation();
     }
+    MarkDirtyRegion();
   }
   if (m_currentLabel != m_lastLabel)
   { // new label - reset scrolling
     m_scrollInfo.Reset();
     m_fadeAnim.QueueAnimation(ANIM_PROCESS_REVERSE);
     m_lastLabel = m_currentLabel;
+    MarkDirtyRegion();
   }
 
   if (m_infoLabels.size() > 1 || !m_shortText)

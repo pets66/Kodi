@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "windowing/Resolution.h"
 #include "utils/Color.h"
 #include "utils/Geometry.h"
+#include "windowing/Resolution.h"
 
 class CCriticalSection;
 class CDisplaySettings;
@@ -27,6 +27,7 @@ enum class GL_SHADER_METHOD
   DEFAULT,
   TEXTURE,
   TEXTURE_RGBA_OES,
+  TEXTURE_NOALPHA,
 };
 
 namespace KODI

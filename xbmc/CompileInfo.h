@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <string>
+
 class CCompileInfo
 {
 public:
@@ -19,4 +21,5 @@ public:
   static const char *GetSuffix();  // Git "Tag", e.g. alpha1
   static const char* GetSCMID();   // Git Revision
   static const char* GetCopyrightYears();
+  static std::string GetBuildDate();
 };

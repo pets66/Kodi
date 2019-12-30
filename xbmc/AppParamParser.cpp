@@ -7,12 +7,14 @@
  */
 
 #include "AppParamParser.h"
+
 #include "CompileInfo.h"
 #include "FileItem.h"
 #include "settings/AdvancedSettings.h"
-#include "utils/log.h"
-#include "utils/SystemInfo.h"
 #include "utils/StringUtils.h"
+#include "utils/SystemInfo.h"
+#include "utils/log.h"
+
 #include <stdlib.h>
 
 CAppParamParser::CAppParamParser()
@@ -21,9 +23,7 @@ CAppParamParser::CAppParamParser()
 {
 }
 
-CAppParamParser::~CAppParamParser()
-{
-}
+CAppParamParser::~CAppParamParser() = default;
 
 void CAppParamParser::Parse(const char* const* argv, int nArgs)
 {

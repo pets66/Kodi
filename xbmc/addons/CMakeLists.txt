@@ -2,7 +2,6 @@ set(SOURCES Addon.cpp
             AddonBuilder.cpp
             BinaryAddonCache.cpp
             AddonDatabase.cpp
-            AddonInfo.cpp
             AddonInstaller.cpp
             AddonManager.cpp
             AddonStatusHandler.cpp
@@ -22,8 +21,6 @@ set(SOURCES Addon.cpp
             ImageResource.cpp
             LanguageResource.cpp
             PluginSource.cpp
-            PVRClient.cpp
-            PVRClientMenuHooks.cpp
             Repository.cpp
             RepositoryUpdater.cpp
             Scraper.cpp
@@ -40,7 +37,6 @@ set(HEADERS Addon.h
             AddonEvents.h
             BinaryAddonCache.h
             AddonDatabase.h
-            AddonInfo.h
             AddonInstaller.h
             AddonManager.h
             AddonProvider.h
@@ -62,8 +58,6 @@ set(HEADERS Addon.h
             ImageResource.h
             LanguageResource.h
             PluginSource.h
-            PVRClient.h
-            PVRClientMenuHooks.h
             Repository.h
             RepositoryUpdater.h
             Resource.h

@@ -7,15 +7,15 @@
  */
 
 #include "FileBrowser.h"
-#include "addons/kodi-addon-dev-kit/include/kodi/gui/dialogs/FileBrowser.h"
 
 #include "URL.h"
 #include "addons/binary-addons/AddonDll.h"
+#include "addons/kodi-addon-dev-kit/include/kodi/gui/dialogs/FileBrowser.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "settings/MediaSourceSettings.h"
 #include "storage/MediaManager.h"
-#include "utils/log.h"
 #include "utils/URIUtils.h"
+#include "utils/log.h"
 
 extern "C"
 {
@@ -296,13 +296,13 @@ void Interface_GUIDialogFileBrowser::GetVECShares(VECSOURCES& vecShares, const s
   std::size_t found;
   found = strShares.find("local");
   if (found!=std::string::npos)
-    g_mediaManager.GetLocalDrives(vecShares);
+    CServiceBroker::GetMediaManager().GetLocalDrives(vecShares);
   found = strShares.find("network");
   if (found!=std::string::npos)
-    g_mediaManager.GetNetworkLocations(vecShares);
+    CServiceBroker::GetMediaManager().GetNetworkLocations(vecShares);
   found = strShares.find("removable");
   if (found!=std::string::npos)
-    g_mediaManager.GetRemovableDrives(vecShares);
+    CServiceBroker::GetMediaManager().GetRemovableDrives(vecShares);
   found = strShares.find("programs");
   if (found!=std::string::npos)
   {

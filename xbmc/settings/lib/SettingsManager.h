@@ -8,10 +8,6 @@
 
 #pragma once
 
-#include <map>
-#include <set>
-#include <vector>
-
 #include "ISettingCallback.h"
 #include "ISettingControlCreator.h"
 #include "ISettingCreator.h"
@@ -22,6 +18,11 @@
 #include "SettingDefinitions.h"
 #include "SettingDependency.h"
 #include "threads/SharedSection.h"
+
+#include <map>
+#include <set>
+#include <unordered_set>
+#include <vector>
 
 class CSettingCategory;
 class CSettingGroup;
@@ -223,8 +224,9 @@ public:
    \brief Registers the given ISettingsHandler implementation.
 
    \param settingsHandler ISettingsHandler implementation
+   \param bFront If True, insert the handler in front of other registered handlers, insert at the end otherwise.
    */
-  void RegisterSettingsHandler(ISettingsHandler *settingsHandler);
+  void RegisterSettingsHandler(ISettingsHandler *settingsHandler, bool bFront = false);
   /*!
    \brief Unregisters the given ISettingsHandler implementation.
 
@@ -273,6 +275,12 @@ public:
    \return Implementation of the setting options filler (either IntegerSettingOptionsFiller or StringSettingOptionsFiller)
    */
   void* GetSettingOptionsFiller(std::shared_ptr<const CSetting> setting);
+
+  /*!
+   \brief Checks whether any settings have been initialized.
+   
+   \return True if at least one setting has been initialized, false otherwise*/
+  bool HasSettings() const;
 
   /*!
    \brief Gets the setting with the given identifier.
@@ -505,6 +513,7 @@ private:
     SettingDependencyMap dependencies;
     std::set<std::string> children;
     CallbackSet callbacks;
+    std::unordered_set<std::string> references;
   };
 
   using SettingMap = std::map<std::string, Setting>;

@@ -132,6 +132,7 @@
 #define ACTION_MOUSE_DRAG             106
 #define ACTION_MOUSE_MOVE             107
 #define ACTION_MOUSE_LONG_CLICK       108
+#define ACTION_MOUSE_DRAG_END         109
 #define ACTION_MOUSE_END              109
 
 #define ACTION_BACKSPACE          110
@@ -219,6 +220,7 @@
 #define ACTION_PVR_PLAY_RADIO         190
 #define ACTION_PVR_SHOW_TIMER_RULE    191
 #define ACTION_CHANNEL_NUMBER_SEP     192
+#define ACTION_PVR_ANNOUNCE_REMINDERS 193
 
 #define ACTION_TOGGLE_FULLSCREEN      199 //!< switch 2 desktop resolution
 #define ACTION_TOGGLE_WATCHED         200 //!< Toggle watched status (videos)
@@ -268,6 +270,7 @@
 #define ACTION_TOGGLE_FONT            249 //!< Toggle font. Used in TextViewer dialog
 
 #define ACTION_VIDEO_NEXT_STREAM      250 //!< Cycle video streams. Used in videofullscreen.
+#define ACTION_QUEUE_ITEM_NEXT        251 //!< used to queue an item to the next position in the playlist
 
 // Voice actions
 #define ACTION_VOICE_RECOGNIZE        300

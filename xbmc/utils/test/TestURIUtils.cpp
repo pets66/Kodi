@@ -6,16 +6,16 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <utility>
-
-#include "gtest/gtest.h"
-
-#include "filesystem/MultiPathDirectory.h"
 #include "ServiceBroker.h"
+#include "URL.h"
+#include "filesystem/MultiPathDirectory.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
-#include "URL.h"
 #include "utils/URIUtils.h"
+
+#include <utility>
+
+#include <gtest/gtest.h>
 
 using namespace XFILE;
 
@@ -346,7 +346,7 @@ TEST_F(TestURIUtils, IsOnDVD)
 TEST_F(TestURIUtils, IsOnLAN)
 {
   std::vector<std::string> multiVec;
-  multiVec.push_back("smb://path/to/file");
+  multiVec.emplace_back("smb://path/to/file");
   EXPECT_TRUE(URIUtils::IsOnLAN(CMultiPathDirectory::ConstructMultiPath(multiVec)));
   EXPECT_TRUE(URIUtils::IsOnLAN("stack://smb://path/to/file"));
   EXPECT_TRUE(URIUtils::IsOnLAN("smb://path/to/file"));
@@ -378,6 +378,11 @@ TEST_F(TestURIUtils, IsRemote)
   EXPECT_TRUE(URIUtils::IsRemote("https://path/to/file"));
   EXPECT_FALSE(URIUtils::IsRemote("addons://user/"));
   EXPECT_FALSE(URIUtils::IsRemote("sources://video/"));
+  EXPECT_FALSE(URIUtils::IsRemote("videodb://movies/titles"));
+  EXPECT_FALSE(URIUtils::IsRemote("musicdb://genres/"));
+  EXPECT_FALSE(URIUtils::IsRemote("library://video/"));
+  EXPECT_FALSE(URIUtils::IsRemote("androidapp://app"));
+  EXPECT_FALSE(URIUtils::IsRemote("plugin://plugin.video.id"));
 }
 
 TEST_F(TestURIUtils, IsSmb)

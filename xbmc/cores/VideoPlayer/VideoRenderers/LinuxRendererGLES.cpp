@@ -9,25 +9,26 @@
 #include "LinuxRendererGLES.h"
 
 #include "Application.h"
-#include "cores/IPlayer.h"
-#include "guilib/Texture.h"
 #include "RenderCapture.h"
 #include "RenderFactory.h"
+#include "ServiceBroker.h"
+#include "VideoShaders/VideoFilterShaderGLES.h"
+#include "VideoShaders/YUV2RGBShaderGLES.h"
+#include "cores/IPlayer.h"
+#include "guilib/Texture.h"
 #include "rendering/MatrixGL.h"
 #include "rendering/gles/RenderSystemGLES.h"
-#include "ServiceBroker.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
-#include "utils/MathUtils.h"
 #include "utils/GLUtils.h"
+#include "utils/MathUtils.h"
 #include "utils/log.h"
 #include "windowing/WinSystem.h"
-#include "VideoShaders/YUV2RGBShaderGLES.h"
-#include "VideoShaders/VideoFilterShaderGLES.h"
+
 
 using namespace Shaders;
 
@@ -39,6 +40,23 @@ CLinuxRendererGLES::CLinuxRendererGLES()
   m_fullRange = !CServiceBroker::GetWinSystem()->UseLimitedColor();
 
   m_renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+
+#if HAS_GLES >= 3
+  unsigned int verMajor, verMinor;
+  m_renderSystem->GetRenderVersion(verMajor, verMinor);
+
+  if (verMajor >= 3)
+  {
+    m_pixelStoreKey = GL_UNPACK_ROW_LENGTH;
+  }
+#endif
+
+#if defined (GL_UNPACK_ROW_LENGTH_EXT)
+  if (m_renderSystem->IsExtSupported("GL_EXT_unpack_subimage"))
+  {
+    m_pixelStoreKey = GL_UNPACK_ROW_LENGTH_EXT;
+  }
+#endif
 }
 
 CLinuxRendererGLES::~CLinuxRendererGLES()
@@ -46,6 +64,9 @@ CLinuxRendererGLES::~CLinuxRendererGLES()
   UnInit();
 
   ReleaseShaders();
+
+  free(m_planeBuffer);
+  m_planeBuffer = nullptr;
 }
 
 CBaseRenderer* CLinuxRendererGLES::Create(CVideoBuffer *buffer)
@@ -96,6 +117,7 @@ bool CLinuxRendererGLES::ValidateRenderTarget()
 
 bool CLinuxRendererGLES::Configure(const VideoPicture &picture, float fps, unsigned int orientation)
 {
+  CLog::Log(LOGDEBUG, "LinuxRendererGLES::Configure: fps: %0.3f", fps);
   m_format = picture.videoBuffer->GetFormat();
   m_sourceWidth = picture.iWidth;
   m_sourceHeight = picture.iHeight;
@@ -119,6 +141,12 @@ bool CLinuxRendererGLES::Configure(const VideoPicture &picture, float fps, unsig
 
   // setup the background colour
   m_clearColour = CServiceBroker::GetWinSystem()->UseLimitedColor() ? (16.0f / 0xff) : 0.0f;
+
+  if (picture.hasDisplayMetadata && picture.hasLightMetadata)
+  {
+    m_passthroughHDR = CServiceBroker::GetWinSystem()->SetHDR(&picture);
+    CLog::Log(LOGDEBUG, "LinuxRendererGLES::Configure: HDR passthrough: %s", m_passthroughHDR ? "on" : "off");
+  }
 
   return true;
 }
@@ -259,19 +287,36 @@ void CLinuxRendererGLES::LoadPlane(CYuvPlane& plane, int type,
 
   glBindTexture(m_textureTarget, plane.id);
 
-  // OpenGL ES does not support strided texture input.
+  bool pixelStoreChanged = false;
   if (stride != static_cast<int>(width * bps))
   {
-    unsigned char* src = static_cast<unsigned char*>(data);
-    for (unsigned int y = 0; y < height; ++y, src += stride)
+    if (m_pixelStoreKey > 0)
     {
-      glTexSubImage2D(m_textureTarget, 0, 0, y, width, 1, type, GL_UNSIGNED_BYTE, src);
+      pixelStoreChanged = true;
+      glPixelStorei(m_pixelStoreKey, stride);
+    }
+    else
+    {
+      size_t planeSize = width * height * bps;
+      if (m_planeBufferSize < planeSize)
+      {
+        m_planeBuffer = static_cast<unsigned char*>(realloc(m_planeBuffer, planeSize));
+        m_planeBufferSize = planeSize;
+      }
+
+      unsigned char *src(static_cast<unsigned char*>(data)),
+                    *dst(m_planeBuffer);
+
+      for (unsigned int y = 0; y < height; ++y, src += stride, dst += width * bps)
+        memcpy(dst, src, width * bps);
+
+      pixelData = m_planeBuffer;
     }
   }
-  else
-  {
-    glTexSubImage2D(m_textureTarget, 0, 0, 0, width, height, type, GL_UNSIGNED_BYTE, pixelData);
-  }
+  glTexSubImage2D(m_textureTarget, 0, 0, 0, width, height, type, GL_UNSIGNED_BYTE, pixelData);
+
+  if (m_pixelStoreKey > 0 && pixelStoreChanged)
+    glPixelStorei(m_pixelStoreKey, 0);
 
   // check if we need to load any border pixels
   if (height < plane.texheight)
@@ -537,9 +582,9 @@ void CLinuxRendererGLES::LoadShaders(int field)
           CLog::Log(LOGNOTICE, "GLES: Selecting YUV 2 RGB shader");
 
           EShaderFormat shaderFormat = GetShaderFormat();
-          m_pYUVProgShader = new YUV2RGBProgressiveShader(shaderFormat, AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap);
+          m_pYUVProgShader = new YUV2RGBProgressiveShader(shaderFormat, m_passthroughHDR ? m_srcPrimaries : AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap);
           m_pYUVProgShader->SetConvertFullColorRange(m_fullRange);
-          m_pYUVBobShader = new YUV2RGBBobShader(shaderFormat, AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap);
+          m_pYUVBobShader = new YUV2RGBBobShader(shaderFormat, m_passthroughHDR ? m_srcPrimaries : AVColorPrimaries::AVCOL_PRI_BT709, m_srcPrimaries, m_toneMap);
           m_pYUVBobShader->SetConvertFullColorRange(m_fullRange);
 
           if ((m_pYUVProgShader && m_pYUVProgShader->CompileAndLink())
@@ -601,6 +646,8 @@ void CLinuxRendererGLES::UnInit()
   m_fbo.fbo.Cleanup();
   m_bValidated = false;
   m_bConfigured = false;
+
+  CServiceBroker::GetWinSystem()->SetHDR(nullptr);
 }
 
 bool CLinuxRendererGLES::CreateTexture(int index)
@@ -732,7 +779,7 @@ void CLinuxRendererGLES::RenderSinglePass(int index, int field)
 
   bool toneMap = false;
 
-  if (m_videoSettings.m_ToneMapMethod != VS_TONEMAPMETHOD_OFF)
+  if (!m_passthroughHDR && m_videoSettings.m_ToneMapMethod != VS_TONEMAPMETHOD_OFF)
   {
     if (buf.hasLightMetadata || (buf.hasDisplayMetadata && buf.displayMetadata.has_luminance))
     {
@@ -1264,7 +1311,7 @@ bool CLinuxRendererGLES::CreateYV12Texture(int index)
 
   for (int i = 0; i < 3; i++)
   {
-    im.plane[i] = new uint8_t[im.planesize[i]];
+    im.plane[i] = nullptr; // will be set in UploadTexture()
   }
 
   for(int f = 0; f < MAX_FIELDS; f++)
@@ -1427,7 +1474,7 @@ bool CLinuxRendererGLES::CreateNV12Texture(int index)
 
   for (int i = 0; i < 2; i++)
   {
-    im.plane[i] = new uint8_t[im.planesize[i]];
+    im.plane[i] = nullptr; // will be set in UploadTexture()
   }
 
   for(int f = 0; f < MAX_FIELDS; f++)

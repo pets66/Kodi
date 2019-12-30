@@ -7,13 +7,15 @@
  */
 
 #include "EGLUtils.h"
-#include "log.h"
 
+#include "ServiceBroker.h"
 #include "StringUtils.h"
 #include "guilib/IDirtyRegionSolver.h"
-#include "ServiceBroker.h"
+#include "log.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
+
+#include <map>
 
 #include <EGL/eglext.h>
 
@@ -34,7 +36,7 @@ namespace
 #endif
 
 #define X(VAL) std::make_pair(VAL, #VAL)
-std::array<std::pair<EGLint, const char*>, 32> eglAttributes =
+std::map<EGLint, const char*> eglAttributes =
 {
   // please keep attributes in accordance to:
   // https://www.khronos.org/registry/EGL/sdk/docs/man/html/eglGetConfigAttrib.xhtml
@@ -71,8 +73,64 @@ std::array<std::pair<EGLint, const char*>, 32> eglAttributes =
   X(EGL_TRANSPARENT_GREEN_VALUE),
   X(EGL_TRANSPARENT_BLUE_VALUE)
 };
+
+std::map<EGLenum, const char*> eglErrors =
+{
+  // please keep errors in accordance to:
+  // https://www.khronos.org/registry/EGL/sdk/docs/man/html/eglGetError.xhtml
+  X(EGL_SUCCESS),
+  X(EGL_NOT_INITIALIZED),
+  X(EGL_BAD_ACCESS),
+  X(EGL_BAD_ALLOC),
+  X(EGL_BAD_ATTRIBUTE),
+  X(EGL_BAD_CONFIG),
+  X(EGL_BAD_CONTEXT),
+  X(EGL_BAD_CURRENT_SURFACE),
+  X(EGL_BAD_DISPLAY),
+  X(EGL_BAD_MATCH),
+  X(EGL_BAD_NATIVE_PIXMAP),
+  X(EGL_BAD_NATIVE_WINDOW),
+  X(EGL_BAD_PARAMETER),
+  X(EGL_BAD_SURFACE),
+  X(EGL_CONTEXT_LOST),
+};
+
+std::map<EGLint, const char*> eglErrorType =
+{
+//! @todo remove when Raspberry Pi updates their EGL headers
+#if !defined(TARGET_RASPBERRY_PI)
+  X(EGL_DEBUG_MSG_CRITICAL_KHR),
+  X(EGL_DEBUG_MSG_ERROR_KHR),
+  X(EGL_DEBUG_MSG_WARN_KHR),
+  X(EGL_DEBUG_MSG_INFO_KHR),
+#endif
+};
 #undef X
+
+} // namespace
+
+//! @todo remove when Raspberry Pi updates their EGL headers
+#if !defined(TARGET_RASPBERRY_PI)
+void EglErrorCallback(EGLenum error, const char* command, EGLint messageType, EGLLabelKHR threadLabel, EGLLabelKHR objectLabel, const char* message)
+{
+  std::string errorStr;
+  std::string typeStr;
+
+  auto eglError = eglErrors.find(error);
+  if (eglError != eglErrors.end())
+  {
+    errorStr = eglError->second;
+  }
+
+  auto eglType = eglErrorType.find(messageType);
+  if (eglType != eglErrorType.end())
+  {
+    typeStr = eglType->second;
+  }
+
+  CLog::Log(LOGDEBUG, "EGL Debugging:\nError: {}\nCommand: {}\nType: {}\nMessage: {}", errorStr, command, typeStr, message);
 }
+#endif
 
 std::set<std::string> CEGLUtils::GetClientExtensions()
 {
@@ -110,18 +168,39 @@ bool CEGLUtils::HasClientExtension(const std::string& name)
   return (exts.find(name) != exts.end());
 }
 
-void CEGLUtils::LogError(const std::string& what)
+void CEGLUtils::Log(int logLevel, const std::string& what)
 {
-  CLog::Log(LOGERROR, "%s (EGL error %d)", what.c_str(), eglGetError());
-}
+  EGLenum error = eglGetError();
+  std::string errorStr = StringUtils::Format("0x%04X", error);
 
-CEGLContextUtils::CEGLContextUtils()
-{
+  auto eglError = eglErrors.find(error);
+  if (eglError != eglErrors.end())
+  {
+    errorStr = eglError->second;
+  }
+
+  CLog::Log(logLevel, "{} ({})", what.c_str(), errorStr);
 }
 
 CEGLContextUtils::CEGLContextUtils(EGLenum platform, std::string const& platformExtension)
 : m_platform{platform}
 {
+//! @todo remove when Raspberry Pi updates their EGL headers
+#if !defined(TARGET_RASPBERRY_PI)
+  if (CEGLUtils::HasClientExtension("EGL_KHR_debug"))
+  {
+    auto eglDebugMessageControl = CEGLUtils::GetRequiredProcAddress<PFNEGLDEBUGMESSAGECONTROLKHRPROC>("eglDebugMessageControlKHR");
+
+    EGLAttrib eglDebugAttribs[] = {EGL_DEBUG_MSG_CRITICAL_KHR, EGL_TRUE,
+                                   EGL_DEBUG_MSG_ERROR_KHR, EGL_TRUE,
+                                   EGL_DEBUG_MSG_WARN_KHR, EGL_TRUE,
+                                   EGL_DEBUG_MSG_INFO_KHR, EGL_TRUE,
+                                   EGL_NONE};
+
+    eglDebugMessageControl(EglErrorCallback, eglDebugAttribs);
+  }
+#endif
+
   m_platformSupported = CEGLUtils::HasClientExtension("EGL_EXT_platform_base") && CEGLUtils::HasClientExtension(platformExtension);
 }
 
@@ -145,7 +224,7 @@ bool CEGLContextUtils::CreateDisplay(EGLNativeDisplayType nativeDisplay)
   m_eglDisplay = eglGetDisplay(nativeDisplay);
   if (m_eglDisplay == EGL_NO_DISPLAY)
   {
-    CEGLUtils::LogError("failed to get EGL display");
+    CEGLUtils::Log(LOGERROR, "failed to get EGL display");
     return false;
   }
 
@@ -172,7 +251,7 @@ bool CEGLContextUtils::CreatePlatformDisplay(void* nativeDisplay, EGLNativeDispl
 
     if (m_eglDisplay == EGL_NO_DISPLAY)
     {
-      CEGLUtils::LogError("failed to get platform display");
+      CEGLUtils::Log(LOGERROR, "failed to get platform display");
       return false;
     }
   }
@@ -190,12 +269,12 @@ bool CEGLContextUtils::InitializeDisplay(EGLint renderingApi)
 {
   if (!eglInitialize(m_eglDisplay, nullptr, nullptr))
   {
-    CEGLUtils::LogError("failed to initialize EGL display");
+    CEGLUtils::Log(LOGERROR, "failed to initialize EGL display");
     Destroy();
     return false;
   }
 
-  const char *value;
+  const char* value;
   value = eglQueryString(m_eglDisplay, EGL_VERSION);
   CLog::Log(LOGNOTICE, "EGL_VERSION = %s", value ? value : "NULL");
 
@@ -210,7 +289,7 @@ bool CEGLContextUtils::InitializeDisplay(EGLint renderingApi)
 
   if (eglBindAPI(renderingApi) != EGL_TRUE)
   {
-    CEGLUtils::LogError("failed to bind EGL API");
+    CEGLUtils::Log(LOGERROR, "failed to bind EGL API");
     Destroy();
     return false;
   }
@@ -218,7 +297,7 @@ bool CEGLContextUtils::InitializeDisplay(EGLint renderingApi)
   return true;
 }
 
-bool CEGLContextUtils::ChooseConfig(EGLint renderableType, EGLint visualId)
+bool CEGLContextUtils::ChooseConfig(EGLint renderableType, EGLint visualId, bool hdr)
 {
   EGLint numMatched{0};
 
@@ -234,7 +313,7 @@ bool CEGLContextUtils::ChooseConfig(EGLint renderableType, EGLint visualId)
       guiAlgorithmDirtyRegions == DIRTYREGION_SOLVER_UNION)
     surfaceType |= EGL_SWAP_BEHAVIOR_PRESERVED_BIT;
 
-  CEGLAttributes<10> attribs;
+  CEGLAttributesVec attribs;
   attribs.Add({{EGL_RED_SIZE, 8},
                {EGL_GREEN_SIZE, 8},
                {EGL_BLUE_SIZE, 8},
@@ -246,32 +325,46 @@ bool CEGLContextUtils::ChooseConfig(EGLint renderableType, EGLint visualId)
                {EGL_SURFACE_TYPE, surfaceType},
                {EGL_RENDERABLE_TYPE, renderableType}});
 
-  if (eglChooseConfig(m_eglDisplay, attribs.Get(), nullptr, 0, &numMatched) != EGL_TRUE)
-  {
-    CEGLUtils::LogError("failed to query number of EGL configs");
-    Destroy();
+  EGLConfig* currentConfig(hdr ? &m_eglHDRConfig : &m_eglConfig);
+
+  if (hdr)
+#if EGL_EXT_pixel_format_float
+    attribs.Add({{EGL_COLOR_COMPONENT_TYPE_EXT, EGL_COLOR_COMPONENT_TYPE_FLOAT_EXT}});
+#else
     return false;
-  }
+#endif
+
+  const char* errorMsg = nullptr;
+
+  if (eglChooseConfig(m_eglDisplay, attribs.Get(), nullptr, 0, &numMatched) != EGL_TRUE)
+    errorMsg = "failed to query number of EGL configs";
 
   std::vector<EGLConfig> eglConfigs(numMatched);
-
   if (eglChooseConfig(m_eglDisplay, attribs.Get(), eglConfigs.data(), numMatched, &numMatched) != EGL_TRUE)
+    errorMsg = "failed to find EGL configs with appropriate attributes";
+
+  if (errorMsg)
   {
-    CEGLUtils::LogError("failed to find EGL configs with appropriate attributes");
-    Destroy();
+    if (!hdr)
+    {
+      CEGLUtils::Log(LOGERROR, errorMsg);
+      Destroy();
+    }
+    else
+      CEGLUtils::Log(LOGINFO, errorMsg);
     return false;
   }
 
   EGLint id{0};
   for (const auto &eglConfig: eglConfigs)
   {
-    m_eglConfig = eglConfig;
+    *currentConfig = eglConfig;
 
     if (visualId == 0)
       break;
 
-    if (eglGetConfigAttrib(m_eglDisplay, m_eglConfig, EGL_NATIVE_VISUAL_ID, &id) != EGL_TRUE)
-      CEGLUtils::LogError("failed to query EGL attibute EGL_NATIVE_VISUAL_ID");
+    if (eglGetConfigAttrib(m_eglDisplay, *currentConfig, EGL_NATIVE_VISUAL_ID, &id) != EGL_TRUE)
+      CEGLUtils::Log(LOGERROR, "failed to query EGL attibute EGL_NATIVE_VISUAL_ID");
 
     if (visualId == id)
       break;
@@ -283,13 +376,13 @@ bool CEGLContextUtils::ChooseConfig(EGLint renderableType, EGLint visualId)
     return false;
   }
 
-  CLog::Log(LOGDEBUG, "EGL Config Attributes:");
+  CLog::Log(LOGDEBUG, "EGL %sConfig Attributes:", hdr ? "HDR " : "");
 
   for (const auto &eglAttribute : eglAttributes)
   {
     EGLint value{0};
-    if (eglGetConfigAttrib(m_eglDisplay, m_eglConfig, eglAttribute.first, &value) != EGL_TRUE)
-      CEGLUtils::LogError(StringUtils::Format("failed to query EGL attibute %s", eglAttribute.second));
+    if (eglGetConfigAttrib(m_eglDisplay, *currentConfig, eglAttribute.first, &value) != EGL_TRUE)
+      CEGLUtils::Log(LOGERROR, StringUtils::Format("failed to query EGL attibute %s", eglAttribute.second));
 
     // we only need to print the hex value if it's an actual EGL define
     CLog::Log(LOGDEBUG, "  %s: %s", eglAttribute.second, (value >= 0x3000 && value <= 0x3200) ? StringUtils::Format("0x%04x", value) : StringUtils::Format("%d", value));
@@ -302,7 +395,7 @@ EGLint CEGLContextUtils::GetConfigAttrib(EGLint attribute) const
 {
   EGLint value{0};
   if (eglGetConfigAttrib(m_eglDisplay, m_eglConfig, attribute, &value) != EGL_TRUE)
-    CEGLUtils::LogError("failed to query EGL attibute");
+    CEGLUtils::Log(LOGERROR, "failed to query EGL attibute");
   return value;
 }
 
@@ -321,6 +414,15 @@ bool CEGLContextUtils::CreateContext(CEGLAttributesVec contextAttribs)
   if (CEGLUtils::HasExtension(m_eglDisplay, "EGL_IMG_context_priority"))
     contextAttribs.Add({{EGL_CONTEXT_PRIORITY_LEVEL_IMG, EGL_CONTEXT_PRIORITY_HIGH_IMG}});
 
+//! @todo remove when Raspberry Pi updates their EGL headers
+#if !defined(TARGET_RASPBERRY_PI)
+  if (CEGLUtils::HasExtension(m_eglDisplay, "EGL_KHR_create_context") &&
+      CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_openGlDebugging)
+  {
+    contextAttribs.Add({{EGL_CONTEXT_FLAGS_KHR, EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR}});
+  }
+#endif
+
   m_eglContext = eglCreateContext(m_eglDisplay, eglConfig,
                                   EGL_NO_CONTEXT, contextAttribs.Get());
 
@@ -329,7 +431,7 @@ bool CEGLContextUtils::CreateContext(CEGLAttributesVec contextAttribs)
     EGLint value{EGL_CONTEXT_PRIORITY_MEDIUM_IMG};
 
     if (eglQueryContext(m_eglDisplay, m_eglContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &value) != EGL_TRUE)
-      CEGLUtils::LogError("failed to query EGL context attribute EGL_CONTEXT_PRIORITY_LEVEL_IMG");
+      CEGLUtils::Log(LOGERROR, "failed to query EGL context attribute EGL_CONTEXT_PRIORITY_LEVEL_IMG");
 
     if (value != EGL_CONTEXT_PRIORITY_HIGH_IMG)
       CLog::Log(LOGDEBUG, "Failed to obtain a high priority EGL context");
@@ -376,12 +478,20 @@ void CEGLContextUtils::SurfaceAttrib()
   {
     if (eglSurfaceAttrib(m_eglDisplay, m_eglSurface, EGL_SWAP_BEHAVIOR, EGL_BUFFER_PRESERVED) != EGL_TRUE)
     {
-      CEGLUtils::LogError("failed to set EGL_BUFFER_PRESERVED swap behavior");
+      CEGLUtils::Log(LOGERROR, "failed to set EGL_BUFFER_PRESERVED swap behavior");
     }
   }
 }
 
-bool CEGLContextUtils::CreateSurface(EGLNativeWindowType nativeWindow)
+void CEGLContextUtils::SurfaceAttrib(EGLint attribute, EGLint value)
+{
+  if (eglSurfaceAttrib(m_eglDisplay, m_eglSurface, attribute, value) != EGL_TRUE)
+  {
+    CEGLUtils::Log(LOGERROR, "failed to set EGL_BUFFER_PRESERVED swap behavior");
+  }
+}
+
+bool CEGLContextUtils::CreateSurface(EGLNativeWindowType nativeWindow, EGLint HDRcolorSpace /* = EGL_NONE */)
 {
   if (m_eglDisplay == EGL_NO_DISPLAY)
   {
@@ -392,11 +502,22 @@ bool CEGLContextUtils::CreateSurface(EGLNativeWindowType nativeWindow)
     throw std::logic_error("Do not call CreateSurface when surface has already been created");
   }
 
-  m_eglSurface = eglCreateWindowSurface(m_eglDisplay, m_eglConfig, nativeWindow, nullptr);
+  CEGLAttributesVec attribs;
+  EGLConfig config = m_eglConfig;
+
+#ifdef EGL_GL_COLORSPACE
+  if (HDRcolorSpace != EGL_NONE)
+  {
+    attribs.Add({{EGL_GL_COLORSPACE, HDRcolorSpace}});
+    config = m_eglHDRConfig;
+  }
+#endif
+
+  m_eglSurface = eglCreateWindowSurface(m_eglDisplay, config, nativeWindow, attribs.Get());
 
   if (m_eglSurface == EGL_NO_SURFACE)
   {
-    CEGLUtils::LogError("failed to create window surface");
+    CEGLUtils::Log(LOGERROR, "failed to create window surface");
     return false;
   }
 
@@ -424,7 +545,7 @@ bool CEGLContextUtils::CreatePlatformSurface(void* nativeWindow, EGLNativeWindow
 
     if (m_eglSurface == EGL_NO_SURFACE)
     {
-      CEGLUtils::LogError("failed to create platform window surface");
+      CEGLUtils::Log(LOGERROR, "failed to create platform window surface");
       return false;
     }
   }

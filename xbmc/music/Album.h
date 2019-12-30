@@ -13,12 +13,13 @@
 \brief
 */
 
-#include <map>
-#include <vector>
 #include "Artist.h"
 #include "Song.h"
 #include "XBDateTime.h"
 #include "utils/ScraperUrl.h"
+
+#include <map>
+#include <vector>
 
 class TiXmlNode;
 class CFileItem;
@@ -55,9 +56,11 @@ public:
     iVotes = -1;
     iYear = -1;
     bCompilation = false;
+    bBoxedSet = false;
     iTimesPlayed = 0;
     dateAdded.Reset();
     lastPlayed.Reset();
+    iTotalDiscs = -1;
     songs.clear();
     releaseType = Album;
     strLastScraped.clear();
@@ -154,10 +157,12 @@ public:
   int iUserrating = -1;
   int iVotes = -1;
   int iYear = -1;
+  bool bBoxedSet = false;
   bool bCompilation = false;
   int iTimesPlayed = 0;
   CDateTime dateAdded;
   CDateTime lastPlayed;
+  int iTotalDiscs = -1;
   VECSONGS songs;     ///< Local songs
   ReleaseType releaseType = Album;
   std::string strLastScraped;

@@ -7,10 +7,11 @@
  */
 
 #include "ActionTranslator.h"
+
 #include "ActionIDs.h"
 #include "interfaces/builtins/Builtins.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
+#include "utils/log.h"
 
 #include <map>
 
@@ -63,6 +64,7 @@ static const std::map<ActionName, ActionID> ActionMappings =
     { "zoomin"                   , ACTION_ZOOM_IN },
     { "playlist"                 , ACTION_SHOW_PLAYLIST },
     { "queue"                    , ACTION_QUEUE_ITEM },
+    { "playnext"                 , ACTION_QUEUE_ITEM_NEXT },
     { "zoomnormal"               , ACTION_ZOOM_LEVEL_NORMAL },
     { "zoomlevel1"               , ACTION_ZOOM_LEVEL_1 },
     { "zoomlevel2"               , ACTION_ZOOM_LEVEL_2 },
@@ -222,6 +224,7 @@ static const std::map<ActionName, ActionID> ActionMappings =
     { "wheelup"                  , ACTION_MOUSE_WHEEL_UP },
     { "wheeldown"                , ACTION_MOUSE_WHEEL_DOWN },
     { "mousedrag"                , ACTION_MOUSE_DRAG },
+    { "mousedragend"             , ACTION_MOUSE_DRAG_END },
     { "mousemove"                , ACTION_MOUSE_MOVE },
 
     // Touch

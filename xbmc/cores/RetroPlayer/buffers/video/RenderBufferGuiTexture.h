@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "cores/RetroPlayer/buffers/BaseRenderBuffer.h"
 #include "cores/GameSettings.h"
+#include "cores/RetroPlayer/buffers/BaseRenderBuffer.h"
 #include "guilib/Texture.h"
 #include "guilib/TextureFormats.h"
 
@@ -23,7 +23,7 @@ namespace RETRO
   {
   public:
     CRenderBufferGuiTexture(SCALINGMETHOD scalingMethod);
-    virtual ~CRenderBufferGuiTexture() = default;
+    ~CRenderBufferGuiTexture() override = default;
 
     // implementation of IRenderBuffer via CBaseRenderBuffer
     bool Allocate(AVPixelFormat format, unsigned int width, unsigned int height) override;

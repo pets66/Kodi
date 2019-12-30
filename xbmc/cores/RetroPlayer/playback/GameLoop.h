@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <atomic>
-
 #include "threads/Event.h"
 #include "threads/Thread.h"
+
+#include <atomic>
 
 namespace KODI
 {
@@ -38,7 +38,7 @@ namespace RETRO
   public:
     CGameLoop(IGameLoopCallback* callback, double fps);
 
-    virtual ~CGameLoop();
+    ~CGameLoop() override;
 
     void Start();
     void Stop();
@@ -51,7 +51,7 @@ namespace RETRO
 
   protected:
     // implementation of CThread
-    virtual void Process() override;
+    void Process() override;
 
   private:
     double FrameTimeMs() const;

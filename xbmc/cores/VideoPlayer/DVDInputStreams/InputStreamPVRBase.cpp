@@ -9,10 +9,10 @@
 #include "InputStreamPVRBase.h"
 
 #include "ServiceBroker.h"
-#include "addons/PVRClient.h"
 #include "cores/VideoPlayer/DVDDemuxers/DVDDemux.h"
 #include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 #include "pvr/PVRManager.h"
+#include "pvr/addons/PVRClient.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/log.h"
@@ -215,6 +215,12 @@ void CInputStreamPVRBase::SetSpeed(int Speed)
 {
   if (m_client)
     m_client->SetSpeed(Speed);
+}
+
+void CInputStreamPVRBase::FillBuffer(bool mode)
+{
+  if (m_client)
+    m_client->FillBuffer(mode);
 }
 
 bool CInputStreamPVRBase::SeekTime(double timems, bool backwards, double *startpts)

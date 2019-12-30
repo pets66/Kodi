@@ -22,8 +22,8 @@ namespace ADDON
   class CAddonDll : public CAddon
   {
   public:
-    CAddonDll(CAddonInfo addonInfo, BinaryAddonBasePtr addonBase);
-    explicit CAddonDll(CAddonInfo addonInfo);
+    CAddonDll(const AddonInfoPtr& addonInfo, BinaryAddonBasePtr addonBase);
+    explicit CAddonDll(const AddonInfoPtr& addonInfo, TYPE addonType);
     ~CAddonDll() override;
 
     virtual ADDON_STATUS GetStatus();
@@ -40,6 +40,28 @@ namespace ADDON
     void Destroy();
 
     bool DllLoaded(void) const;
+
+    /*!
+    * @brief Get api version of moduleType type
+    *
+    * @return The version of requested type, if dll is loaded and supported by addon.
+    *         If one of both do not match, an empty version is returned.
+    *
+    * @note This should only be called if the associated dll is loaded.
+    * Otherwise use @ref CAddonInfo::DependencyVersion(...)
+    */
+    AddonVersion GetTypeVersionDll(int type) const;
+
+    /*!
+    * @brief Get api min version of moduleType type
+    *
+    * @return The version of requested type, if dll is loaded and supported by addon.
+    *         If one of both do not match, an empty version is returned.
+    *
+    * @note This should only be called if the associated dll is loaded.
+    * Otherwise use @ref CAddonInfo::DependencyMinVersion(...)
+    */
+    AddonVersion GetTypeMinVersionDll(int type) const;
 
     /*!
      * @brief Function to create a addon instance class

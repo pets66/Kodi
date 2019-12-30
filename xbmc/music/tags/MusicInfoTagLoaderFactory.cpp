@@ -7,18 +7,18 @@
  */
 
 #include "MusicInfoTagLoaderFactory.h"
-#include "TagLoaderTagLib.h"
+
+#include "FileItem.h"
 #include "MusicInfoTagLoaderCDDA.h"
-#include "MusicInfoTagLoaderShn.h"
 #include "MusicInfoTagLoaderDatabase.h"
 #include "MusicInfoTagLoaderFFmpeg.h"
+#include "MusicInfoTagLoaderShn.h"
+#include "ServiceBroker.h"
+#include "TagLoaderTagLib.h"
+#include "addons/AudioDecoder.h"
+#include "addons/binary-addons/BinaryAddonBase.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
-#include "FileItem.h"
-#include "ServiceBroker.h"
-
-#include "addons/binary-addons/BinaryAddonBase.h"
-#include "addons/AudioDecoder.h"
 
 using namespace ADDON;
 
@@ -48,16 +48,19 @@ IMusicInfoTagLoader* CMusicInfoTagLoaderFactory::CreateLoader(const CFileItem& i
   CServiceBroker::GetBinaryAddonManager().GetAddonInfos(addonInfos, true, ADDON_AUDIODECODER);
   for (const auto& addonInfo : addonInfos)
   {
-    if (CAudioDecoder::HasTags(addonInfo) &&
-        CAudioDecoder::GetExtensions(addonInfo).find("."+strExtension) != std::string::npos)
+    if (CAudioDecoder::HasTags(addonInfo))
     {
-      CAudioDecoder* result = new CAudioDecoder(addonInfo);
-      if (!result->CreateDecoder())
+      auto exts = StringUtils::Split(CAudioDecoder::GetExtensions(addonInfo), "|");
+      if (std::find(exts.begin(), exts.end(), "." + strExtension) != exts.end())
       {
-        delete result;
-        return nullptr;
+        CAudioDecoder* result = new CAudioDecoder(addonInfo);
+        if (!result->CreateDecoder())
+        {
+          delete result;
+          return nullptr;
+        }
+        return result;
       }
-      return result;
     }
   }
 

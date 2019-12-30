@@ -6,9 +6,8 @@
  *  See LICENSES/README.md for more information.
  */
 
-#if defined (TARGET_ANDROID)
-
 #include "AndroidPowerSyscall.h"
+
 #include "platform/android/activity/XBMCApp.h"
 
 IPowerSyscall* CAndroidPowerSyscall::CreateInstance()
@@ -21,12 +20,6 @@ void CAndroidPowerSyscall::Register()
   IPowerSyscall::RegisterPowerSyscall(CAndroidPowerSyscall::CreateInstance);
 }
 
-CAndroidPowerSyscall::CAndroidPowerSyscall()
-{ }
-
-CAndroidPowerSyscall::~CAndroidPowerSyscall()
-{ }
-
 int CAndroidPowerSyscall::BatteryLevel(void)
 {
   return CXBMCApp::GetBatteryLevel();
@@ -36,5 +29,3 @@ bool CAndroidPowerSyscall::PumpPowerEvents(IPowerEventsCallback *callback)
 {
   return true;
 }
-
-#endif

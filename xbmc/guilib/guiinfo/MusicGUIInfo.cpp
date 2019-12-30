@@ -15,6 +15,9 @@
 #include "URL.h"
 #include "Util.h"
 #include "guilib/LocalizeStrings.h"
+#include "guilib/guiinfo/GUIInfo.h"
+#include "guilib/guiinfo/GUIInfoHelper.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "music/MusicInfoLoader.h"
 #include "music/MusicThumbLoader.h"
 #include "music/tags/MusicInfoTag.h"
@@ -23,10 +26,6 @@
 #include "settings/SettingsComponent.h"
 #include "utils/URIUtils.h"
 #include "utils/log.h"
-
-#include "guilib/guiinfo/GUIInfo.h"
-#include "guilib/guiinfo/GUIInfoHelper.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
 
 using namespace KODI::GUILIB;
 using namespace KODI::GUILIB::GUIINFO;
@@ -49,7 +48,7 @@ bool CMusicGUIInfo::InitCurrentItem(CFileItem *item)
     tag->SetLoaded(true);
 
     // find a thumb for this file.
-    if (item->IsInternetStream())
+    if (item->IsInternetStream() && !item->IsMusicDb())
     {
       if (!g_application.m_strPlayListFile.empty())
       {
@@ -76,7 +75,9 @@ bool CMusicGUIInfo::InitCurrentItem(CFileItem *item)
 
 bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int contextWindow, const CGUIInfo &info, std::string *fallback) const
 {
-  if (info.GetData1() && info.m_info >= MUSICPLAYER_TITLE && info.m_info <= MUSICPLAYER_ALBUM_ARTIST)
+  // For musicplayer "offset" and "position" info labels check playlist
+  if (info.GetData1() && info.m_info >= MUSICPLAYER_OFFSET_POSITION_FIRST &&
+      info.m_info <= MUSICPLAYER_OFFSET_POSITION_LAST)
     return GetPlaylistInfo(value, info);
 
   const CMusicInfoTag* tag = item->GetMusicInfoTag();
@@ -143,6 +144,13 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
           return true;
         }
         break;
+      case LISTITEM_TOTALDISCS:
+        value = StringUtils::Format("%i", tag->GetTotalDiscs());
+        return true;
+      case MUSICPLAYER_DISC_TITLE:
+      case LISTITEM_DISC_TITLE:
+        value = tag->GetDiscSubtitle();
+        return true;
       case MUSICPLAYER_ARTIST:
       case LISTITEM_ARTIST:
         value = tag->GetArtistString();
@@ -250,7 +258,10 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
         int iDuration = tag->GetDuration();
         if (iDuration > 0)
         {
-          value = StringUtils::SecondsToTimeString(iDuration, static_cast<TIME_FORMAT>(info.GetData4()));
+          value = StringUtils::SecondsToTimeString(iDuration,
+                                                   static_cast<TIME_FORMAT>(info.m_info == LISTITEM_DURATION
+                                                                            ? info.GetData4()
+                                                                            : info.GetData1()));
           return true;
         }
         break;
@@ -323,6 +334,14 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
     // MUSICPLAYER_*
     ///////////////////////////////////////////////////////////////////////////////////////////////
     case MUSICPLAYER_PROPERTY:
+      if (StringUtils::StartsWithNoCase(info.GetData3(), "Role.") && item->HasMusicInfoTag())
+      {
+        // "Role.xxxx" properties are held in music tag
+        std::string property = info.GetData3();
+        property.erase(0, 5); //Remove Role.
+        value = item->GetMusicInfoTag()->GetArtistStringForRole(property);
+        return true;
+      }
       value = item->GetProperty(info.GetData3()).asString();
       return true;
     case MUSICPLAYER_PLAYLISTLEN:
@@ -544,6 +563,19 @@ bool CMusicGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int contextW
     case MUSICPM_ENABLED:
       value = g_partyModeManager.IsEnabled();
       return true;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // LISTITEM_*
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    case LISTITEM_IS_BOXSET:
+      const CFileItem* item = static_cast<const CFileItem*>(gitem);
+      const CMusicInfoTag* tag = item->GetMusicInfoTag();
+      if (tag)
+      {
+        value = item->GetMusicInfoTag()->GetBoxset() == true;
+        return true;
+      }
+      break;
   }
 
   return false;

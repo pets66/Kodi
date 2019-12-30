@@ -30,11 +30,9 @@ using JOYSTICK::FEATURE_TYPE;
 class CController : public ADDON::CAddon
 {
 public:
-  static std::unique_ptr<CController> FromExtension(ADDON::CAddonInfo addonInfo, const cp_extension_t* ext);
+  explicit CController(const ADDON::AddonInfoPtr& addonInfo);
 
-  explicit CController(ADDON::CAddonInfo addonInfo);
-
-  virtual ~CController();
+  ~CController() override;
 
   static const ControllerPtr EmptyPtr;
 

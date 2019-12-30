@@ -195,6 +195,29 @@
       "speed": { "type": "integer" }
     }
   },
+  "Player.ViewMode": {
+    "type": "string",
+    "enum": [  "normal", "zoom", "stretch4x3", "widezoom", "stretch16x9", "original",
+               "stretch16x9nonlin", "zoom120width", "zoom110width" ]
+  },
+  "Player.CustomViewMode": {
+    "type": "object",
+    "required": true,
+    "properties": {
+      "zoom": { "type": [
+          { "type": "string", "enum": [ "increase", "decrease" ], "required": true },
+          { "$ref": "Optional.Number", "minimum":0.5, "maximum": 2.0, "description": "Zoom where 1.0 means 100%", "required": true } ] },
+      "pixelratio": { "type": [
+          { "type": "string", "enum": [ "increase", "decrease" ], "required": true },
+          { "$ref": "Optional.Number", "minimum":0.5, "maximum": 2.0, "description": "Pixel aspect ratio where 1.0 means square pixel", "required": true } ] },
+      "verticalshift": { "type": [
+          { "type": "string", "enum": [ "increase", "decrease" ], "required": true },	  
+          { "$ref": "Optional.Number", "minimum": -2.0, "maximum": 2.0, "description": "Vertical shift 1.0 means shift to bottom", "required": true } ] },
+      "nonlinearstretch": { "type": [
+          { "type": "string", "enum": [ "increase", "decrease" ], "required": true },	  
+          { "$ref": "Optional.Boolean", "description": "Flag to enable nonlinear stretch", "required": true } ] }
+    }
+  },
   "Player.Repeat": {
     "type": "string",
     "enum": [ "off", "one", "all" ]
@@ -207,7 +230,10 @@
       "language": { "type": "string", "required": true },
       "codec": { "type": "string", "required": true },
       "bitrate": { "type": "integer", "required": true },
-      "channels": { "type": "integer", "required": true }
+      "channels": { "type": "integer", "required": true },
+      "isdefault": { "type": "boolean", "required": true },
+      "isoriginal": { "type": "boolean", "required": true },
+      "isimpaired": { "type": "boolean", "required": true }
     }
   },
   "Player.Video.Stream": {
@@ -226,7 +252,10 @@
     "properties": {
       "index": { "type": "integer", "minimum": 0, "required": true },
       "name": { "type": "string", "required": true },
-      "language": { "type": "string", "required": true }
+      "language": { "type": "string", "required": true },
+      "isdefault": { "type": "boolean", "required": true },
+      "isforced": { "type": "boolean", "required": true },
+      "isimpaired": { "type": "boolean", "required": true }
     }
   },
   "Player.Property.Name": {
@@ -872,6 +901,7 @@
       "userrating": { "type": "integer" },
       "ratings": { "type": "Video.Ratings" },
       "runtime": { "type": "integer", "description": "Runtime in seconds" },
+      "status": { "type": "string", "description": "Returns 'returning series', 'in production', 'planned', 'cancelled' or 'ended'" },
       "uniqueid": { "$ref": "Media.UniqueID" }
     }
   },
@@ -954,7 +984,7 @@
                 "firstaired", "hastimer", "isactive", "parentalrating",
                 "wasactive", "thumbnail", "rating", "originaltitle", "cast",
                 "director", "writer", "year", "imdbnumber", "hastimerrule",
-                "hasrecording", "recording", "isseries" ]
+                "hasrecording", "recording", "isseries", "isplayable" ]
     }
   },
   "PVR.Details.Broadcast": {
@@ -989,7 +1019,8 @@
       "hastimerrule": { "type": "boolean" },
       "hasrecording": { "type": "boolean" },
       "recording": { "type": "string" },
-      "isseries": { "type": "boolean" }
+      "isseries": { "type": "boolean" },
+      "isplayable": { "type": "boolean" }
     }
   },
   "PVR.Fields.Channel": {
@@ -997,7 +1028,7 @@
     "items": { "type": "string",
       "enum": [ "thumbnail", "channeltype", "hidden", "locked", "channel", "lastplayed",
                 "broadcastnow", "broadcastnext", "uniqueid", "icon", "channelnumber",
-                "subchannelnumber", "isrecording" ]
+                "subchannelnumber", "isrecording", "hasarchive" ]
     }
   },
   "PVR.Details.Channel": {
@@ -1016,7 +1047,8 @@
       "icon": { "type": "string" },
       "channelnumber": { "type": "integer" },
       "subchannelnumber": { "type": "integer" },
-      "isrecording": { "type": "boolean" }
+      "isrecording": { "type": "boolean" },
+      "hasarchive": { "type": "boolean" }
     }
   },
   "PVR.Details.ChannelGroup": {
@@ -1094,7 +1126,8 @@
       "enum": [ "title", "plot", "plotoutline", "genre", "playcount",
                 "resume", "channel", "starttime","endtime", "runtime",
                 "lifetime", "icon", "art", "streamurl", "file",
-                "directory", "radio", "isdeleted", "epgeventid", "channeluid" ]
+                "directory", "radio", "isdeleted", "epgeventid", "channeluid",
+                "season", "episode", "showtitle" ]
     }
   },
   "PVR.Details.Recording": {
@@ -1120,7 +1153,10 @@
       "radio": { "type": "boolean" },
       "isdeleted": { "type": "boolean" },
       "epgeventid": { "type": "integer" },
-      "channeluid": { "type": "integer" }
+      "channeluid": { "type": "integer" },
+      "season": { "type": "integer" },
+      "episode": { "type": "integer" },
+      "showtitle": { "type": "string" }
     }
   },
   "Textures.Details.Size": {
@@ -1453,7 +1489,9 @@
       "displaycomposer": { "type": "string"},
       "displayconductor": { "type": "string"},
       "displayorchestra": { "type": "string"},
-      "displaylyricist": { "type": "string"}
+      "displaylyricist": { "type": "string"},
+      "mediapath": { "type": "string", "description": "Media source path that identifies the item"},
+      "dynpath": { "type": "string", "description": "An experimental property for debug purposes, often same as mediapath but when different gives the actual file playing that should also be in file property"}
     }
   },
   "List.Fields.All": {
@@ -1474,7 +1512,7 @@
                 "locked", "channelnumber", "starttime", "endtime", "specialsortseason",
                 "specialsortepisode", "compilation", "releasetype", "albumreleasetype",
                 "contributors", "displaycomposer", "displayconductor", "displayorchestra", "displaylyricist",
-                "userrating", "votes", "sortartist", "musicbrainzreleasegroupid"]
+                "userrating", "votes", "sortartist", "musicbrainzreleasegroupid", "mediapath", "dynpath"]
     }
   },
   "List.Item.All": {

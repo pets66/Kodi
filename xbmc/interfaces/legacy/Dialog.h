@@ -1,4 +1,4 @@
- /*
+/*
  *  Copyright (C) 2005-2018 Team Kodi
  *  This file is part of Kodi - https://kodi.tv
  *
@@ -8,15 +8,15 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "AddonClass.h"
 #include "AddonString.h"
 #include "Alternative.h"
 #include "ListItem.h"
-#include "dialogs/GUIDialogProgress.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
+#include "dialogs/GUIDialogProgress.h"
+
+#include <string>
+#include <vector>
 
 #define INPUT_ALPHANUM        0
 #define INPUT_NUMERIC         1
@@ -762,8 +762,7 @@ namespace XBMCAddon
       void deallocating() override;
 
     public:
-
-      DialogBusy() {}
+      DialogBusy() = default;
       ~DialogBusy() override;
 
 #ifdef DOXYGEN_SHOULD_USE_THIS

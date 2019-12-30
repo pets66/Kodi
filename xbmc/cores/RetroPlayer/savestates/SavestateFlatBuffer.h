@@ -10,9 +10,9 @@
 
 #include "ISavestate.h"
 
-#include <flatbuffers/flatbuffers.h>
-
 #include <memory>
+
+#include <flatbuffers/flatbuffers.h>
 
 namespace flatbuffers
 {
@@ -30,7 +30,7 @@ namespace RETRO
   {
   public:
     CSavestateFlatBuffer();
-    ~CSavestateFlatBuffer();
+    ~CSavestateFlatBuffer() override;
 
     // Implementation of ISavestate
     void Reset() override;

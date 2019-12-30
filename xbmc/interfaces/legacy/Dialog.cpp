@@ -31,7 +31,7 @@
 #include "Dialog.h"
 #include "ListItem.h"
 #ifdef TARGET_POSIX
-#include "platform/linux/XTimeUtils.h"
+#include "platform/posix/XTimeUtils.h"
 #endif
 
 using namespace KODI::MESSAGING;
@@ -173,7 +173,10 @@ namespace XBMCAddon
                     const String& line3)
     {
       DelayedCallGuard dcguard(languageHook);
-      return HELPERS::ShowOKDialogLines(CVariant{heading}, CVariant{line1}, CVariant{line2}, CVariant{line3});
+      if (line2.empty() && line3.empty())
+        return HELPERS::ShowOKDialogText(CVariant{heading}, CVariant{line1});
+      else
+        return HELPERS::ShowOKDialogLines(CVariant{heading}, CVariant{line1}, CVariant{line2}, CVariant{line3});
     }
 
     void Dialog::textviewer(const String& heading, const String& text, bool usemono)
@@ -218,14 +221,14 @@ namespace XBMCAddon
       VECSOURCES localShares;
       if (!shares)
       {
-        g_mediaManager.GetLocalDrives(localShares);
+        CServiceBroker::GetMediaManager().GetLocalDrives(localShares);
         if (strcmpi(s_shares.c_str(), "local") != 0)
-          g_mediaManager.GetNetworkLocations(localShares);
+          CServiceBroker::GetMediaManager().GetNetworkLocations(localShares);
       }
       else // always append local drives
       {
         localShares = *shares;
-        g_mediaManager.GetLocalDrives(localShares);
+        CServiceBroker::GetMediaManager().GetLocalDrives(localShares);
       }
 
       if (useFileDirectories && !maskparam.empty())
@@ -253,14 +256,14 @@ namespace XBMCAddon
       VECSOURCES localShares;
       if (!shares)
       {
-        g_mediaManager.GetLocalDrives(localShares);
+        CServiceBroker::GetMediaManager().GetLocalDrives(localShares);
         if (strcmpi(s_shares.c_str(), "local") != 0)
-          g_mediaManager.GetNetworkLocations(localShares);
+          CServiceBroker::GetMediaManager().GetNetworkLocations(localShares);
       }
       else // always append local drives
       {
         localShares = *shares;
-        g_mediaManager.GetLocalDrives(localShares);
+        CServiceBroker::GetMediaManager().GetLocalDrives(localShares);
       }
 
       if (useFileDirectories && !lmask.empty())

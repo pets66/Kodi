@@ -8,21 +8,19 @@
 
 #pragma once
 
-#include <vector>
-
-#include "ListItem.h"
-#include "PlayList.h"
-#include "InfoTagVideo.h"
-#include "Exception.h"
+#include "AddonCallback.h"
 #include "AddonString.h"
+#include "Alternative.h"
+#include "Exception.h"
 #include "InfoTagMusic.h"
 #include "InfoTagRadioRDS.h"
-#include "AddonCallback.h"
-#include "Alternative.h"
-
+#include "InfoTagVideo.h"
+#include "ListItem.h"
+#include "PlayList.h"
+#include "cores/IPlayerCallback.h"
 #include "swighelper.h"
 
-#include "cores/IPlayerCallback.h"
+#include <vector>
 
 namespace XBMCAddon
 {
@@ -792,18 +790,18 @@ namespace XBMCAddon
 #endif
 
 #if !defined SWIG && !defined DOXYGEN_SHOULD_SKIP_THIS
-      SWIGHIDDENVIRTUAL void OnPlayBackStarted(const CFileItem &file) override;
-      SWIGHIDDENVIRTUAL void OnAVStarted(const CFileItem &file) override;
-      SWIGHIDDENVIRTUAL void OnAVChange() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackEnded() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackStopped() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackError() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackPaused() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackResumed() override;
-      SWIGHIDDENVIRTUAL void OnQueueNextItem() override;
-      SWIGHIDDENVIRTUAL void OnPlayBackSpeedChanged(int iSpeed) override;
-      SWIGHIDDENVIRTUAL void OnPlayBackSeek(int64_t iTime, int64_t seekOffset) override;
-      SWIGHIDDENVIRTUAL void OnPlayBackSeekChapter(int iChapter) override;
+      void OnPlayBackStarted(const CFileItem& file) override;
+      void OnAVStarted(const CFileItem& file) override;
+      void OnAVChange() override;
+      void OnPlayBackEnded() override;
+      void OnPlayBackStopped() override;
+      void OnPlayBackError() override;
+      void OnPlayBackPaused() override;
+      void OnPlayBackResumed() override;
+      void OnQueueNextItem() override;
+      void OnPlayBackSpeedChanged(int iSpeed) override;
+      void OnPlayBackSeek(int64_t iTime, int64_t seekOffset) override;
+      void OnPlayBackSeekChapter(int iChapter) override;
 #endif
 
     protected:

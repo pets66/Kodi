@@ -7,6 +7,7 @@
  */
 
 #include "GameClientInput.h"
+
 #include "GameClientController.h"
 #include "GameClientHardware.h"
 #include "GameClientJoystick.h"
@@ -14,18 +15,18 @@
 #include "GameClientMouse.h"
 #include "GameClientPort.h"
 #include "GameClientTopology.h"
-#include "addons/kodi-addon-dev-kit/include/kodi/kodi_game_types.h"
+#include "ServiceBroker.h"
+#include "addons/kodi-addon-dev-kit/include/kodi/addon-instance/Game.h"
+#include "games/GameServices.h"
 #include "games/addons/GameClient.h"
 #include "games/addons/GameClientCallbacks.h"
 #include "games/controllers/Controller.h"
 #include "games/controllers/ControllerTopology.h"
-#include "games/GameServices.h"
 #include "input/joysticks/JoystickTypes.h"
 #include "peripherals/EventLockHandle.h"
 #include "peripherals/Peripherals.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
-#include "ServiceBroker.h"
 
 #include <algorithm>
 
@@ -140,7 +141,7 @@ bool CGameClientInput::HasFeature(const std::string &controllerId, const std::st
 
   try
   {
-    bHasFeature = m_struct.toAddon.HasFeature(controllerId.c_str(), featureName.c_str());
+    bHasFeature = m_struct.toAddon.HasFeature(&m_struct, controllerId.c_str(), featureName.c_str());
   }
   catch (...)
   {
@@ -167,7 +168,7 @@ bool CGameClientInput::InputEvent(const game_input_event &event)
 
   try
   {
-    bHandled = m_struct.toAddon.InputEvent(&event);
+    bHandled = m_struct.toAddon.InputEvent(&m_struct, &event);
   }
   catch (...)
   {
@@ -183,7 +184,10 @@ void CGameClientInput::LoadTopology()
 
   if (m_gameClient.Initialized())
   {
-    try { topologyStruct = m_struct.toAddon.GetTopology(); }
+    try
+    {
+      topologyStruct = m_struct.toAddon.GetTopology(&m_struct);
+    }
     catch (...) { m_gameClient.LogException("GetTopology()"); }
   }
 
@@ -203,7 +207,10 @@ void CGameClientInput::LoadTopology()
 
     playerLimit = topologyStruct->player_limit;
 
-    try { m_struct.toAddon.FreeTopology(topologyStruct); }
+    try
+    {
+      m_struct.toAddon.FreeTopology(&m_struct, topologyStruct);
+    }
     catch (...) { m_gameClient.LogException("FreeTopology()"); }
   }
 
@@ -243,7 +250,8 @@ void CGameClientInput::SetControllerLayouts(const ControllerVector &controllers)
 
   try
   {
-    m_struct.toAddon.SetControllerLayouts(controllerStructs.data(), static_cast<unsigned int>(controllerStructs.size()));
+    m_struct.toAddon.SetControllerLayouts(&m_struct, controllerStructs.data(),
+                                          static_cast<unsigned int>(controllerStructs.size()));
   }
   catch (...)
   {
@@ -327,7 +335,7 @@ bool CGameClientInput::OpenKeyboard(const ControllerPtr &controller)
     {
       try
       {
-        bSuccess = m_struct.toAddon.EnableKeyboard(true, controller->ID().c_str());
+        bSuccess = m_struct.toAddon.EnableKeyboard(&m_struct, true, controller->ID().c_str());
       }
       catch (...)
       {
@@ -356,7 +364,7 @@ void CGameClientInput::CloseKeyboard()
     {
       try
       {
-        m_struct.toAddon.EnableKeyboard(false, nullptr);
+        m_struct.toAddon.EnableKeyboard(&m_struct, false, "");
       }
       catch (...)
       {
@@ -391,7 +399,7 @@ bool CGameClientInput::OpenMouse(const ControllerPtr &controller)
     {
       try
       {
-        bSuccess = m_struct.toAddon.EnableMouse(true, controller->ID().c_str());
+        bSuccess = m_struct.toAddon.EnableMouse(&m_struct, true, controller->ID().c_str());
       }
       catch (...)
       {
@@ -420,7 +428,7 @@ void CGameClientInput::CloseMouse()
     {
       try
       {
-        m_struct.toAddon.EnableMouse(false, nullptr);
+        m_struct.toAddon.EnableMouse(&m_struct, false, "");
       }
       catch (...)
       {
@@ -459,7 +467,8 @@ bool CGameClientInput::OpenJoystick(const std::string &portAddress, const Contro
     {
       try
       {
-        bSuccess = m_struct.toAddon.ConnectController(true, portAddress.c_str(), controller->ID().c_str());
+        bSuccess = m_struct.toAddon.ConnectController(&m_struct, true, portAddress.c_str(),
+                                                      controller->ID().c_str());
       }
       catch (...)
       {
@@ -503,7 +512,7 @@ void CGameClientInput::CloseJoystick(const std::string &portAddress)
     {
       try
       {
-        m_struct.toAddon.ConnectController(false, portAddress.c_str(), nullptr);
+        m_struct.toAddon.ConnectController(&m_struct, false, portAddress.c_str(), "");
       }
       catch (...)
       {
@@ -630,6 +639,19 @@ CGameClientInput::PortMap CGameClientInput::MapJoysticks(const PERIPHERALS::Peri
 
   //! @todo Preserve existing joystick ports
 
+  // Sort by order of last button press
+  PERIPHERALS::PeripheralVector sortedJoysticks = peripheralJoysticks;
+  std::sort(sortedJoysticks.begin(), sortedJoysticks.end(),
+    [](const PERIPHERALS::PeripheralPtr &lhs, const PERIPHERALS::PeripheralPtr &rhs)
+    {
+      if (lhs->LastActive().IsValid() && !rhs->LastActive().IsValid())
+        return true;
+      if (!lhs->LastActive().IsValid() && rhs->LastActive().IsValid())
+        return false;
+
+      return lhs->LastActive() > rhs->LastActive();
+    });
+
   unsigned int i = 0;
   for (const auto &it : gameClientjoysticks)
   {
@@ -642,7 +664,7 @@ CGameClientInput::PortMap CGameClientInput::MapJoysticks(const PERIPHERALS::Peri
       break;
 
     // Dereference iterators
-    const PERIPHERALS::PeripheralPtr &peripheralJoystick = peripheralJoysticks[i++];
+    const PERIPHERALS::PeripheralPtr &peripheralJoystick = sortedJoysticks[i++];
     const std::unique_ptr<CGameClientJoystick> &gameClientJoystick = it.second;
 
     // Map input provider to input handler

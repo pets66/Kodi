@@ -6,15 +6,16 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <sstream>
-
 #include "DatabaseUtils.h"
+
 #include "dbwrappers/dataset.h"
 #include "music/MusicDatabase.h"
-#include "utils/log.h"
-#include "utils/Variant.h"
 #include "utils/StringUtils.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
 #include "video/VideoDatabase.h"
+
+#include <sstream>
 
 MediaType DatabaseUtils::MediaTypeFromVideoContentType(int videoContentType)
 {
@@ -68,6 +69,8 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldDateAdded) return "albumview.dateAdded";
     else if (field == FieldPlaycount) return "albumview.iTimesPlayed";
     else if (field == FieldLastPlayed) return "albumview.lastPlayed";
+    else if (field == FieldTotalDiscs)
+      return "albumview.iDiscTotal";
   }
   else if (mediaType == MediaTypeSong)
   {
@@ -91,6 +94,8 @@ std::string DatabaseUtils::GetField(Field field, const MediaType &mediaType, Dat
     else if (field == FieldArtist || field == FieldAlbumArtist) return "songview.strArtists";
     else if (field == FieldGenre) return "songview.strGenre";
     else if (field == FieldDateAdded) return "songview.dateAdded";
+    else if (field == FieldDiscTitle)
+      return "songview.strDiscSubtitle";
   }
   else if (mediaType == MediaTypeArtist)
   {
@@ -491,6 +496,8 @@ int DatabaseUtils::GetField(Field field, const MediaType &mediaType, bool asInde
     else if (field == FieldPlaycount) return CMusicDatabase::album_iTimesPlayed;
     else if (field == FieldLastPlayed) return CMusicDatabase::album_dtLastPlayed;
     else if (field == FieldDateAdded) return CMusicDatabase::album_dtDateAdded;
+    else if (field == FieldTotalDiscs)
+      return CMusicDatabase::album_iTotalDiscs;
   }
   else if (mediaType == MediaTypeSong)
   {

@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include <androidjni/JNIBase.h>
-
 #include "filesystem/File.h"
 
 #include <memory>
+
+#include <androidjni/JNIBase.h>
 
 namespace jni
 {
@@ -22,7 +22,7 @@ namespace jni
   public:
     CJNIXBMCFile();
     CJNIXBMCFile(const jni::jhobject &object) : CJNIBase(object) {}
-    virtual ~CJNIXBMCFile() {}
+    ~CJNIXBMCFile() override = default;
 
     static void RegisterNatives(JNIEnv* env);
 

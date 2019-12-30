@@ -18,18 +18,20 @@
  * not required.
  */
 
+#include "VideoPlayerRadioRDS.h"
+
 #include "Application.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
-#include "DVDStreamInfo.h"
-#include "GUIInfoManager.h"
-#include "GUIUserMessages.h"
-#include "ServiceBroker.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "DVDDemuxers/DVDDemuxUtils.h"
 #include "DVDDemuxers/DVDFactoryDemuxer.h"
 #include "DVDInputStreams/DVDInputStream.h"
+#include "DVDStreamInfo.h"
+#include "GUIInfoManager.h"
+#include "GUIUserMessages.h"
+#include "ServiceBroker.h"
 #include "cores/FFmpeg.h"
+#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
@@ -45,8 +47,6 @@
 #include "utils/CharsetConverter.h"
 #include "utils/StringUtils.h"
 #include "utils/log.h"
-
-#include "VideoPlayerRadioRDS.h"
 
 using namespace XFILE;
 using namespace PVR;
@@ -783,7 +783,7 @@ void CDVDRadioRDSData::ProcessUECP(const unsigned char *data, unsigned int len)
       else
       {
         //! crc16-check
-        unsigned short crc16 = crc16_ccitt(m_UECPData, m_UECPDataIndex-3, 1);
+        unsigned short crc16 = crc16_ccitt(m_UECPData, m_UECPDataIndex-3, true);
         if (crc16 != (m_UECPData[m_UECPDataIndex-2]<<8) + m_UECPData[m_UECPDataIndex-1])
         {
           CLog::Log(LOGERROR, "Radio UECP (RDS) Processor - Error(TS): wrong CRC # calc = %04x <> transmit = %02x%02x",
@@ -931,7 +931,7 @@ unsigned int CDVDRadioRDSData::DecodeTA_TP(uint8_t *msgElement)
   {
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Warning, g_localizeStrings.Get(19021), g_localizeStrings.Get(29930));
     m_TA_TP_TrafficAdvisory = true;
-    m_TA_TP_TrafficVolume = g_application.GetVolume();
+    m_TA_TP_TrafficVolume = g_application.GetVolumePercent();
     float trafAdvVol = (float)CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt("pvrplayback.trafficadvisoryvolume");
     if (trafAdvVol)
       g_application.SetVolume(m_TA_TP_TrafficVolume+trafAdvVol);

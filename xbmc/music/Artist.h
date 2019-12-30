@@ -8,15 +8,15 @@
 
 #pragma once
 
+#include "XBDateTime.h"
+#include "utils/Fanart.h"
+#include "utils/ScraperUrl.h"
+#include "utils/StringUtils.h"
+
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "utils/StringUtils.h"
-#include "utils/Fanart.h"
-#include "utils/ScraperUrl.h"
-#include "XBDateTime.h"
 
 class TiXmlNode;
 class CAlbum;
@@ -159,6 +159,7 @@ typedef std::vector<CArtistCredit> VECARTISTCREDITS;
 const std::string BLANKARTIST_FAKEMUSICBRAINZID = "Artist Tag Missing";
 const std::string BLANKARTIST_NAME = "[Missing Tag]";
 const long BLANKARTIST_ID = 1;
+const std::string VARIOUSARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
 
 #define ROLE_ARTIST 1  //Default role
 

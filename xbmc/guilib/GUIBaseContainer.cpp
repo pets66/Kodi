@@ -7,23 +7,24 @@
  */
 
 #include "GUIBaseContainer.h"
+
+#include "FileItem.h"
+#include "GUIInfoManager.h"
 #include "GUIListItemLayout.h"
 #include "GUIMessage.h"
 #include "ServiceBroker.h"
-#include "utils/CharsetConverter.h"
-#include "GUIInfoManager.h"
-#include "utils/TimeUtils.h"
-#include "utils/log.h"
-#include "utils/SortUtils.h"
-#include "utils/StringUtils.h"
-#include "FileItem.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "input/Key.h"
-#include "utils/MathUtils.h"
-#include "utils/XBMCTinyXML.h"
 #include "listproviders/IListProvider.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
+#include "utils/CharsetConverter.h"
+#include "utils/MathUtils.h"
+#include "utils/SortUtils.h"
+#include "utils/StringUtils.h"
+#include "utils/TimeUtils.h"
+#include "utils/XBMCTinyXML.h"
+#include "utils/log.h"
 
 #define HOLD_TIME_START 100
 #define HOLD_TIME_END   3000
@@ -58,6 +59,10 @@ CGUIBaseContainer::CGUIBaseContainer(const CGUIBaseContainer &) = default;
 
 CGUIBaseContainer::~CGUIBaseContainer(void)
 {
+  // release the container from items
+  for (auto item : m_items)
+    item->FreeMemory();
+
   delete m_listProvider;
 }
 
@@ -121,6 +126,8 @@ void CGUIBaseContainer::Process(unsigned int currentTime, CDirtyRegionList &dirt
     if (itemNo >= 0)
     {
       CGUIListItemPtr item = m_items[itemNo];
+      item->SetCurrentItem(itemNo + 1);
+
       // render our item
       if (m_orientation == VERTICAL)
         ProcessItem(origin.x, pos, item, focused, currentTime, dirtyregions);
@@ -823,7 +830,7 @@ void CGUIBaseContainer::SetFocus(bool bOnOff)
 void CGUIBaseContainer::SaveStates(std::vector<CControlState> &states)
 {
   if (!m_listProvider || !m_listProvider->AlwaysFocusDefaultItem())
-    states.push_back(CControlState(GetID(), GetSelectedItem()));
+    states.emplace_back(GetID(), GetSelectedItem());
 }
 
 void CGUIBaseContainer::SetPageControl(int id)
@@ -1019,7 +1026,7 @@ void CGUIBaseContainer::UpdateScrollByLetter()
     if (currentMatch != nextLetter)
     {
       currentMatch = nextLetter;
-      m_letterOffsets.push_back(make_pair((int)i, currentMatch));
+      m_letterOffsets.emplace_back(static_cast<int>(i), currentMatch);
     }
   }
 }

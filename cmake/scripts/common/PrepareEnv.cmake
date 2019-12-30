@@ -24,14 +24,6 @@ if(NOT EXISTS "${APP_INCLUDE_DIR}/")
   file(MAKE_DIRECTORY ${APP_INCLUDE_DIR})
 endif()
 
-# make sure C++11 is always set
-if(NOT WIN32)
-  string(REGEX MATCH "-std=(gnu|c)\\+\\+11" cxx11flag "${CMAKE_CXX_FLAGS}")
-  if(NOT cxx11flag)
-    set(CXX11_SWITCH "-std=c++11")
-  endif()
-endif()
-
 if(NOT CORE_SYSTEM_NAME)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CORE_SYSTEM_NAME "osx")
@@ -41,6 +33,14 @@ if(NOT CORE_SYSTEM_NAME)
 endif()
 
 set(PLATFORM_TAG ${CORE_SYSTEM_NAME})
+
+# The CPU variable is given either by ./tools/depends or by the
+# ./cmake/scripts/common/ArchSetup.cmake (which refers to the Kodi building
+# itself). However, this file is only used by addons, so CPU can not always
+# be defined, so in this case, if empty, the base CPU will be used.
+if(NOT CPU)
+  set(CPU ${CMAKE_SYSTEM_PROCESSOR})
+endif()
 
 if(CORE_SYSTEM_NAME STREQUAL android)
   if (CPU MATCHES "v7a")
@@ -52,7 +52,8 @@ if(CORE_SYSTEM_NAME STREQUAL android)
   else()
     message(FATAL_ERROR "Unsupported architecture")
   endif()
-elseif(CORE_SYSTEM_NAME STREQUAL ios)
+elseif(CORE_SYSTEM_NAME STREQUAL darwin_embedded)
+  set(PLATFORM_TAG ${CORE_PLATFORM_NAME})
   if (CPU MATCHES armv7)
     set(PLATFORM_TAG ${PLATFORM_TAG}-armv7)
   elseif (CPU MATCHES arm64)

@@ -7,9 +7,10 @@
  */
 
 #include "MusicInfoTagLoaderFFmpeg.h"
+
 #include "MusicInfoTag.h"
-#include "filesystem/File.h"
 #include "cores/FFmpeg.h"
+#include "filesystem/File.h"
 #include "utils/StringUtils.h"
 
 using namespace MUSIC_INFO;
@@ -134,6 +135,8 @@ bool CMusicInfoTagLoaderFFmpeg::Load(const std::string& strFileName, CMusicInfoT
                                      strcasecmp(avtag->key, "TSOP") == 0) {}
                             else if (strcasecmp(avtag->key, "TSO2") == 0) {}  // Album artist sort
                             else if (strcasecmp(avtag->key, "TSOC") == 0) {}  // composer sort
+                            else if (strcasecmp(avtag->key, "TSST") == 0)
+                              tag.SetDiscSubtitle(avtag->value);
                           };
 
   AVDictionaryEntry* avtag=nullptr;

@@ -8,36 +8,28 @@
 
 #include "ButtonTranslator.h"
 
-#include <algorithm>
-#include <utility>
-
 #include "AppTranslator.h"
 #include "CustomControllerTranslator.h"
+#include "FileItem.h"
 #include "GamepadTranslator.h"
-#include "IRTranslator.h"
 #include "IButtonMapper.h"
+#include "IRTranslator.h"
 #include "Key.h"
 #include "KeyboardTranslator.h"
+#include "Util.h"
 #include "WindowTranslator.h"
 #include "filesystem/Directory.h"
 #include "guilib/WindowIDs.h"
 #include "input/actions/ActionIDs.h"
 #include "input/actions/ActionTranslator.h"
 #include "input/mouse/MouseTranslator.h"
-#include "utils/log.h"
 #include "utils/XBMCTinyXML.h"
-#include "FileItem.h"
-#include "Util.h"
+#include "utils/log.h"
+
+#include <algorithm>
+#include <utility>
 
 using namespace KODI;
-
-CButtonTranslator::CButtonTranslator()
-{
-}
-
-CButtonTranslator::~CButtonTranslator()
-{
-}
 
 // Add the supplied device name to the list of connected devices
 bool CButtonTranslator::AddDevice(const std::string& strDevice)
@@ -100,7 +92,6 @@ bool CButtonTranslator::Load()
       }
 
       // Load mappings for any HID devices we have connected
-      std::list<std::string>::iterator it;
       for (const auto& device : m_deviceList)
       {
         std::string devicedir = dir;

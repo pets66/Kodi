@@ -37,7 +37,7 @@ namespace dbiplus
 #include <string>
 
 // return codes of Cleaning up the Database
-// numbers are strings from strings.xml
+// numbers are strings from strings.po
 #define ERROR_OK     317
 #define ERROR_CANCEL    0
 #define ERROR_DATABASE    315
@@ -128,6 +128,7 @@ public:
    \param iTrack [in] the track number and disc number of the song
    \param iDuration [in] the duration of the song
    \param iYear [in] the year of the song
+  \param strDiscSubtitle [in] subtitle of a disc
    \param iTimesPlayed [in] the number of times the song has been played
    \param iStartOffset [in] the start offset of the song (when using a single audio file with a .cue)
    \param iEndOffset [in] the end offset of the song (when using a single audio file with .cue)
@@ -148,6 +149,7 @@ public:
               const std::string &artistDisp, const std::string &artistSort,
               const std::vector<std::string>& genres,
               int iTrack, int iDuration, int iYear,
+              std::string& strDiscSubtitle,
               const int iTimesPlayed, int iStartOffset, int iEndOffset,
               const CDateTime& dtLastPlayed, float rating, int userrating, int votes,
               const ReplayGain& replayGain);
@@ -174,6 +176,7 @@ public:
    \param iTrack [in] the track number and disc number of the song
    \param iDuration [in] the duration of the song
    \param iYear [in] the year of the song
+   \param strDiscSubtitle [in] subtitle of a disc
    \param iTimesPlayed [in] the number of times the song has been played
    \param iStartOffset [in] the start offset of the song (when using a single audio file with a .cue)
    \param iEndOffset [in] the end offset of the song (when using a single audio file with .cue)
@@ -191,6 +194,7 @@ public:
                  const std::string &artistDisp, const std::string &artistSort,
                  const std::vector<std::string>& genres,
                  int iTrack, int iDuration, int iYear,
+                 const std::string& strDiscSubtitle,
                  int iTimesPlayed, int iStartOffset, int iEndOffset,
                  const CDateTime& dtLastPlayed, float rating, int userrating, int votes, const ReplayGain& replayGain);
 
@@ -227,6 +231,7 @@ public:
    \param strArtistSort the album artist name(s) sort string
    \param strGenre the album genre(s)
    \param year the year
+   \param bBoxedSet if the album is a boxset
    \param strRecordLabel the recording label
    \param strType album type (Musicbrainz release type e.g. "Broadcast, Soundtrack, live"),
    \param bCompilation if the album is a compilation
@@ -236,7 +241,7 @@ public:
   int  AddAlbum(const std::string& strAlbum, const std::string& strMusicBrainzAlbumID,
                 const std::string& strReleaseGroupMBID,
                 const std::string& strArtist, const std::string& strArtistSort,
-                const std::string& strGenre, int year,
+                const std::string& strGenre, int year, bool bBoxedSet,
                 const std::string& strRecordLabel, const std::string& strType,
                 bool bCompilation, CAlbum::ReleaseType releaseType);
 
@@ -256,7 +261,8 @@ public:
                    const std::string& strThemes, const std::string& strReview,
                    const std::string& strImage, const std::string& strLabel,
                    const std::string& strType,
-                   float fRating, int iUserrating, int iVotes, int iYear, bool bCompilation,
+                   float fRating, int iUserrating, int iVotes, int iYear, bool bBoxedSet,
+                   bool bCompilation,
                    CAlbum::ReleaseType releaseType,
                    bool bScrapedMBID);
   bool ClearAlbumLastScrapedTime(int idAlbum);
@@ -267,7 +273,7 @@ public:
   /////////////////////////////////////////////////
   bool AddAudioBook(const CFileItem& item);
   bool SetResumeBookmarkForAudioBook(const CFileItem& item, int bookmark);
-  bool GetResumeBookmarkForAudioBook(const std::string& path, int& bookmark);
+  bool GetResumeBookmarkForAudioBook(const CFileItem& item, int& bookmark);
 
   /*! \brief Checks if the given path is inside a folder that has already been scanned into the library
    \param path the path we want to check
@@ -281,7 +287,9 @@ public:
   int  GetAlbumByName(const std::string& strAlbum, const std::vector<std::string>& artist);
   int  GetAlbumByMatch(const CAlbum &album);
   std::string GetAlbumById(int id);
+  std::string GetAlbumDiscTitle(int idAlbum, int idDisc);
   bool SetAlbumUserrating(const int idAlbum, int userrating);
+  int GetAlbumDiscsCount(int idAlbum);
 
   /////////////////////////////////////////////////
   // Artist CRUD
@@ -290,7 +298,7 @@ public:
 
   int  AddArtist(const std::string& strArtist, const std::string& strMusicBrainzArtistID, const std::string& strSortName, bool bScrapedMBID = false);
   int  AddArtist(const std::string& strArtist, const std::string& strMusicBrainzArtistID, bool bScrapedMBID = false);
-  bool GetArtist(int idArtist, CArtist& artist, bool fetchAll = true);
+  bool GetArtist(int idArtist, CArtist& artist, bool fetchAll = false);
   bool GetArtistExists(int idArtist);
   int GetLastArtist();
   int  UpdateArtist(int idArtist,
@@ -354,6 +362,7 @@ public:
   int GetSourceFromPath(const std::string& strPath);
   bool AddAlbumSource(int idAlbum, int idSource);
   bool AddAlbumSources(int idAlbum,  const std::string& strPath);
+  bool DeleteAlbumSources(int idAlbum);
   bool GetSources(CFileItemList& items);
 
   bool GetSourcesByArtist(int idArtist, CFileItem* item);
@@ -414,9 +423,13 @@ public:
   /////////////////////////////////////////////////
   // Compilations
   /////////////////////////////////////////////////
-  bool GetCompilationAlbums(const std::string& strBaseDir, CFileItemList& items);
-  bool GetCompilationSongs(const std::string& strBaseDir, CFileItemList& items);
   int  GetCompilationAlbumsCount();
+
+  ////////////////////////////////////////////////
+  // Boxsets
+  ////////////////////////////////////////////////
+  bool IsAlbumBoxset(int idAlbum);
+  int GetBoxsetsCount();
 
   int GetSinglesCount();
 
@@ -442,17 +455,42 @@ public:
   bool GetAlbumTypesNav(const std::string &strBaseDir, CFileItemList &items, const Filter &filter = Filter(), bool countOnly = false);
   bool GetMusicLabelsNav(const std::string &strBaseDir, CFileItemList &items, const Filter &filter = Filter(), bool countOnly = false);
   bool GetAlbumsNav(const std::string& strBaseDir, CFileItemList& items, int idGenre = -1, int idArtist = -1, const Filter &filter = Filter(), const SortDescription &sortDescription = SortDescription(), bool countOnly = false);
-  bool GetAlbumsByYear(const std::string &strBaseDir, CFileItemList& items, int year);
+  bool GetDiscsNav(const std::string& strBaseDir,
+                   CFileItemList& items,
+                   int idAlbum,
+                   const Filter& filter = Filter(),
+                   const SortDescription& sortDescription = SortDescription(),
+                   bool countOnly = false);
+  bool GetAlbumsByYear(const std::string& strBaseDir, CFileItemList& items, int year);
   bool GetSongsNav(const std::string& strBaseDir, CFileItemList& items, int idGenre, int idArtist,int idAlbum, const SortDescription &sortDescription = SortDescription());
   bool GetSongsByYear(const std::string& baseDir, CFileItemList& items, int year);
   bool GetSongsByWhere(const std::string &baseDir, const Filter &filter, CFileItemList& items, const SortDescription &sortDescription = SortDescription());
   bool GetSongsFullByWhere(const std::string &baseDir, const Filter &filter, CFileItemList& items, const SortDescription &sortDescription = SortDescription(), bool artistData = false);
   bool GetAlbumsByWhere(const std::string &baseDir, const Filter &filter, CFileItemList &items, const SortDescription &sortDescription = SortDescription(), bool countOnly = false);
+  bool GetDiscsByWhere(const std::string& baseDir,
+                       const Filter& filter,
+                       CFileItemList& items,
+                       const SortDescription& sortDescription = SortDescription(),
+                       bool countOnly = false);
+  bool GetDiscsByWhere(CMusicDbUrl& musicUrl,
+                       const Filter& filter,
+                       CFileItemList& items,
+                       const SortDescription& sortDescription = SortDescription(),
+                       bool countOnly = false);
   bool GetArtistsByWhere(const std::string& strBaseDir, const Filter &filter, CFileItemList& items, const SortDescription &sortDescription = SortDescription(), bool countOnly = false);
-  bool GetRandomSong(CFileItem* item, int& idSong, const Filter &filter);
+  int GetDiscsCount(const std::string& baseDir, const Filter& filter = Filter());
   int GetSongsCount(const Filter &filter = Filter());
-  unsigned int GetSongIDs(const Filter &filter, std::vector<std::pair<int,int> > &songIDs);
   bool GetFilter(CDbUrl &musicUrl, Filter &filter, SortDescription &sorting) override;
+
+  /////////////////////////////////////////////////
+  // Party Mode
+  /////////////////////////////////////////////////
+  /*! \brief Gets song IDs in random order that match the filter criteria
+  \param filter the criteria to apply in the query
+  \param songIDs a vector of <1, id> pairs suited to party mode use
+  \return count of song ids found.
+  */
+  unsigned int GetRandomSongIDs(const Filter &filter, std::vector<std::pair<int, int> > &songIDs);
 
   /////////////////////////////////////////////////
   // JSON-RPC 
@@ -488,8 +526,10 @@ public:
   /////////////////////////////////////////////////
   // XML
   /////////////////////////////////////////////////
-  void ExportToXML(const CLibExportSettings& settings, CGUIDialogProgress* progressDialog = NULL);
-  void ImportFromXML(const std::string &xmlFile);
+  void ExportToXML(const CLibExportSettings& settings, CGUIDialogProgress* progressDialog = nullptr);
+  bool ExportSongHistory(TiXmlNode* pNode, CGUIDialogProgress* progressDialog = nullptr);
+  void ImportFromXML(const std::string& xmlFile, CGUIDialogProgress* progressDialog = nullptr);
+  bool ImportSongHistory(const std::string& xmlFile, const int total, CGUIDialogProgress* progressDialog = nullptr);
 
   /////////////////////////////////////////////////
   // Properties
@@ -586,6 +626,14 @@ public:
   \return true if art is found, false if no art is found.
   */
   bool GetArtTypes(const MediaType &mediaType, std::vector<std::string> &artTypes);
+
+  /*! \brief Fetch the distinct types of available-but-unassigned art held in the
+  database for a specific media item.
+  \param mediaId the id in the media (artist/album) table.
+  \param mediaType the type of media, which corresponds to the table the item resides in (artist/album).
+  \return the types of art e.g. "thumb", "fanart", etc.
+  */
+  std::vector<std::string> GetAvailableArtTypesForItem(int mediaId, const MediaType& mediaType);
 
   /////////////////////////////////////////////////
   // Tag Scan Version
@@ -714,6 +762,7 @@ private:
     song_iTrack,
     song_iDuration,
     song_iYear,
+    song_strDiscSubtitle,
     song_strFileName,
     song_strMusicBrainzTrackID,
     song_iTimesPlayed,
@@ -728,6 +777,7 @@ private:
     song_strAlbum,
     song_strPath,
     song_bCompilation,
+    song_bBoxedSet,
     song_strAlbumArtists,
     song_strAlbumArtistSort,
     song_strAlbumReleaseType,
@@ -749,6 +799,7 @@ private:
     album_strArtistSort,
     album_strGenres,
     album_iYear,
+    album_bBoxedSet,
     album_strMoods,
     album_strStyles,
     album_strThemes,
@@ -764,6 +815,7 @@ private:
     album_lastScraped,
     album_iTimesPlayed,
     album_strReleaseType,
+    album_iTotalDiscs,
     album_dtDateAdded,
     album_dtLastPlayed,
     album_enumCount // end of the enum, do not add past here

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "utils/EGLUtils.h"
 #include "WinSystemWayland.h"
+#include "utils/EGLUtils.h"
 
 #include <wayland-egl.hpp>
 
@@ -24,7 +24,7 @@ class CWinSystemWaylandEGLContext : public CWinSystemWayland
 {
 public:
   CWinSystemWaylandEGLContext();
-  virtual ~CWinSystemWaylandEGLContext() = default;
+  ~CWinSystemWaylandEGLContext() override = default;
 
   bool CreateNewWindow(const std::string& name,
                        bool fullScreen,

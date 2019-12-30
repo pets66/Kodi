@@ -333,7 +333,7 @@ static int PlayerControl(const std::vector<std::string>& params)
   else if (StringUtils::StartsWithNoCase(params[0], "resumelivetv"))
   {
     CFileItem& fileItem(g_application.CurrentFileItem());
-    PVR::CPVRChannelPtr channel = fileItem.HasPVRRecordingInfoTag() ? fileItem.GetPVRRecordingInfoTag()->Channel() : PVR::CPVRChannelPtr();
+    std::shared_ptr<PVR::CPVRChannel> channel = fileItem.HasPVRRecordingInfoTag() ? fileItem.GetPVRRecordingInfoTag()->Channel() : std::shared_ptr<PVR::CPVRChannel>();
 
     if (channel)
     {
@@ -363,7 +363,7 @@ static int PlayDVD(const std::vector<std::string>& params)
   bool restart = false;
   if (!params.empty() && StringUtils::EqualsNoCase(params[0], "restart"))
     restart = true;
-  MEDIA_DETECT::CAutorun::PlayDisc(g_mediaManager.GetDiscPath(), true, restart);
+  MEDIA_DETECT::CAutorun::PlayDisc(CServiceBroker::GetMediaManager().GetDiscPath(), true, restart);
 #endif
 
   return 0;
@@ -429,11 +429,14 @@ static int PlayMedia(const std::vector<std::string>& params)
     if ( CGUIWindowVideoBase::ShowResumeMenu(item) == false )
       return false;
   }
-  if (item.m_bIsFolder || item.IsPlayList() || item.IsSmartPlayList())
+  if (item.m_bIsFolder || item.IsPlayList())
   {
     CFileItemList items;
     std::string extensions = CServiceBroker::GetFileExtensionProvider().GetVideoExtensions() + "|" + CServiceBroker::GetFileExtensionProvider().GetMusicExtensions();
-    XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
+    if (item.IsPlayList())
+      CUtil::GetRecursiveListing(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
+    else
+      XFILE::CDirectory::GetDirectory(item.GetPath(), items, extensions, XFILE::DIR_FLAG_DEFAULTS);
 
     if (!items.IsEmpty()) // fall through on non expandable playlist
     {
@@ -449,7 +452,7 @@ static int PlayMedia(const std::vector<std::string>& params)
       }
 
       std::unique_ptr<CGUIViewState> state(CGUIViewState::GetViewState(containsVideo ? WINDOW_VIDEO_NAV : WINDOW_MUSIC_NAV, items));
-      if (state.get())
+      if (state)
         items.Sort(state->GetSortMethod());
       else
         items.Sort(SortByLabel, SortOrderAscending);
@@ -471,7 +474,7 @@ static int PlayMedia(const std::vector<std::string>& params)
       return 0;
     }
   }
-  if (item.IsAudio() || item.IsVideo())
+  if ((item.IsAudio() || item.IsVideo()) && !item.IsSmartPlayList())
     CServiceBroker::GetPlaylistPlayer().Play(std::make_shared<CFileItem>(item), "");
   else
     g_application.PlayMedia(item, "", PLAYLIST_NONE);
@@ -527,7 +530,7 @@ static int Seek(const std::vector<std::string>& params)
 ///     <br>
 ///     | Control                 | Video playback behaviour               | Audio playback behaviour    | Added in    |
 ///     |:------------------------|:---------------------------------------|:----------------------------|:------------|
-///     | Play                    | Play/Pause                             | Play/Pause                  |             | 
+///     | Play                    | Play/Pause                             | Play/Pause                  |             |
 ///     | Stop                    | Stop                                   | Stop                        |             |
 ///     | Forward                 | Fast Forward                           | Fast Forward                |             |
 ///     | Rewind                  | Rewind                                 | Rewind                      |             |
@@ -551,9 +554,13 @@ static int Seek(const std::vector<std::string>& params)
 ///     | Partymode(video) **     | Toggles video partymode                | none                        |             |
 ///     | Partymode(path to .xsp) | Partymode for *.xsp-file               | Partymode for *.xsp-file    |             |
 ///     | ShowVideoMenu           | Shows the DVD/BR menu if available     | none                        |             |
+///     | FrameAdvance(n) ***     | Advance video by _n_ frames            | none                        | Kodi v18    |
 ///     <br>
 ///     '*' = For these controls\, the PlayerControl built-in function can make use of the 'notify'-parameter. For example: PlayerControl(random\, notify)
+///     <br>
 ///     '**' = If no argument is given for 'partymode'\, the control  will default to music.
+///     <br>
+///     '***' = This only works if the player is paused.
 ///     <br>
 ///     @param[in] control               Control to execute.
 ///     @param[in] param                 "notify" to notify user (optional\, certain controls).

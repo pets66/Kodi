@@ -9,7 +9,7 @@
 #pragma once
 
 extern "C" {
-#include "libavutil/pixfmt.h"
+#include <libavutil/pixfmt.h>
 }
 
 #include <memory>
@@ -24,7 +24,7 @@ namespace RETRO
   class IRenderBuffer
   {
   public:
-    virtual ~IRenderBuffer() { }
+    virtual ~IRenderBuffer() = default;
 
     // Pool functions
     virtual void Acquire() = 0;

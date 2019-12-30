@@ -7,15 +7,15 @@
  */
 
 #include "Addon.h"
-#include "LanguageHook.h"
 
+#include "GUIUserMessages.h"
+#include "LanguageHook.h"
 #include "ServiceBroker.h"
 #include "addons/AddonManager.h"
 #include "addons/settings/GUIDialogAddonSettings.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
-#include "GUIUserMessages.h"
 #include "utils/StringUtils.h"
 
 using namespace ADDON;
@@ -40,7 +40,7 @@ namespace XBMCAddon
 
       CGUIMessage message(GUI_MSG_SETTING_UPDATED, 0, 0);
       std::vector<std::string> params;
-      params.push_back(id);
+      params.emplace_back(id);
       params.push_back(value);
       message.SetStringParams(params);
       CServiceBroker::GetGUI()->GetWindowManager().SendThreadMessage(message, WINDOW_DIALOG_ADDON_SETTINGS);

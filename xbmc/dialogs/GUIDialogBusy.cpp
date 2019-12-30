@@ -7,12 +7,13 @@
  */
 
 #include "GUIDialogBusy.h"
+
 #include "ServiceBroker.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIProgressControl.h"
 #include "guilib/GUIWindowManager.h"
-#include "threads/Thread.h"
 #include "threads/IRunnable.h"
+#include "threads/Thread.h"
 
 #define PROGRESS_CONTROL 10
 
@@ -24,10 +25,7 @@ public:
   explicit CBusyWaiter(IRunnable *runnable) :
   CThread(runnable, "waiting"), m_done(new CEvent()),  m_runnable(runnable) { }
 
-  ~CBusyWaiter()
-  {
-    StopThread();
-  }
+  ~CBusyWaiter() override { StopThread(); }
 
   bool Wait(unsigned int displaytime, bool allowCancel)
   {

@@ -8,9 +8,12 @@
 
 #pragma once
 
+#include <assert.h> /* assert */
 #include <stdarg.h>     /* va_list, va_start, va_arg, va_end */
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -43,10 +46,25 @@
   #define ATTRIBUTE_HIDDEN
 #endif
 
+#ifdef _MSC_VER
+    #define ATTRIBUTE_FORCEINLINE __forceinline
+#elif defined(__GNUC__)
+    #define ATTRIBUTE_FORCEINLINE inline __attribute__((__always_inline__))
+#elif defined(__CLANG__)
+    #if __has_attribute(__always_inline__)
+        #define ATTRIBUTE_FORCEINLINE inline __attribute__((__always_inline__))
+    #else
+        #define ATTRIBUTE_FORCEINLINE inline
+    #endif
+#else
+    #define ATTRIBUTE_FORCEINLINE inline
+#endif
+
 #include "versions.h"
 
 namespace kodi { namespace addon { class CAddonBase; }}
 namespace kodi { namespace addon { class IAddonInstance; }}
+namespace kodi { namespace gui { struct IRenderHelper; }}
 
 extern "C" {
 
@@ -57,24 +75,28 @@ typedef void* KODI_HANDLE;
 
 //==============================================================================
 ///
+/// @ingroup cpp_kodi_addon_addonbase
+/// @brief Return value of functions in \ref kodi::addon::CAddonBase and
+/// associated classes
+///
 typedef enum ADDON_STATUS
 {
-  ///
+  /// For everything OK and no error
   ADDON_STATUS_OK,
 
-  ///
+  /// A needed connection was lost
   ADDON_STATUS_LOST_CONNECTION,
 
-  ///
+  /// Addon needs a restart inside Kodi
   ADDON_STATUS_NEED_RESTART,
 
-  ///
+  /// Necessary settings are not yet set
   ADDON_STATUS_NEED_SETTINGS,
 
-  ///
+  /// Unknown and incomprehensible error
   ADDON_STATUS_UNKNOWN,
 
-  /// permanent failure, like failing to resolve methods
+  /// Permanent failure, like failing to resolve methods
   ADDON_STATUS_PERMANENT_FAILURE,
 
   /* internal used return error if function becomes not used from child on
@@ -179,6 +201,7 @@ typedef struct KodiToAddonFuncTable_Addon
   ADDON_STATUS (*create_instance)(int instanceType, const char* instanceID, KODI_HANDLE instance, KODI_HANDLE* addonInstance, KODI_HANDLE parent);
   void (*destroy_instance)(int instanceType, KODI_HANDLE instance);
   ADDON_STATUS (*set_setting)(const char *settingName, const void *settingValue);
+  ADDON_STATUS(*create_instance_ex)(int instanceType, const char* instanceID, KODI_HANDLE instance, KODI_HANDLE* addonInstance, KODI_HANDLE parent, const char* version);
 } KodiToAddonFuncTable_Addon;
 
 /*
@@ -237,6 +260,11 @@ public:
     return ADDON_STATUS_NOT_IMPLEMENTED;
   }
 
+  virtual ADDON_STATUS CreateInstanceEx(int instanceType, std::string instanceID, KODI_HANDLE instance, KODI_HANDLE& addonInstance, const std::string &version)
+  {
+    return CreateInstance(instanceType, instanceID, instance, addonInstance);
+  }
+
   const ADDON_TYPE m_type;
 };
 } /* namespace addon */
@@ -267,6 +295,111 @@ private:
 //==============================================================================
 namespace kodi {
 namespace addon {
+
+/*
+ * Internally used helper class to manage processing of a "C" structure in "CPP"
+ * class.
+ *
+ * At constant, the "C" structure is copied, otherwise the given pointer is
+ * superseded and is changeable.
+ *
+ * -----------------------------------------------------------------------------
+ *
+ * Example:
+ *
+ * ~~~~~~~~~~~~~{.cpp}
+ * extern "C" typedef struct C_SAMPLE_DATA
+ * {
+ *   unsigned int iUniqueId;
+ * } C_SAMPLE_DATA;
+ *
+ * class CPPSampleData : public CStructHdl<CPPSampleData, C_SAMPLE_DATA>
+ * {
+ * public:
+ *   CPPSampleData() = default;
+ *   CPPSampleData(const CPPSampleData& sample) : CStructHdl(sample) { }
+ *   CPPSampleData(const C_SAMPLE_DATA* sample) : CStructHdl(sample) { }
+ *   CPPSampleData(C_SAMPLE_DATA* sample) : CStructHdl(sample) { }
+ *
+ *   void SetUniqueId(unsigned int uniqueId) { m_cStructure->iUniqueId = uniqueId; }
+ *   unsigned int GetUniqueId() const { return m_cStructure->iUniqueId; }
+ * };
+ *
+ * ~~~~~~~~~~~~~
+ *
+ * It also works with the following example:
+ *
+ * ~~~~~~~~~~~~~{.cpp}
+ * CPPSampleData test;
+ * // Some work
+ * C_SAMPLE_DATA* data = test;
+ * // Give "data" to Kodi
+ * ~~~~~~~~~~~~~
+ */
+template<class CPP_CLASS, typename C_STRUCT>
+class CStructHdl
+{
+public:
+  CStructHdl()
+    : m_cStructure(new C_STRUCT)
+    , m_owner(true)
+  {
+  }
+
+  CStructHdl(const CPP_CLASS& cppClass)
+    : m_cStructure(new C_STRUCT(*cppClass.m_cStructure))
+    , m_owner(true)
+  {
+  }
+
+  CStructHdl(const C_STRUCT* cStructure)
+    : m_cStructure(new C_STRUCT({*cStructure}))
+    , m_owner(true)
+  {
+  }
+
+  CStructHdl(C_STRUCT* cStructure)
+    : m_cStructure(cStructure)
+    , m_owner(false)
+  {
+    assert(cStructure);
+  }
+
+  const CPP_CLASS& operator=(const CPP_CLASS& right)
+  {
+    assert(*right.m_cStructure);
+    if (m_owner)
+      delete m_cStructure;
+    m_owner = true;
+    m_cStructure = new C_STRUCT(*right.m_cStructure);
+    return *this;
+  }
+
+  const CPP_CLASS& operator=(const C_STRUCT& right)
+  {
+    assert(*right);
+    if (m_owner)
+      delete m_cStructure;
+    m_owner = true;
+    m_cStructure = new C_STRUCT(*right);
+    return *this;
+  }
+
+  virtual ~CStructHdl()
+  {
+    if (m_owner)
+      delete m_cStructure;
+  }
+
+  operator C_STRUCT*() { return m_cStructure; }
+
+protected:
+  C_STRUCT* m_cStructure = nullptr;
+
+private:
+  bool m_owner = false;
+};
+
 /// Add-on main instance class.
 class ATTRIBUTE_HIDDEN CAddonBase
 {
@@ -278,6 +411,9 @@ public:
     CAddonBase::m_interface->toAddon->create_instance = ADDONBASE_CreateInstance;
     CAddonBase::m_interface->toAddon->destroy_instance = ADDONBASE_DestroyInstance;
     CAddonBase::m_interface->toAddon->set_setting = ADDONBASE_SetSetting;
+    // If version is present, we know that kodi has create_instance_ex implemented
+    if (!CAddonBase::m_strGlobalApiVersion.empty())
+      CAddonBase::m_interface->toAddon->create_instance_ex = ADDONBASE_CreateInstanceEx;
   }
 
   virtual ~CAddonBase() = default;
@@ -288,6 +424,59 @@ public:
 
   virtual ADDON_STATUS SetSetting(const std::string& settingName, const CSettingValue& settingValue) { return ADDON_STATUS_UNKNOWN; }
 
+  //==========================================================================
+  /// @ingroup cpp_kodi_addon_addonbase
+  /// @brief Instance created
+  ///
+  /// @param[in] instanceType   The requested type of required instance, see \ref ADDON_TYPE.
+  /// @param[in] instanceID     An individual identification key string given by Kodi.
+  /// @param[in] instance       The instance handler used by Kodi must be passed
+  ///                           to the classes created here. See in the example.
+  /// @param[out] addonInstance The pointer to instance class created in addon.
+  ///                           Needed to be able to identify them on calls.
+  /// @return                   \ref ADDON_STATUS_OK if correct, for possible errors
+  ///                           see \ref ADDON_STATUS
+  ///
+  ///
+  /// --------------------------------------------------------------------------
+  ///
+  /// **Here is a code example how this is used:**
+  ///
+  /// ~~~~~~~~~~~~~{.cpp}
+  /// #include <kodi/AddonBase.h>
+  ///
+  /// ...
+  ///
+  /// /* If you use only one instance in your add-on, can be instanceType and
+  ///  * instanceID ignored */
+  /// ADDON_STATUS CMyAddon::CreateInstance(int instanceType,
+  ///                                       std::string instanceID,
+  ///                                       KODI_HANDLE instance,
+  ///                                       KODI_HANDLE& addonInstance)
+  /// {
+  ///   if (instanceType == ADDON_INSTANCE_SCREENSAVER)
+  ///   {
+  ///     kodi::Log(ADDON_LOG_NOTICE, "Creating my Screensaver");
+  ///     addonInstance = new CMyScreensaver(instance);
+  ///     return ADDON_STATUS_OK;
+  ///   }
+  ///   else if (instanceType == ADDON_INSTANCE_VISUALIZATION)
+  ///   {
+  ///     kodi::Log(ADDON_LOG_NOTICE, "Creating my Visualization");
+  ///     addonInstance = new CMyVisualization(instance);
+  ///     return ADDON_STATUS_OK;
+  ///   }
+  ///   else if (...)
+  ///   {
+  ///     ...
+  ///   }
+  ///   return ADDON_STATUS_UNKNOWN;
+  /// }
+  ///
+  /// ...
+  ///
+  /// ~~~~~~~~~~~~~
+  ///
   virtual ADDON_STATUS CreateInstance(int instanceType, std::string instanceID, KODI_HANDLE instance, KODI_HANDLE& addonInstance)
   {
     /* The handling below is intended for the case of the add-on only one
@@ -305,9 +494,19 @@ public:
 
     return ADDON_STATUS_UNKNOWN;
   }
+  //--------------------------------------------------------------------------
+
+  virtual ADDON_STATUS CreateInstanceEx(int instanceType, std::string instanceID, KODI_HANDLE instance, KODI_HANDLE& addonInstance, const std::string &version)
+  {
+    return CreateInstance(instanceType, instanceID, instance, addonInstance);
+  }
+
+  /* Background helper for GUI render systems, e.g. Screensaver or Visualization */
+  std::shared_ptr<kodi::gui::IRenderHelper> m_renderHelper;
 
   /* Global variables of class */
   static AddonGlobalInterface* m_interface; // Interface function table to hold addresses on add-on and from kodi
+  static std::string m_strGlobalApiVersion;
 
 /*private:*/ /* Needed public as long the old call functions becomes used! */
   static inline void ADDONBASE_Destroy()
@@ -325,16 +524,21 @@ public:
 
   static inline ADDON_STATUS ADDONBASE_CreateInstance(int instanceType, const char* instanceID, KODI_HANDLE instance, KODI_HANDLE* addonInstance, KODI_HANDLE parent)
   {
+    return ADDONBASE_CreateInstanceEx(instanceType, instanceID, instance, addonInstance, parent, "");
+  }
+
+  static inline ADDON_STATUS ADDONBASE_CreateInstanceEx(int instanceType, const char* instanceID, KODI_HANDLE instance, KODI_HANDLE* addonInstance, KODI_HANDLE parent, const char* version)
+  {
     ADDON_STATUS status = ADDON_STATUS_NOT_IMPLEMENTED;
     if (parent != nullptr)
-      status = static_cast<IAddonInstance*>(parent)->CreateInstance(instanceType, instanceID, instance, *addonInstance);
+      status = static_cast<IAddonInstance*>(parent)->CreateInstanceEx(instanceType, instanceID, instance, *addonInstance, version);
     if (status == ADDON_STATUS_NOT_IMPLEMENTED)
-      status = CAddonBase::m_interface->addonBase->CreateInstance(instanceType, instanceID, instance, *addonInstance);
+      status = CAddonBase::m_interface->addonBase->CreateInstanceEx(instanceType, instanceID, instance, *addonInstance, version);
     if (*addonInstance == nullptr)
-      throw std::logic_error("kodi::addon::CAddonBase CreateInstance returns a empty instance pointer!");
+      throw std::logic_error("kodi::addon::CAddonBase CreateInstanceEx returns a empty instance pointer!");
 
     if (static_cast<::kodi::addon::IAddonInstance*>(*addonInstance)->m_type != instanceType)
-      throw std::logic_error("kodi::addon::CAddonBase CreateInstance with difference on given and returned instance type!");
+      throw std::logic_error("kodi::addon::CAddonBase CreateInstanceEx with difference on given and returned instance type!");
 
     return status;
   }
@@ -636,6 +840,11 @@ inline void* GetInterface(const std::string &name, const std::string &version)
     kodi::addon::CAddonBase::m_interface->addonBase = new AddonClass; \
     return kodi::addon::CAddonBase::m_interface->addonBase->Create(); \
   } \
+  extern "C" __declspec(dllexport) ADDON_STATUS ADDON_CreateEx(KODI_HANDLE addonInterface, const char* globalApiVersion, void *unused) \
+  { \
+    kodi::addon::CAddonBase::m_strGlobalApiVersion = globalApiVersion; \
+    return ADDON_Create(addonInterface, unused); \
+  } \
   extern "C" __declspec(dllexport) void ADDON_Destroy() \
   { \
     kodi::addon::CAddonBase::ADDONBASE_Destroy(); \
@@ -652,4 +861,10 @@ inline void* GetInterface(const std::string &name, const std::string &version)
   { \
     return kodi::addon::GetTypeVersion(type); \
   } \
-  AddonGlobalInterface* kodi::addon::CAddonBase::m_interface = nullptr;
+  extern "C" __declspec(dllexport) const char* ADDON_GetTypeMinVersion(int type) \
+  { \
+    return kodi::addon::GetTypeMinVersion(type); \
+  } \
+  AddonGlobalInterface* kodi::addon::CAddonBase::m_interface = nullptr; \
+  std::string kodi::addon::CAddonBase::m_strGlobalApiVersion;
+

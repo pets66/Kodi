@@ -7,13 +7,14 @@
  */
 
 #include "MusicInfoTagLoaderCDDA.h"
-#include "network/cddb.h"
+
 #include "MusicInfoTag.h"
+#include "ServiceBroker.h"
+#include "network/cddb.h"
 #include "profiles/ProfileManager.h"
 #include "settings/SettingsComponent.h"
 #include "storage/MediaManager.h"
 #include "utils/log.h"
-#include "ServiceBroker.h"
 
 using namespace MUSIC_INFO;
 
@@ -42,7 +43,7 @@ bool CMusicInfoTagLoaderCDDA::Load(const std::string& strFileName, CMusicInfoTag
     bool bResult = false;
 
     // Get information for the inserted disc
-    CCdInfo* pCdInfo = g_mediaManager.GetCdInfo();
+    CCdInfo* pCdInfo = CServiceBroker::GetMediaManager().GetCdInfo();
     if (pCdInfo == NULL)
       return bResult;
 

@@ -8,13 +8,14 @@
 
 #pragma once
 
+#include "IStorageProvider.h"
+#include "MediaSource.h" // for VECSOURCES
+#include "threads/CriticalSection.h"
+#include "utils/Job.h"
+
 #include <map>
 #include <vector>
 
-#include "MediaSource.h" // for VECSOURCES
-#include "utils/Job.h"
-#include "IStorageProvider.h"
-#include "threads/CriticalSection.h"
 #include "PlatformDefs.h"
 
 #define TRAY_OPEN     16
@@ -115,6 +116,3 @@ private:
   void RemoveDiscInfo(const std::string& devicePath);
   std::map<std::string, DiscInfo> m_mapDiscInfo;
 };
-
-extern class CMediaManager g_mediaManager;
-

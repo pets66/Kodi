@@ -8,9 +8,9 @@
 
 #pragma once
 
-#if !defined(__arm__) && !defined(__aarch64__)
-
 #include "settings/lib/ISettingCallback.h"
+
+#include <string>
 
 enum AppleRemoteOptions
 {
@@ -25,7 +25,7 @@ class XBMCHelper : public ISettingCallback
  public:
   static XBMCHelper& GetInstance();
 
-  virtual bool OnSettingChanging(std::shared_ptr<const CSetting> setting) override;
+  bool OnSettingChanging(std::shared_ptr<const CSetting> setting) override;
 
   void Start();
   void Stop();
@@ -70,6 +70,3 @@ private:
 
   static XBMCHelper* smp_instance;
 };
-
-#endif
-

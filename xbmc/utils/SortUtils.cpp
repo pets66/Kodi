@@ -7,13 +7,13 @@
  */
 
 #include "SortUtils.h"
+
 #include "LangInfo.h"
 #include "URL.h"
 #include "Util.h"
 #include "utils/CharsetConverter.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
-#include "utils/log.h"
 
 #include <algorithm>
 
@@ -179,6 +179,11 @@ std::string ByTrackNumber(SortAttribute attributes, const SortItem &values)
   return StringUtils::Format("%i", (int)values.at(FieldTrackNumber).asInteger());
 }
 
+std::string ByTotalDiscs(SortAttribute attributes, const SortItem& values)
+{
+  return StringUtils::Format("%d %s", static_cast<int>(values.at(FieldTotalDiscs).asInteger()),
+                             ByLabel(attributes, values));
+}
 std::string ByTime(SortAttribute attributes, const SortItem &values)
 {
   std::string label;
@@ -350,7 +355,7 @@ std::string ByVideoCodec(SortAttribute attributes, const SortItem &values)
 
 std::string ByVideoAspectRatio(SortAttribute attributes, const SortItem &values)
 {
-  return StringUtils::Format("%.03f %s", values.at(FieldVideoAspectRatio).asFloat(), ByLabel(attributes, values).c_str());
+  return StringUtils::Format("%.3f %s", values.at(FieldVideoAspectRatio).asFloat(), ByLabel(attributes, values).c_str());
 }
 
 std::string ByAudioChannels(SortAttribute attributes, const SortItem &values)
@@ -396,6 +401,11 @@ std::string ByChannel(SortAttribute attributes, const SortItem &values)
 std::string ByChannelNumber(SortAttribute attributes, const SortItem &values)
 {
   return values.at(FieldChannelNumber).asString();
+}
+
+std::string ByClientChannelOrder(SortAttribute attributes, const SortItem& values)
+{
+  return values.at(FieldClientChannelOrder).asString();
 }
 
 std::string ByDateTaken(SortAttribute attributes, const SortItem &values)
@@ -601,11 +611,13 @@ std::map<SortBy, SortUtils::SortPreparator> fillPreparators()
   preparators[SortByRandom]                   = ByRandom;
   preparators[SortByChannel]                  = ByChannel;
   preparators[SortByChannelNumber]            = ByChannelNumber;
+  preparators[SortByClientChannelOrder]       = ByClientChannelOrder;
   preparators[SortByDateTaken]                = ByDateTaken;
   preparators[SortByRelevance]                = ByRelevance;
   preparators[SortByInstallDate]              = ByInstallDate;
   preparators[SortByLastUpdated]              = ByLastUpdated;
   preparators[SortByLastUsed]                 = ByLastUsed;
+  preparators[SortByTotalDiscs] = ByTotalDiscs;
 
   return preparators;
 }
@@ -686,11 +698,13 @@ std::map<SortBy, Fields> fillSortingFields()
   sortingFields[SortByBitrate].insert(FieldBitrate);
   sortingFields[SortByChannel].insert(FieldChannelName);
   sortingFields[SortByChannelNumber].insert(FieldChannelNumber);
+  sortingFields[SortByClientChannelOrder].insert(FieldClientChannelOrder);
   sortingFields[SortByDateTaken].insert(FieldDateTaken);
   sortingFields[SortByRelevance].insert(FieldRelevance);
   sortingFields[SortByInstallDate].insert(FieldInstallDate);
   sortingFields[SortByLastUpdated].insert(FieldLastUpdated);
   sortingFields[SortByLastUsed].insert(FieldLastUsed);
+  sortingFields[SortByTotalDiscs].insert(FieldTotalDiscs);
   sortingFields.insert(std::pair<SortBy, Fields>(SortByRandom, Fields()));
 
   return sortingFields;
@@ -720,18 +734,7 @@ void SortUtils::Sort(SortBy sortBy, SortOrder sortOrder, SortAttribute attribute
         }
 
         std::wstring sortLabel;
-#ifdef TARGET_ANDROID
-        // Android does not support locale; Translate to ASCII
-        std::string dest;
-        g_charsetConverter.utf8ToASCII(preparator(attributes, *item), dest);
-        for (char c : dest)
-        {
-          if (::isalnum(c) || c == ' ')
-            sortLabel.push_back(c);
-        }
-#else
         g_charsetConverter.utf8ToW(preparator(attributes, *item), sortLabel, false);
-#endif
         item->insert(std::pair<Field, CVariant>(FieldSort, CVariant(sortLabel)));
       }
 
@@ -770,18 +773,7 @@ void SortUtils::Sort(SortBy sortBy, SortOrder sortOrder, SortAttribute attribute
         }
 
         std::wstring sortLabel;
-#ifdef TARGET_ANDROID
-        // Android does not support locale; Translate to ASCII
-        std::string dest;
-        g_charsetConverter.utf8ToASCII(preparator(attributes, **item), dest);
-        for (char c : dest)
-        {
-          if (::isalnum(c) || c == ' ')
-            sortLabel.push_back(c);
-        }
-#else
         g_charsetConverter.utf8ToW(preparator(attributes, **item), sortLabel, false);
-#endif
         (*item)->insert(std::pair<Field, CVariant>(FieldSort, CVariant(sortLabel)));
       }
 
@@ -927,8 +919,11 @@ const sort_map table[] = {
   { SortByListeners,                SORT_METHOD_LISTENERS,                    SortAttributeNone,          20455 },
   { SortByChannel,                  SORT_METHOD_CHANNEL,                      SortAttributeNone,          19029 },
   { SortByChannel,                  SORT_METHOD_CHANNEL_NUMBER,               SortAttributeNone,          549 },
+  { SortByChannel,                  SORT_METHOD_CLIENT_CHANNEL_ORDER,         SortAttributeNone,          19315 },
   { SortByDateTaken,                SORT_METHOD_DATE_TAKEN,                   SortAttributeIgnoreFolders, 577 },
   { SortByNone,                     SORT_METHOD_NONE,                         SortAttributeNone,          16018 },
+  { SortByTotalDiscs, SORT_METHOD_TOTAL_DISCS, SortAttributeNone, 38077 },
+
   // the following have no corresponding SORT_METHOD_*
   { SortByAlbumType,                SORT_METHOD_NONE,                         SortAttributeNone,          564 },
   { SortByVotes,                    SORT_METHOD_NONE,                         SortAttributeNone,          205 },
@@ -1071,11 +1066,13 @@ const std::map<std::string, SortBy> sortMethods = {
   { "random",           SortByRandom },
   { "channel",          SortByChannel },
   { "channelnumber",    SortByChannelNumber },
+  { "clientchannelorder", SortByClientChannelOrder },
   { "datetaken",        SortByDateTaken },
   { "userrating",       SortByUserRating },
   { "installdate",      SortByInstallDate },
   { "lastupdated",      SortByLastUpdated },
   { "lastused",         SortByLastUsed },
+  { "totaldiscs",       SortByTotalDiscs },
 };
 
 SortBy SortUtils::SortMethodFromString(const std::string& sortMethod)

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "guilib/GUILabelControl.h"
 #include "guilib/GUIImage.h"
+#include "guilib/GUILabelControl.h"
 
 #include <string>
 
@@ -22,7 +22,7 @@ namespace GAME
   public:
     CGUIFeatureGroupTitle(const CGUILabelControl& groupTitleTemplate, const std::string& groupName, unsigned int buttonIndex);
 
-    virtual ~CGUIFeatureGroupTitle() = default;
+    ~CGUIFeatureGroupTitle() override = default;
   };
 
   class CGUIFeatureSeparator : public CGUIImage
@@ -30,7 +30,7 @@ namespace GAME
   public:
     CGUIFeatureSeparator(const CGUIImage& separatorTemplate, unsigned int buttonIndex);
 
-    virtual ~CGUIFeatureSeparator() = default;
+    ~CGUIFeatureSeparator() override = default;
   };
 }
 }
